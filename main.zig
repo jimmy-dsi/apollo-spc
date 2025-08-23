@@ -1,0 +1,172 @@
+const std = @import("std");
+
+const db = @import("debug.zig");
+
+const Emu  = @import("emu.zig").Emu;
+const SDSP = @import("s_dsp.zig").SDSP;
+const SSMP = @import("s_smp.zig").SSMP;
+
+pub fn main() !void {
+    Emu.static_init();
+
+    var emu = Emu.new();
+    emu.init(
+        SDSP.new(&emu),
+        SSMP.new(&emu, .{})
+    );
+
+    std.debug.print("Mode commands: \n", .{});
+    std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
+    std.debug.print("   v = Memory viewer \n", .{});
+    std.debug.print("Action commands: \n", .{});
+    std.debug.print("   s = Step instruction [default] \n", .{});
+    std.debug.print("   p = View previous page \n", .{});
+    std.debug.print("   n = View next page \n", .{});
+    std.debug.print("   u = Shift memory view up one row \n", .{});
+    std.debug.print("   d = Shift memory view down one row \n", .{});
+    std.debug.print("\n", .{});
+    std.debug.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
+    std.debug.print("\n", .{});
+
+    const stdin = std.io.getStdIn().reader();
+    var buffer: [8]u8 = undefined;
+
+    emu.s_smp.enable_access_logs = true;
+    emu.s_smp.enable_timer_logs = true;
+    emu.s_smp.clear_access_logs();
+    emu.s_smp.clear_timer_logs();
+    emu.step();
+    emu.step();
+
+    var cur_page: u8 = 0x00;
+    var cur_offset: u8 = 0x00;
+    var cur_mode: u8 = 'i';
+    var cur_action: u8 = 's';
+
+    while (true) {
+        _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+        std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+        //std.debug.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+
+        const last_pc = emu.s_smp.spc.pc();
+        const prev_state = emu.s_smp.state;
+
+        sw: switch (std.ascii.toLower(buffer[0])) {
+            'n' => {
+                cur_action = 'n';
+                cur_page +%= 1;
+                if (cur_mode == 'v') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                }
+            },
+            'p' => {
+                cur_action = 'p';
+                cur_page -%= 1;
+                if (cur_mode == 'v') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                }
+            },
+            'd' => {
+                cur_action = 'd';
+                if (cur_offset > 0xEF) {
+                    cur_page +%= 1;
+                }
+                cur_offset +%= 0x10;
+                if (cur_mode == 'v') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                }
+            },
+            'u' => {
+                cur_action = 'u';
+                if (cur_offset < 0x10) {
+                    cur_page -%= 1;
+                }
+                cur_offset -%= 0x10;
+                if (cur_mode == 'v') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                }
+            },
+            'i' => {
+                cur_mode = 'i';
+                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+            },
+            'v' => {
+                cur_mode = 'v';
+                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_memory_page(&emu, cur_page, cur_offset, .{});
+            },
+            's' => {
+                cur_action = 's';
+                // Default behavior: Step instruction
+
+                if (cur_mode == 'i') {
+                    db.print_pc(&emu);
+                    std.debug.print(" |  ", .{});
+                    db.print_opcode(&emu);
+                    std.debug.print("  ", .{});
+                }
+
+                emu.step_instruction();
+
+                const all_logs = emu.s_smp.get_access_logs(.{.exclude_at_end = 1});
+                var logs = db.filter_access_logs(all_logs);
+
+                emu.s_smp.clear_access_logs();
+
+                if (cur_mode == 'i') {
+                    db.print_logs(&prev_state, logs[0..]) catch {
+                        std.debug.print("                                                ", .{});
+                    };
+
+                    db.print_spc_state(&emu);
+                    std.debug.print(" | ", .{});
+                    db.print_dsp_cycle(&emu);
+                    std.debug.print("\n", .{});
+
+                    // Print timer logs after instruction log
+                    const all_timer_logs = emu.s_smp.get_timer_logs(.{});
+                    const timer_logs = db.filter_timer_logs(all_timer_logs);
+
+                    emu.s_smp.clear_timer_logs();
+
+                    for (timer_logs) |log| {
+                        if (log == null) {
+                            break;
+                        }
+                        std.debug.print("\x1B[32m", .{});
+                        db.print_timer_log(&log.?, .{.prefix =true });
+                        std.debug.print("\x1B[39m\n", .{});
+                    }
+                }
+                else if (cur_mode == 'v') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                }
+            },
+            else => {
+                continue :sw cur_action;
+            }
+        }
+        std.debug.print("Current DSP cycle: {d}\n", .{emu.s_dsp.last_processed_cycle});
+
+        //std.debug.print("\n", .{});
+    }
+
+    emu.event_loop();
+
+    //std.debug.print("Hello, {d}!\n", .{emu.s_smp.?.boot_rom.len});
+//
+    //for (emu.s_smp.?.boot_rom) |item| {
+    //    std.debug.print("{X:0>2}\n", .{item});
+    //}
+//
+    //std.debug.print("Hello, {d}!\n", .{SDSP.gauss_table.len});
+//
+    //for (SDSP.gauss_table) |item| {
+    //    std.debug.print("{X:0>4}\n", .{item});
+    //}
+}

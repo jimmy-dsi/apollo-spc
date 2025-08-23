@@ -1,0 +1,6 @@
+zig-out/
+data/*
+!data/bootrom.bin
+!data/gauss.bin
+apollo
+*.o
