@@ -306,8 +306,168 @@ pub fn print_opcode(emu: *Emu) void {
         0x39 => {
             std.debug.print("and (x), (y)    ", .{});
         },
+        0x3A => {
+            operand_count = 1;
+            std.debug.print("incw ${X:0>2}        ", .{operand_1});
+        },
+        0x3B => {
+            operand_count = 1;
+            std.debug.print("rol ${X:0>2}+x       ", .{operand_1});
+        },
+        0x3C => {
+            std.debug.print("rol a           ", .{});
+        },
+        0x3D => {
+            std.debug.print("inc x           ", .{});
+        },
+        0x3E => {
+            operand_count = 1;
+            std.debug.print("cmp x, ${X:0>2}      ", .{operand_1});
+        },
+        0x3F => {
+            operand_count = 2;
+            std.debug.print("call ${X:0>4}      ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x40 => {
+            std.debug.print("setp            ", .{});
+        },
+        0x41 => {
+            std.debug.print("tcall 4         ", .{});
+        },
+        0x42 => {
+            operand_count = 1;
+            std.debug.print("set1 ${X:0>2}.2      ", .{operand_1});
+        },
+        0x43 => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("bbs ${X:0>2}.2, ${X:0>4}", .{operand_1, target_address});
+        },
+        0x44 => {
+            operand_count = 1;
+            std.debug.print("eor a, ${X:0>2}      ", .{operand_1});
+        },
+        0x45 => {
+            operand_count = 2;
+            std.debug.print("eor a, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x46 => {
+            std.debug.print("eor a, (x)      ", .{});
+        },
+        0x47 => {
+            operand_count = 1;
+            std.debug.print("eor a, [${X:0>2}+x]  ", .{operand_1});
+        },
+        0x48 => {
+            operand_count = 1;
+            std.debug.print("eor a, #${X:0>2}     ", .{operand_1});
+        },
+        0x49 => {
+            operand_count = 2;
+            std.debug.print("eor ${X:0>2}, ${X:0>2}    ", .{operand_2, operand_1});
+        },
+        0x4A => {
+            operand_count = 2;
+            const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
+            std.debug.print("and1 c, ${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
+        },
+        0x4B => {
+            operand_count = 1;
+            std.debug.print("lsr ${X:0>2}         ", .{operand_1});
+        },
+        0x4C => {
+            operand_count = 2;
+            const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
+            std.debug.print("lsr ${X:0>4}       ", .{addr});
+        },
+        0x4D => {
+            std.debug.print("push x          ", .{});
+        },
+        0x4E => {
+            operand_count = 2;
+            const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
+            std.debug.print("tclr1 ${X:0>4}     ", .{addr});
+        },
+        0x4F => {
+            operand_count = 1;
+            std.debug.print("pcall ${X:0>2}       ", .{operand_1});
+        },
+        0x50 => {
+            operand_count = 1;
+            const offset: i8 = @bitCast(operand_1);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 2;
+            std.debug.print("bvc ${X:0>4}       ", .{target_address});
+        },
+        0x51 => {
+            std.debug.print("tcall 5         ", .{});
+        },
+        0x52 => {
+            operand_count = 1;
+            std.debug.print("clr1 ${X:0>2}.2      ", .{operand_1});
+        },
+        0x53 => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("bbc ${X:0>2}.2, ${X:0>4}", .{operand_1, target_address});
+        },
+        0x54 => {
+            operand_count = 1;
+            std.debug.print("eor a, ${X:0>2}+x    ", .{operand_1});
+        },
+        0x55 => {
+            operand_count = 2;
+            std.debug.print("eor a, ${X:0>4}+x  ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x56 => {
+            operand_count = 2;
+            std.debug.print("eor a, ${X:0>4}+y  ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x57 => {
+            operand_count = 1;
+            std.debug.print("eor a, [${X:0>2}]+y  ", .{operand_1});
+        },
+        0x58 => {
+            operand_count = 2;
+            std.debug.print("eor ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+        },
+        0x59 => {
+            std.debug.print("eor (x), (y)    ", .{});
+        },
+        0x5A => {
+            operand_count = 1;
+            std.debug.print("cmpw ya, ${X:0>2}    ", .{operand_1});
+        },
+        0x5B => {
+            operand_count = 1;
+            std.debug.print("lsr ${X:0>2}+x       ", .{operand_1});
+        },
+        0x5C => {
+            std.debug.print("lsr a           ", .{});
+        },
+        0x5D => {
+            std.debug.print("mov x, a        ", .{});
+        },
+        0x5E => {
+            operand_count = 2;
+            std.debug.print("cmp y, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x5F => {
+            operand_count = 2;
+            std.debug.print("jmp ${X:0>4}       ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x60 => {
+            std.debug.print("clrc            ", .{});
+        },
         else => {
-            std.debug.print("and (x), (y)    ", .{});
+            std.debug.print("clrc            ", .{});
         }
     }
 

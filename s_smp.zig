@@ -337,7 +337,7 @@ pub const SSMP = struct {
     }
 
     inline fn run_next_instr(self: *SSMP) !void {
-        @setEvalBranchQuota(3000);
+        @setEvalBranchQuota(5000);
 
         const substate = self.co.substate();
 
@@ -369,65 +369,104 @@ pub const SSMP = struct {
         const opcode = self.last_opcode;
         
         switch (opcode) {
-            0x00 => { try self.spc.nop(substate_offset);                                         }, // nop
-            0x01 => { try self.spc.tcall(substate_offset, 0);                                    }, // tcall 0
-            0x02 => { try self.spc.set1(substate_offset, 0);                                     }, // set1 dp.0
-            0x03 => { try self.spc.branch_bit(substate_offset, 0, 1);                            }, // bbs dp.0, r
-            0x04 => { try self.spc.alu_a_with_d(substate_offset, SPC.AluOp.bitor);               }, // or a, dp
-            0x05 => { try self.spc.alu_a_with_abs(substate_offset, SPC.AluOp.bitor);             }, // or a, addr
-            0x06 => { try self.spc.alu_a_with_x_ind(substate_offset, SPC.AluOp.bitor);           }, // or a, (x)
-            0x07 => { try self.spc.alu_a_with_d_x_ind(substate_offset, SPC.AluOp.bitor);         }, // or a, [dp+x]
-            0x08 => { try self.spc.alu_a_with_imm(substate_offset, SPC.AluOp.bitor);             }, // or a, #im
-            0x09 => { try self.spc.alu_d_with_d(substate_offset, SPC.AluOp.bitor);               }, // or dp, dp
-            0x0A => { try self.spc.alu_c_with_mem_1bit(substate_offset, SPC.AluOp.bitor, false); }, // or1 c, mem.b
-            0x0B => { try self.spc.alu_modify_d(substate_offset, SPC.AluModifyOp.asl);           }, // asl dp
-            0x0C => { try self.spc.alu_modify_abs(substate_offset, SPC.AluModifyOp.asl);         }, // asl addr
-            0x0D => { try self.spc.push_reg(substate_offset, &self.spc.state.psw);               }, // push psw
-            0x0E => { try self.spc.tset1(substate_offset);                                       }, // tset1 addr
-            0x0F => { try self.spc.brk(substate_offset);                                         }, // brk
-            0x10 => { try self.spc.branch(substate_offset, self.spc.n() == 0);                   }, // bpl r
-            0x11 => { try self.spc.tcall(substate_offset, 1);                                    }, // tcall 1
-            0x12 => { try self.spc.clr1(substate_offset, 0);                                     }, // clr1 dp.0
-            0x13 => { try self.spc.branch_bit(substate_offset, 0, 0);                            }, // bbc dp.0, r
-            0x14 => { try self.spc.alu_a_with_d_x(substate_offset, SPC.AluOp.bitor);             }, // or a, dp+x
-            0x15 => { try self.spc.alu_a_with_abs_x(substate_offset, SPC.AluOp.bitor);           }, // or a, addr+x
-            0x16 => { try self.spc.alu_a_with_abs_y(substate_offset, SPC.AluOp.bitor);           }, // or a, addr+y
-            0x17 => { try self.spc.alu_a_with_d_ind_y(substate_offset, SPC.AluOp.bitor);         }, // or a, [dp]+y
-            0x18 => { try self.spc.alu_d_with_imm(substate_offset, SPC.AluOp.bitor);             }, // or dp, #im
-            0x19 => { try self.spc.alu_x_ind_with_y_ind(substate_offset, SPC.AluOp.bitor);       }, // or (x), (y)
-            0x1A => { try self.spc.decw_d(substate_offset);                                      }, // decw dp
-            0x1B => { try self.spc.alu_modify_d_x(substate_offset, SPC.AluModifyOp.asl);         }, // asl dp+x
-            0x1C => { try self.spc.alu_modify_a(substate_offset, SPC.AluModifyOp.asl);           }, // asl a
-            0x1D => { try self.spc.alu_modify_x(substate_offset, SPC.AluModifyOp.dec);           }, // dec x
-            0x1E => { try self.spc.alu_x_with_abs(substate_offset, SPC.AluOp.cmp);               }, // cmp x, addr
-            0x1F => { try self.spc.jmp_abs_x_ind(substate_offset);                               }, // jmp [addr+x]
-            0x20 => { try self.spc.clrp(substate_offset);                                        }, // clrp
-            0x21 => { try self.spc.tcall(substate_offset, 2);                                    }, // tcall 2
-            0x22 => { try self.spc.set1(substate_offset, 1);                                     }, // set1 dp.1
-            0x23 => { try self.spc.branch_bit(substate_offset, 1, 1);                            }, // bbs dp.1, r
-            0x24 => { try self.spc.alu_a_with_d(substate_offset, SPC.AluOp.bitand);              }, // and a, dp
-            0x25 => { try self.spc.alu_a_with_abs(substate_offset, SPC.AluOp.bitand);            }, // and a, addr
-            0x26 => { try self.spc.alu_a_with_x_ind(substate_offset, SPC.AluOp.bitand);          }, // and a, (x)
-            0x27 => { try self.spc.alu_a_with_d_x_ind(substate_offset, SPC.AluOp.bitand);        }, // and a, [dp+x]
-            0x28 => { try self.spc.alu_a_with_imm(substate_offset, SPC.AluOp.bitand);            }, // and a, #im
-            0x29 => { try self.spc.alu_d_with_d(substate_offset, SPC.AluOp.bitand);              }, // or dp, dp
-            0x2A => { try self.spc.alu_c_with_mem_1bit(substate_offset, SPC.AluOp.bitor, true);  }, // or1 c, /mem.b
-            0x2B => { try self.spc.alu_modify_d(substate_offset, SPC.AluModifyOp.rol);           }, // rol dp
-            0x2C => { try self.spc.alu_modify_abs(substate_offset, SPC.AluModifyOp.rol);         }, // rol addr
-            0x2D => { try self.spc.push_reg(substate_offset, &self.spc.state.a);                 }, // push a
-            0x2E => { try self.spc.cbne_d(substate_offset);                                      }, // cbne dp, r
-            0x2F => { try self.spc.branch(substate_offset, true);                                }, // bra r
-            0x30 => { try self.spc.branch(substate_offset, self.spc.n() != 0);                   }, // bmi r
-            0x31 => { try self.spc.tcall(substate_offset, 3);                                    }, // tcall 3
-            0x32 => { try self.spc.clr1(substate_offset, 1);                                     }, // clr1 dp.1
-            0x33 => { try self.spc.branch_bit(substate_offset, 1, 0);                            }, // bbc dp.1, r
-            0x34 => { try self.spc.alu_a_with_d_x(substate_offset, SPC.AluOp.bitand);            }, // and a, dp+x
-            0x35 => { try self.spc.alu_a_with_abs_x(substate_offset, SPC.AluOp.bitand);          }, // and a, addr+x
-            0x36 => { try self.spc.alu_a_with_abs_y(substate_offset, SPC.AluOp.bitand);          }, // and a, addr+y
-            0x37 => { try self.spc.alu_a_with_d_ind_y(substate_offset, SPC.AluOp.bitand);        }, // and a, [dp]+y
-            0x38 => { try self.spc.alu_d_with_imm(substate_offset, SPC.AluOp.bitand);            }, // and dp, #im
-            0x39 => { try self.spc.alu_x_ind_with_y_ind(substate_offset, SPC.AluOp.bitand);      }, // and (x), (y)
-            else => { try self.spc.alu_x_ind_with_y_ind(substate_offset, SPC.AluOp.bitand);      },
+            0x00 => { try self.spc.nop(substate_offset);                                               }, // nop
+            0x01 => { try self.spc.tcall(substate_offset, 0);                                          }, // tcall 0
+            0x02 => { try self.spc.set1(substate_offset, 0);                                           }, // set1 dp.0
+            0x03 => { try self.spc.branch_bit(substate_offset, 0, 1);                                  }, // bbs dp.0, r
+            0x04 => { try self.spc.alu_a_with_d(substate_offset, SPC.AluOp.bitor);                     }, // or a, dp
+            0x05 => { try self.spc.alu_a_with_abs(substate_offset, SPC.AluOp.bitor);                   }, // or a, addr
+            0x06 => { try self.spc.alu_a_with_x_ind(substate_offset, SPC.AluOp.bitor);                 }, // or a, (x)
+            0x07 => { try self.spc.alu_a_with_d_x_ind(substate_offset, SPC.AluOp.bitor);               }, // or a, [dp+x]
+            0x08 => { try self.spc.alu_a_with_imm(substate_offset, SPC.AluOp.bitor);                   }, // or a, #im
+            0x09 => { try self.spc.alu_d_with_d(substate_offset, SPC.AluOp.bitor);                     }, // or dp, dp
+            0x0A => { try self.spc.alu_c_with_mem_1bit(substate_offset, SPC.AluOp.bitor, false);       }, // or1 c, mem.b
+            0x0B => { try self.spc.alu_modify_d(substate_offset, SPC.AluModifyOp.asl);                 }, // asl dp
+            0x0C => { try self.spc.alu_modify_abs(substate_offset, SPC.AluModifyOp.asl);               }, // asl addr
+            0x0D => { try self.spc.push_reg(substate_offset, &self.spc.state.psw);                     }, // push psw
+            0x0E => { try self.spc.tset1(substate_offset);                                             }, // tset1 addr
+            0x0F => { try self.spc.brk(substate_offset);                                               }, // brk
+            0x10 => { try self.spc.branch(substate_offset, self.spc.n() == 0);                         }, // bpl r
+            0x11 => { try self.spc.tcall(substate_offset, 1);                                          }, // tcall 1
+            0x12 => { try self.spc.clr1(substate_offset, 0);                                           }, // clr1 dp.0
+            0x13 => { try self.spc.branch_bit(substate_offset, 0, 0);                                  }, // bbc dp.0, r
+            0x14 => { try self.spc.alu_a_with_d_x(substate_offset, SPC.AluOp.bitor);                   }, // or a, dp+x
+            0x15 => { try self.spc.alu_a_with_abs_x(substate_offset, SPC.AluOp.bitor);                 }, // or a, addr+x
+            0x16 => { try self.spc.alu_a_with_abs_y(substate_offset, SPC.AluOp.bitor);                 }, // or a, addr+y
+            0x17 => { try self.spc.alu_a_with_d_ind_y(substate_offset, SPC.AluOp.bitor);               }, // or a, [dp]+y
+            0x18 => { try self.spc.alu_d_with_imm(substate_offset, SPC.AluOp.bitor);                   }, // or dp, #im
+            0x19 => { try self.spc.alu_x_ind_with_y_ind(substate_offset, SPC.AluOp.bitor);             }, // or (x), (y)
+            0x1A => { try self.spc.decw_d(substate_offset);                                            }, // decw dp
+            0x1B => { try self.spc.alu_modify_d_x(substate_offset, SPC.AluModifyOp.asl);               }, // asl dp+x
+            0x1C => { try self.spc.alu_modify_a(substate_offset, SPC.AluModifyOp.asl);                 }, // asl a
+            0x1D => { try self.spc.alu_modify_x(substate_offset, SPC.AluModifyOp.dec);                 }, // dec x
+            0x1E => { try self.spc.alu_x_with_abs(substate_offset, SPC.AluOp.cmp);                     }, // cmp x, addr
+            0x1F => { try self.spc.jmp_abs_x_ind(substate_offset);                                     }, // jmp [addr+x]
+            0x20 => { try self.spc.clrp(substate_offset);                                              }, // clrp
+            0x21 => { try self.spc.tcall(substate_offset, 2);                                          }, // tcall 2
+            0x22 => { try self.spc.set1(substate_offset, 1);                                           }, // set1 dp.1
+            0x23 => { try self.spc.branch_bit(substate_offset, 1, 1);                                  }, // bbs dp.1, r
+            0x24 => { try self.spc.alu_a_with_d(substate_offset, SPC.AluOp.bitand);                    }, // and a, dp
+            0x25 => { try self.spc.alu_a_with_abs(substate_offset, SPC.AluOp.bitand);                  }, // and a, addr
+            0x26 => { try self.spc.alu_a_with_x_ind(substate_offset, SPC.AluOp.bitand);                }, // and a, (x)
+            0x27 => { try self.spc.alu_a_with_d_x_ind(substate_offset, SPC.AluOp.bitand);              }, // and a, [dp+x]
+            0x28 => { try self.spc.alu_a_with_imm(substate_offset, SPC.AluOp.bitand);                  }, // and a, #im
+            0x29 => { try self.spc.alu_d_with_d(substate_offset, SPC.AluOp.bitand);                    }, // and dp, dp
+            0x2A => { try self.spc.alu_c_with_mem_1bit(substate_offset, SPC.AluOp.bitor, true);        }, // or1 c, /mem.b
+            0x2B => { try self.spc.alu_modify_d(substate_offset, SPC.AluModifyOp.rol);                 }, // rol dp
+            0x2C => { try self.spc.alu_modify_abs(substate_offset, SPC.AluModifyOp.rol);               }, // rol addr
+            0x2D => { try self.spc.push_reg(substate_offset, &self.spc.state.a);                       }, // push a
+            0x2E => { try self.spc.cbne_d(substate_offset);                                            }, // cbne dp, r
+            0x2F => { try self.spc.branch(substate_offset, true);                                      }, // bra r
+            0x30 => { try self.spc.branch(substate_offset, self.spc.n() != 0);                         }, // bmi r
+            0x31 => { try self.spc.tcall(substate_offset, 3);                                          }, // tcall 3
+            0x32 => { try self.spc.clr1(substate_offset, 1);                                           }, // clr1 dp.1
+            0x33 => { try self.spc.branch_bit(substate_offset, 1, 0);                                  }, // bbc dp.1, r
+            0x34 => { try self.spc.alu_a_with_d_x(substate_offset, SPC.AluOp.bitand);                  }, // and a, dp+x
+            0x35 => { try self.spc.alu_a_with_abs_x(substate_offset, SPC.AluOp.bitand);                }, // and a, addr+x
+            0x36 => { try self.spc.alu_a_with_abs_y(substate_offset, SPC.AluOp.bitand);                }, // and a, addr+y
+            0x37 => { try self.spc.alu_a_with_d_ind_y(substate_offset, SPC.AluOp.bitand);              }, // and a, [dp]+y
+            0x38 => { try self.spc.alu_d_with_imm(substate_offset, SPC.AluOp.bitand);                  }, // and dp, #im
+            0x39 => { try self.spc.alu_x_ind_with_y_ind(substate_offset, SPC.AluOp.bitand);            }, // and (x), (y)
+            0x3A => { try self.spc.incw_d(substate_offset);                                            }, // incw dp
+            0x3B => { try self.spc.alu_modify_d_x(substate_offset, SPC.AluModifyOp.rol);               }, // rol dp+x
+            0x3C => { try self.spc.alu_modify_a(substate_offset, SPC.AluModifyOp.rol);                 }, // rol a
+            0x3D => { try self.spc.alu_modify_x(substate_offset, SPC.AluModifyOp.inc);                 }, // inc x
+            0x3E => { try self.spc.alu_x_with_d(substate_offset, SPC.AluOp.cmp);                       }, // cmp x, dp
+            0x3F => { try self.spc.call(substate_offset);                                              }, // call addr
+            0x40 => { try self.spc.setp(substate_offset);                                              }, // setp
+            0x41 => { try self.spc.tcall(substate_offset, 4);                                          }, // tcall 4
+            0x42 => { try self.spc.set1(substate_offset, 2);                                           }, // set1 dp.2
+            0x43 => { try self.spc.branch_bit(substate_offset, 2, 1);                                  }, // bbs dp.2, r
+            0x44 => { try self.spc.alu_a_with_d(substate_offset, SPC.AluOp.bitxor);                    }, // eor a, dp
+            0x45 => { try self.spc.alu_a_with_abs(substate_offset, SPC.AluOp.bitxor);                  }, // eor a, addr
+            0x46 => { try self.spc.alu_a_with_x_ind(substate_offset, SPC.AluOp.bitxor);                }, // eor a, (x)
+            0x47 => { try self.spc.alu_a_with_d_x_ind(substate_offset, SPC.AluOp.bitxor);              }, // eor a, [dp+x]
+            0x48 => { try self.spc.alu_a_with_imm(substate_offset, SPC.AluOp.bitxor);                  }, // eor a, #im
+            0x49 => { try self.spc.alu_d_with_d(substate_offset, SPC.AluOp.bitxor);                    }, // eor dp, dp
+            0x4A => { try self.spc.alu_c_with_mem_1bit(substate_offset, SPC.AluOp.bitand, false);      }, // and1 c, mem.b
+            0x4B => { try self.spc.alu_modify_d(substate_offset, SPC.AluModifyOp.lsr);                 }, // lsr dp
+            0x4C => { try self.spc.alu_modify_abs(substate_offset, SPC.AluModifyOp.lsr);               }, // lsr addr
+            0x4D => { try self.spc.push_reg(substate_offset, &self.spc.state.x);                       }, // push x
+            0x4E => { try self.spc.tclr1(substate_offset);                                             }, // tclr1 addr
+            0x4F => { try self.spc.pcall(substate_offset);                                             }, // pcall up
+            0x50 => { try self.spc.branch(substate_offset, self.spc.v() == 0);                         }, // bvc r
+            0x51 => { try self.spc.tcall(substate_offset, 5);                                          }, // tcall 5
+            0x52 => { try self.spc.clr1(substate_offset, 2);                                           }, // clr1 dp.2
+            0x53 => { try self.spc.branch_bit(substate_offset, 2, 0);                                  }, // bbc dp.2, r
+            0x54 => { try self.spc.alu_a_with_d_x(substate_offset, SPC.AluOp.bitxor);                  }, // eor a, dp+x
+            0x55 => { try self.spc.alu_a_with_abs_x(substate_offset, SPC.AluOp.bitxor);                }, // eor a, addr+x
+            0x56 => { try self.spc.alu_a_with_abs_y(substate_offset, SPC.AluOp.bitxor);                }, // eor a, addr+y
+            0x57 => { try self.spc.alu_a_with_d_ind_y(substate_offset, SPC.AluOp.bitxor);              }, // eor a, [dp]+y
+            0x58 => { try self.spc.alu_d_with_imm(substate_offset, SPC.AluOp.bitxor);                  }, // eor dp, #im
+            0x59 => { try self.spc.alu_x_ind_with_y_ind(substate_offset, SPC.AluOp.bitxor);            }, // eor (x), (y)
+            0x5A => { try self.spc.cmpw(substate_offset);                                              }, // cmpw ya, dp
+            0x5B => { try self.spc.alu_modify_d_x(substate_offset, SPC.AluModifyOp.lsr);               }, // lsr dp+x
+            0x5C => { try self.spc.alu_modify_a(substate_offset, SPC.AluModifyOp.lsr);                 }, // lsr a
+            0x5D => { try self.spc.mov_reg_reg(substate_offset, &self.spc.state.x, &self.spc.state.a); }, // mov x, a
+            0x5E => { try self.spc.alu_y_with_abs(substate_offset, SPC.AluOp.cmp);                     }, // cmp y, addr
+            0x5F => { try self.spc.jmp_abs(substate_offset);                                           }, // jmp addr
+            0x60 => { try self.spc.clrc(substate_offset);                                              }, // clrc
+            else => { try self.spc.clrc(substate_offset);                                              },
         }
     }
 
