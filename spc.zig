@@ -226,7 +226,26 @@ pub const SPC = struct {
 
             },
             AluOp.add => {
+                const carry = self.c();
+                const res: i16 = @as(i16, lhs.*) +% @as(i16, rhs) +% @as(i16, carry);
 
+                self.state.set_c(@intFromBool(res >= 0x100));
+
+                const res_u16: u16 = @bitCast(res);
+                const res_u8:  u8  = @intCast(res_u16 & 0xFF);
+
+                const sign_l = lhs.* >> 7;
+                const sign_r = rhs   >> 7;
+                const sign_v = @intFromBool(res < 0);
+
+                self.state.set_z(@intFromBool(res_u8 == 0));
+                self.state.set_n(@intFromBool(res_u8 & 0x80 != 0));
+                self.state.set_h(@intFromBool((lhs.* ^ rhs ^ res_u8) & 0x10 != 0));
+
+                // Overflow bit is triggered if the two inputs have the same sign but get the result is the opposite sign
+                self.state.set_v(@intFromBool(sign_l == sign_r and sign_v != sign_l));
+
+                lhs.* = res_u8;
             },
             AluOp.sub => {
 
@@ -315,7 +334,11 @@ pub const SPC = struct {
                 self.state.set_n(@intFromBool(value.* & 0x80 != 0));
             },
             AluModifyOp.ror => {
-                
+                const prev_carry = self.c();
+                self.state.set_c(@intCast(value.* & 0x01));
+                value.* = value.* >> 1 | @as(u8, prev_carry) << 7;
+                self.state.set_z(@intFromBool(value.* == 0));
+                self.state.set_n(@intFromBool(value.* & 0x80 != 0));
             },
             else => unreachable
         }
@@ -327,7 +350,18 @@ pub const SPC = struct {
 
             },
             AluWordOp.addw => {
+                var   lhs_lo: u8 = @intCast(lhs & 0xFF);
+                var   lhs_hi: u8 = @intCast(lhs >>   8);
+                const rhs_lo: u8 = @intCast(rhs & 0xFF);
+                const rhs_hi: u8 = @intCast(rhs >>   8);
 
+                self.state.set_c(0); // Clear carry before addition
+                self.do_alu_op(&lhs_lo, rhs_lo, AluOp.add);
+                self.do_alu_op(&lhs_hi, rhs_hi, AluOp.add);
+
+                const res: u16 = @as(u16, lhs_lo) | @as(u16, lhs_hi) << 8;
+                self.state.set_z(@intFromBool(res == 0));
+                return res;
             },
             AluWordOp.subw => {
 
@@ -986,8 +1020,7 @@ pub const SPC = struct {
             2     => {  address.* = self.last_read_byte(); continue :sw 3;       }, // Start of DP word read (2)
             3...5 => {  try self.read_dp_word(address.*, substate - 2);          },
             6     => {  data.* = self.last_read_word();                             // Perform ALU operation - End
-                        const res = self.do_alu_word_op(self.ya(), data.*, op);
-                        self.set_ya(res);
+                        _ = self.do_alu_word_op(self.ya(), data.*, op);
                         self.finish(0);                                          },
 
             else => unreachable
@@ -1037,6 +1070,92 @@ pub const SPC = struct {
             0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
             2    => {  self.state.set_c(0);                          // Set flag - End
                        self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn dbnz_d(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+        const data    = &self.data_u8[1];
+        const offset  = &self.data_i8[0];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                                 }, // Fetch
+            2    => {  address.* = self.last_read_byte(); continue :sw 3;        }, // Start of DP read (2)
+            3    => {  try self.read_dp(address.*, substate - 2);                },
+            4    => {  data.* = self.last_read_byte(); continue :sw 5;           }, // Start of DP write (4)
+            5    => {  try self.write_dp(address.*, data.* -% 1, substate - 4);  },
+            6    => {  data.* -%= 1; continue :sw 7;                             }, // Start of fetch (6)
+            7    => {  try self.fetch(substate - 6);                             },
+            8    => {  if (data.* == 0) { self.finish(0); }                         // End if branch condition is false
+                       else { try self.idle(); }                                 }, // Idle
+            9    => {  try self.idle();                                          },
+            10   => {  offset.* = @bitCast(self.last_read_byte());                  // End
+                       self.state.pc +%= @bitCast(@as(i16, offset.*));  
+                       self.finish(0);                                           },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn ret(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1  => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2     => {  try self.idle();                           }, // Idle
+            3...6 => {  try self.pull_word(substate - 3);          }, // Pull word
+            7     => {  self.state.pc = self.last_read_word();        // End
+                        self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn addw(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+        const data    = &self.data_u16[0];
+
+        const op = AluWordOp.addw;
+
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                                }, // Fetch
+            2     => {  address.* = self.last_read_byte(); continue :sw 3;       }, // Start of DP word read (2)
+            3...5 => {  try self.read_dp_word(address.*, substate - 2);          },
+            6     => {  try self.idle();                                         }, // Idle
+            7     => {  data.* = self.last_read_word();                             // Perform ALU operation - End
+                        const res = self.do_alu_word_op(self.ya(), data.*, op);
+                        self.set_ya(res);
+                        self.finish(0);                                          },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn alu_y_with_d(self: *SPC, substate: u32, comptime op: AluOp) !void {
+        const address = &self.data_u8[0];
+        const data    = &self.data_u8[1];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                           }, // Fetch
+            2    => {  address.* = self.last_read_byte(); continue :sw 3;  }, // Start of DP read (2)
+            3    => {  try self.read_dp(address.*, substate - 2);          },
+            4    => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
+                       self.do_alu_op(&self.state.y, data.*, op);           
+                       self.finish(0);                                     },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn reti(self: *SPC, substate: u32) !void {
+        sw: switch (substate) {
+            0, 1  => {  try self.dummy_read(self.pc(), substate);                }, // Dummy read
+            2     => {  try self.idle();                                         }, // Idle
+            3, 4  => {  try self.pull(substate - 3);                             }, // Pull 
+            5     => {  self.state.psw = self.last_read_byte(); continue :sw 6;  }, // Start of pull word (5)
+            6...8 => {  try self.pull_word(substate - 5);                        }, 
+            9     => {  self.state.pc = self.last_read_word();                      // End
+                        self.finish(0);                                          },
 
             else => unreachable
         }

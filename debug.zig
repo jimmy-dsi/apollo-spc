@@ -466,8 +466,141 @@ pub fn print_opcode(emu: *Emu) void {
         0x60 => {
             std.debug.print("clrc            ", .{});
         },
+        0x61 => {
+            std.debug.print("tcall 6         ", .{});
+        },
+        0x62 => {
+            operand_count = 1;
+            std.debug.print("set1 ${X:0>2}.3      ", .{operand_1});
+        },
+        0x63 => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("bbs ${X:0>2}.3, ${X:0>4}", .{operand_1, target_address});
+        },
+        0x64 => {
+            operand_count = 1;
+            std.debug.print("cmp a, ${X:0>2}      ", .{operand_1});
+        },
+        0x65 => {
+            operand_count = 2;
+            std.debug.print("cmp a, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x66 => {
+            std.debug.print("cmp a, (x)      ", .{});
+        },
+        0x67 => {
+            operand_count = 1;
+            std.debug.print("cmp a, [${X:0>2}+x]  ", .{operand_1});
+        },
+        0x68 => {
+            operand_count = 1;
+            std.debug.print("cmp a, #${X:0>2}     ", .{operand_1});
+        },
+        0x69 => {
+            operand_count = 2;
+            std.debug.print("cmp ${X:0>2}, ${X:0>2}    ", .{operand_2, operand_1});
+        },
+        0x6A => {
+            operand_count = 2;
+            const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
+            std.debug.print("and1 c, /${X:0>4}.{d}", .{addr & 0x1FFF, addr >> 13});
+        },
+        0x6B => {
+            operand_count = 1;
+            std.debug.print("ror ${X:0>2}         ", .{operand_1});
+        },
+        0x6C => {
+            operand_count = 2;
+            const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
+            std.debug.print("ror ${X:0>4}       ", .{addr});
+        },
+        0x6D => {
+            std.debug.print("push y          ", .{});
+        },
+        0x6E => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("dbnz ${X:0>2}, ${X:0>4} ", .{operand_1, target_address});
+        },
+        0x6F => {
+            std.debug.print("ret             ", .{});
+        },
+        0x70 => {
+            operand_count = 1;
+            const offset: i8 = @bitCast(operand_1);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 2;
+            std.debug.print("bvc ${X:0>4}       ", .{target_address});
+        },
+        0x71 => {
+            std.debug.print("tcall 7         ", .{});
+        },
+        0x72 => {
+            operand_count = 1;
+            std.debug.print("clr1 ${X:0>2}.3      ", .{operand_1});
+        },
+        0x73 => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("bbc ${X:0>2}.3, ${X:0>4}", .{operand_1, target_address});
+        },
+        0x74 => {
+            operand_count = 1;
+            std.debug.print("cmp a, ${X:0>2}+x    ", .{operand_1});
+        },
+        0x75 => {
+            operand_count = 2;
+            std.debug.print("cmp a, ${X:0>4}+x  ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x76 => {
+            operand_count = 2;
+            std.debug.print("cmp a, ${X:0>4}+y  ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0x77 => {
+            operand_count = 1;
+            std.debug.print("cmp a, [${X:0>2}]+y  ", .{operand_1});
+        },
+        0x78 => {
+            operand_count = 2;
+            std.debug.print("cmp ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+        },
+        0x79 => {
+            std.debug.print("cmp (x), (y)    ", .{});
+        },
+        0x7A => {
+            operand_count = 1;
+            std.debug.print("addw ya, ${X:0>2}    ", .{operand_1});
+        },
+        0x7B => {
+            operand_count = 1;
+            std.debug.print("ror ${X:0>2}+x       ", .{operand_1});
+        },
+        0x7C => {
+            std.debug.print("ror a           ", .{});
+        },
+        0x7D => {
+            std.debug.print("mov a, x        ", .{});
+        },
+        0x7E => {
+            operand_count = 1;
+            std.debug.print("cmp y, ${X:0>2}      ", .{operand_1});
+        },
+        0x7F => {
+            std.debug.print("reti            ", .{});
+        },
         else => {
-            std.debug.print("clrc            ", .{});
+            std.debug.print("reti            ", .{});
         }
     }
 
