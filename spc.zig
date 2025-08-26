@@ -10,7 +10,7 @@ const Co = CoState.Co;
 
 pub const SPC = struct {
     pub const AluOp = enum {
-        none,
+        none, mov,
         add, sub, cmp,
         bitand, bitor, bitxor
     };
@@ -223,11 +223,18 @@ pub const SPC = struct {
     inline fn do_alu_op(self: *SPC, lhs: *u8, rhs: u8, comptime op: AluOp) void {
         switch (op) {
             AluOp.none => {
-
+                lhs.* = rhs;
             },
-            AluOp.add => {
+            AluOp.mov => {
+                lhs.* = rhs;
+                self.state.set_z(@intFromBool(lhs.* == 0));
+                self.state.set_n(@intFromBool(lhs.* & 0x80 != 0));
+            },
+            AluOp.add, AluOp.sub => {
+                const r: u8 = if (op == AluOp.add) rhs else ~rhs;
+
                 const carry = self.c();
-                const res: i16 = @as(i16, lhs.*) +% @as(i16, rhs) +% @as(i16, carry);
+                const res: i16 = @as(i16, lhs.*) +% @as(i16, r) +% @as(i16, carry);
 
                 self.state.set_c(@intFromBool(res >= 0x100));
 
@@ -235,20 +242,17 @@ pub const SPC = struct {
                 const res_u8:  u8  = @intCast(res_u16 & 0xFF);
 
                 const sign_l = lhs.* >> 7;
-                const sign_r = rhs   >> 7;
+                const sign_r = r     >> 7;
                 const sign_v = @intFromBool(res < 0);
 
                 self.state.set_z(@intFromBool(res_u8 == 0));
                 self.state.set_n(@intFromBool(res_u8 & 0x80 != 0));
-                self.state.set_h(@intFromBool((lhs.* ^ rhs ^ res_u8) & 0x10 != 0));
+                self.state.set_h(@intFromBool((lhs.* ^ r ^ res_u8) & 0x10 != 0));
 
                 // Overflow bit is triggered if the two inputs have the same sign but get the result is the opposite sign
                 self.state.set_v(@intFromBool(sign_l == sign_r and sign_v != sign_l));
 
                 lhs.* = res_u8;
-            },
-            AluOp.sub => {
-
             },
             AluOp.cmp => {
                 const res:     i16 = @as(i16, lhs.*) -% @as(i16, rhs);
@@ -282,8 +286,9 @@ pub const SPC = struct {
 
         switch (op) {
             AluOp.none => {
-                return 0; // TODO
+                return rhs_bit;
             },
+            AluOp.mov => unreachable,
             AluOp.add => unreachable,
             AluOp.sub => unreachable,
             AluOp.cmp => unreachable,
@@ -364,7 +369,18 @@ pub const SPC = struct {
                 return res;
             },
             AluWordOp.subw => {
+                var   lhs_lo: u8 = @intCast(lhs & 0xFF);
+                var   lhs_hi: u8 = @intCast(lhs >>   8);
+                const rhs_lo: u8 = @intCast(rhs & 0xFF);
+                const rhs_hi: u8 = @intCast(rhs >>   8);
 
+                self.state.set_c(1); // Set carry before subtraction
+                self.do_alu_op(&lhs_lo, rhs_lo, AluOp.sub);
+                self.do_alu_op(&lhs_hi, rhs_hi, AluOp.sub);
+
+                const res: u16 = @as(u16, lhs_lo) | @as(u16, lhs_hi) << 8;
+                self.state.set_z(@intFromBool(res == 0));
+                return res;
             },
             AluWordOp.cmpw => {
                 const res:     i32 = @as(i32, lhs) -% @as(i32, rhs);
@@ -546,6 +562,8 @@ pub const SPC = struct {
     }
 
     pub inline fn alu_c_with_mem_1bit(self: *SPC, substate: u32, comptime op: AluOp, comptime negate: bool) !void {
+        const requires_idle = op == AluOp.bitor or op == AluOp.bitxor;
+
         const address  = &self.data_u16[0];
         const data     = &self.data_u8[0];
         const bit      = &self.data_u8[1];
@@ -556,8 +574,9 @@ pub const SPC = struct {
                         bit.* = @intCast(address.* >> 13);                                  
                         address.* &= 0x1FFF; continue :sw 5;                                       }, // Looks like only the first 0x2000 ARAM addresses can have these bit ops applied... TIL
             5     => {  try self.read(address.*, substate - 4);                                    },
-            6     => {  data.* = self.last_read_byte();                                               // Idle
-                        try self.idle();                                                           },
+            6     => {  data.* = self.last_read_byte();                                               // Idle (if needed)
+                        if (requires_idle) { try self.idle(); }
+                        else { continue :sw 7; }                                                   },
             7     => {  const dt = if (negate) ~data.* else data.*;                                   // Perform ALU operation - End
                         self.state.set_c(self.do_alu_op_1bit(self.c(), dt, @intCast(bit.*), op));  
                         self.finish(0);                                                            },
@@ -1075,6 +1094,33 @@ pub const SPC = struct {
         }
     }
 
+
+
+    pub inline fn cmp_d_with_d(self: *SPC, substate: u32) !void {
+        const op = AluOp.cmp;
+
+        const address_d = &self.data_u8[0];
+        const address_s = &self.data_u8[1];
+        const data_l    = &self.data_u8[2];
+        const data_r    = &self.data_u8[3];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                                }, // Fetch
+            2    => {  address_s.* = self.last_read_byte(); continue :sw 3;     }, // Start of DP read (2)
+            3    => {  try self.read_dp(address_s.*, substate - 2);             },
+            4    => {  data_r.* = self.last_read_byte(); continue :sw 5;        }, // Start of fetch (4)
+            5    => {  try self.fetch(substate - 4);                            },
+            6    => {  address_d.* = self.last_read_byte(); continue :sw 7;     }, // Start of DP read (6)
+            7    => {  try self.read_dp(address_d.*, substate - 6);             },
+            8    => {  data_l.* = self.last_read_byte();                           // Idle
+                       self.do_alu_op(data_l, data_r.*, op);
+                       try self.idle();                                         },
+            9    => {  self.finish(0);                                          }, // End
+
+            else => unreachable
+        }
+    }
+
     pub inline fn dbnz_d(self: *SPC, substate: u32) !void {
         const address = &self.data_u8[0];
         const data    = &self.data_u8[1];
@@ -1106,6 +1152,50 @@ pub const SPC = struct {
             3...6 => {  try self.pull_word(substate - 3);          }, // Pull word
             7     => {  self.state.pc = self.last_read_word();        // End
                         self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+
+
+    pub inline fn cmp_d_with_imm(self: *SPC, substate: u32) !void {
+        const op = AluOp.cmp;
+
+        const immediate = &self.data_u8[0];
+        const address   = &self.data_u8[1];
+        const data      = &self.data_u8[2];
+        
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                               }, // Fetch immediate
+            2     => {  immediate.* = self.last_read_byte(); continue :sw 3;    }, // Start of DP fetch (2)
+            3     => {  try self.fetch(substate - 2);                           }, 
+            4     => {  address.* = self.last_read_byte(); continue :sw 5;      }, // Start of DP read (4)
+            5     => {  try self.read_dp(address.*, substate - 4);              }, 
+            6     => {  data.* = self.last_read_byte();                            // Idle
+                        self.do_alu_op(data, immediate.*, op);
+                        try self.idle();                                        },
+            7     => {  self.finish(0);                                         }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn cmp_x_ind_with_y_ind(self: *SPC, substate: u32) !void {
+        const op = AluOp.cmp;
+
+        const lhs = &self.data_u8[0];
+        const rhs = &self.data_u8[1];
+        
+        sw: switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);          }, // Dummy read
+            2, 3 => {  try self.read_dp(self.y(), substate - 2);          }, // DP read
+            4    => {  rhs.* = self.last_read_byte(); continue :sw 5;     }, // Start of DP write (4)
+            5    => {  try self.read_dp(self.x(), substate - 4);          }, 
+            6    => {  lhs.* = self.last_read_byte();                        // Idle
+                       self.do_alu_op(lhs, rhs.*, op);
+                       try self.idle();                                   }, 
+            7    => {  self.finish(0);                                    }, // End
 
             else => unreachable
         }
@@ -1156,6 +1246,125 @@ pub const SPC = struct {
             6...8 => {  try self.pull_word(substate - 5);                        }, 
             9     => {  self.state.pc = self.last_read_word();                      // End
                         self.finish(0);                                          },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn setc(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2    => {  self.state.set_c(1);                          // Set flag - End
+                       self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn alu_y_with_imm(self: *SPC, substate: u32, comptime op: AluOp) !void {
+        const data = &self.data_u8[0];
+        
+        switch (substate) {
+            0, 1  => {  try self.fetch(substate);                   }, // Fetch
+            2     => {  data.* = self.last_read_byte();                // Perform ALU operation - End
+                        self.do_alu_op(&self.state.y, data.*, op);
+                        self.finish(0);                             },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn pop_reg(self: *SPC, substate: u32, reg: *u8) !void {
+        switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2    => {  try self.idle();                           }, // Idle
+            3, 4 => {  try self.pull(substate - 3);               }, // Pull
+            5    => {  reg.* = self.last_read_byte();                // Set register - End
+                       self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn subw(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+        const data    = &self.data_u16[0];
+
+        const op = AluWordOp.subw;
+
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                                }, // Fetch
+            2     => {  address.* = self.last_read_byte(); continue :sw 3;       }, // Start of DP word read (2)
+            3...5 => {  try self.read_dp_word(address.*, substate - 2);          },
+            6     => {  try self.idle();                                         }, // Idle
+            7     => {  data.* = self.last_read_word();                             // Perform ALU operation - End
+                        const res = self.do_alu_word_op(self.ya(), data.*, op);
+                        self.set_ya(res);
+                        self.finish(0);                                          },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn div(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1   => {  try self.dummy_read(self.pc(), substate);                          }, // Dummy read
+            2...11 => {  try self.idle();                                                   }, // Idle for 10 cycles - simulates the wait time it takes for division to process
+            12     => {  const top = self.ya();                                                // Perform division - End
+                         self.state.set_h(@intFromBool(self.y() & 0xF >= self.x() & 0xF));
+                         // The high bit of what would be the 9-bit quotient goes into the overflow flag
+                         self.state.set_v(@intFromBool(self.y() >= self.x()));
+                         if (@as(u16, self.y()) < @as(u16, self.x()) << 1) { // Seems like this is the SPC's creative way of checking if quotient would be less than 512
+                             // In which case, perform normal integer division
+                             self.state.a = @intCast(top / self.x() & 0xFF);
+                             self.state.y = @intCast(top % self.x() & 0xFF);
+                         }
+                         else {
+                             // Otherwise... I have absolutely no idea what this is even trying to do here
+                             // But it replicates the "glitchy" results you'd get if the quotient can't fit within 9 bits
+                             self.state.a = @intCast(255      - (top - (@as(u16, self.x()) << 9)) / (@as(u16, 256) - self.x()) & 0xFF);
+                             self.state.y = @intCast(self.x() + (top - (@as(u16, self.x()) << 9)) % (@as(u16, 256) - self.x()) & 0xFF);
+                         }
+                         // Set N and Z flags based on quotient value
+                         self.state.set_z(@intFromBool(self.a() == 0));
+                         self.state.set_n(@intFromBool(self.a() & 0x80 != 0));
+                         self.finish(0);                                                    },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn xcn(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1  => {  try self.dummy_read(self.pc(), substate);               }, // Dummy read
+            2...4 => {  try self.idle();                                        }, // Idle
+            5     => {  self.state.a = self.a() >> 4 | (self.a() & 0x0F) << 4;
+                        self.state.set_z(@intFromBool(self.a() == 0));
+                        self.state.set_n(@intFromBool(self.a() & 0x80 != 0));
+                        self.finish(0);                                         }, // Perform exchange - End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn ei(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2    => {  try self.idle();                           }, // Idle
+            3    => {  self.state.set_i(1);                          // Set flag - End
+                       self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_x_ind_inc_a(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);             }, // Dummy read
+            2    => {  try self.idle();                                      }, // Idle
+            3, 4 => {  try self.write_dp(self.x(), self.a(), substate - 3);  }, // DP write
+            5    => {  self.state.x = self.x() +% 1;                            // Increment X - End
+                       self.finish(0);                                       },
 
             else => unreachable
         }
