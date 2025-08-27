@@ -46,8 +46,8 @@ pub const Emu = struct {
 
     pub fn step(self: *Emu) void {
         // Note: Normally the S-DSP and S-SMP steps are "staggered", meaning that on a period of every 2 DSP cycles (or 1 SMP cycle),
-        // the first DSP cycle is used to process the S-DSP main loop (the raw audio processing)
-        // and the second DSP cycle is used to process the S-SMP main loop (the execution of SPC700 instructions and handling of MMIO).
+        // the first DSP cycle is used to process the S-SMP main loop (the execution of SPC700 instructions and handling of MMIO)
+        // and the second DSP cycle is used to process the S-DSP main loop (the raw audio processing).
         // However, according to the ares source code, there is one scenario where the S-SMP run is delayed by a single DSP cycle
         // and overlaps the S-DSP main execution: When the S-SMP reads incoming data from one of the APU IO ports that are sent from the S-CPU.
         // To account for this, we will execute the step function for both the S-DSP and S-SMP every single DSP cycle.
@@ -55,8 +55,8 @@ pub const Emu = struct {
 
         self.s_dsp.last_processed_cycle = self.s_dsp.clock_counter;
 
-        self.s_dsp.step();
         self.s_smp.step();
+        self.s_dsp.step();
 
         self.s_dsp.inc_cycle(); // Increment clock counter by 1 DSP cycle.
     }

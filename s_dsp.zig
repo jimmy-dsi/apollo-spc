@@ -31,6 +31,11 @@ pub const SDSP = struct {
         break :blk table_u16;
     };
 
+    const State = enum {
+        init,
+        main
+    };
+
     emu: *Emu,
 
     audio_ram: [0x1_0000] u8 = undefined,
@@ -38,6 +43,8 @@ pub const SDSP = struct {
 
     state: DSPState  = undefined,
     co:    CoManager,
+
+    exec_state: State = State.init,
 
     last_processed_cycle: u64 = 0,
     clock_counter: u64 = 0,
@@ -52,6 +59,8 @@ pub const SDSP = struct {
     }
 
     pub fn power_on(self: *SDSP) void {
+        self.exec_state = State.init;
+
         for (&self.audio_ram) |*value| {
             value.* = Emu.rand.int(u8);
         }
@@ -89,9 +98,18 @@ pub const SDSP = struct {
     }
 
     pub fn main(self: *SDSP) !void {
-        const substate = self.co.substate();
-        try self.proc(substate);
-        //std.debug.print("Finished S-DSP sample loop\n", .{});
+        switch (self.exec_state) {
+            State.init => {
+                // Delay S-DSP execution by 1 DSP cycle
+                self.co.finish(1);
+                self.exec_state = State.main;
+            },
+            State.main => {
+                const substate = self.co.substate();
+                try self.proc(substate);
+                //std.debug.print("Finished S-DSP sample loop\n", .{});
+            }
+        }
     }
 
     pub fn proc(self: *SDSP, substate: u32) !void {

@@ -113,7 +113,7 @@ pub const SSMP = struct {
     }
 
     pub fn power_on(self: *SSMP) void {
-        self.exec_state = State.init;
+        self.exec_state = State.main;
         self.spc.power_on();
         self.reset();
     }
@@ -165,12 +165,7 @@ pub const SSMP = struct {
 
     pub fn main(self: *SSMP) !void {
         sw: switch (self.exec_state) {
-            State.init => {
-                // Stagger SMP process cycles so that it occurs on every 2nd DSP cycle
-                self.exec_state = State.main;
-                // Delay by 1 DSP cycle
-                self.co.finish(1);
-            },
+            State.init => { },
             State.main => {
                 try self.run_next_instr();
                 continue :sw State.main;
