@@ -544,8 +544,40 @@ pub const SSMP = struct {
             0xAC => { try self.spc.alu_modify_abs(substate_offset, SPC.AluModifyOp.inc);                }, // inc addr
             0xAD => { try self.spc.alu_y_with_imm(substate_offset, SPC.AluOp.cmp);                      }, // cmp y, #im
             0xAE => { try self.spc.pop_reg(substate_offset, &self.spc.state.a);                         }, // pop a
-            0xAF => { try self.spc.mov_x_ind_inc_a(substate_offset);                                    }, // mov (x)+, a
-            else => { try self.spc.mov_x_ind_inc_a(substate_offset);                                    },
+            0xAF => { try self.spc.mov_x_ind_inc_from_a(substate_offset);                               }, // mov (x)+, a
+            0xB0 => { try self.spc.branch(substate_offset, self.spc.c() != 0);                          }, // bcs r
+            0xB1 => { try self.spc.tcall(substate_offset, 11);                                          }, // tcall 11
+            0xB2 => { try self.spc.clr1(substate_offset, 5);                                            }, // clr1 dp.5
+            0xB3 => { try self.spc.branch_bit(substate_offset, 5, 0);                                   }, // bbc dp.5, r
+            0xB4 => { try self.spc.alu_a_with_d_x(substate_offset, SPC.AluOp.sub);                      }, // sbc a, dp+x
+            0xB5 => { try self.spc.alu_a_with_abs_x(substate_offset, SPC.AluOp.sub);                    }, // sbc a, addr+x
+            0xB6 => { try self.spc.alu_a_with_abs_y(substate_offset, SPC.AluOp.sub);                    }, // sbc a, addr+y
+            0xB7 => { try self.spc.alu_a_with_d_ind_y(substate_offset, SPC.AluOp.sub);                  }, // sbc a, [dp]+y
+            0xB8 => { try self.spc.alu_d_with_imm(substate_offset, SPC.AluOp.sub);                      }, // sbc dp, #im
+            0xB9 => { try self.spc.alu_x_ind_with_y_ind(substate_offset, SPC.AluOp.sub);                }, // sbc (x), (y)
+            0xBA => { try self.spc.movw_ya_d(substate_offset);                                          }, // movw ya, dp
+            0xBB => { try self.spc.alu_modify_d_x(substate_offset, SPC.AluModifyOp.inc);                }, // inc dp+x
+            0xBC => { try self.spc.alu_modify_a(substate_offset, SPC.AluModifyOp.inc);                  }, // inc a
+            0xBD => { try self.spc.mov_reg_reg(substate_offset, &self.spc.state.sp, &self.spc.state.x); }, // mov sp, x
+            0xBE => { try self.spc.das(substate_offset);                                                }, // das a
+            0xBF => { try self.spc.mov_a_from_x_ind_inc(substate_offset);                               }, // mov a, (x)+
+            0xC0 => { try self.spc.di(substate_offset);                                                 }, // di
+            0xC1 => { try self.spc.tcall(substate_offset, 12);                                          }, // tcall 12
+            0xC2 => { try self.spc.set1(substate_offset, 6);                                            }, // set1 dp.6
+            0xC3 => { try self.spc.branch_bit(substate_offset, 6, 1);                                   }, // bbs dp.6, r
+            0xC4 => { try self.spc.mov_d_from_a(substate_offset);                                       }, // mov dp, a
+            0xC5 => { try self.spc.mov_abs_from_a(substate_offset);                                     }, // mov addr, a
+            0xC6 => { try self.spc.mov_x_ind_from_a(substate_offset);                                   }, // mov (x), a
+            0xC7 => { try self.spc.mov_d_x_ind_from_a(substate_offset);                                 }, // mov [dp+x], a
+            0xC8 => { try self.spc.alu_x_with_imm(substate_offset, SPC.AluOp.cmp);                      }, // cmp x, #im
+            0xC9 => { try self.spc.mov_abs_from_x(substate_offset);                                     }, // mov addr, x
+            0xCA => { try self.spc.mov1_mem_bit_with_c(substate_offset);                                }, // mov1 mem.b, c
+            0xCB => { try self.spc.mov_d_from_y(substate_offset);                                       }, // mov dp, y
+            0xCC => { try self.spc.mov_abs_from_y(substate_offset);                                     }, // mov addr, y
+            0xCD => { try self.spc.alu_x_with_imm(substate_offset, SPC.AluOp.mov);                      }, // mov x, #im
+            0xCE => { try self.spc.pop_reg(substate_offset, &self.spc.state.x);                         }, // pop x
+            0xCF => { try self.spc.mul(substate_offset);                                                }, // mul ya
+            else => { try self.spc.mul(substate_offset);                                                },
         }
     }
 
