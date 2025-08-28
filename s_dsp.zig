@@ -115,8 +115,8 @@ pub const SDSP = struct {
     pub fn proc(self: *SDSP, substate: u32) !void {
         // Main 32-step S-DSP loop. Seems there are some discrepancies with the FullSNES timing diagram and how Ares implements this. Replicating Ares behavior.
         switch (substate) {
-            0  => { self.proc_t1();  try self.co.wait(2); },
-            1  => { self.proc_t0();  try self.co.wait(2); },
+            0  => { self.proc_t0();  try self.co.wait(2); },
+            1  => { self.proc_t1();  try self.co.wait(2); },
             2  => { self.proc_t2();  try self.co.wait(2); },
             3  => { self.proc_t3();  try self.co.wait(2); },
             4  => { self.proc_t4();  try self.co.wait(2); },
