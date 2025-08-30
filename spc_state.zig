@@ -1,4 +1,8 @@
 pub const SPCState = struct {
+    pub const Mode = enum {
+        normal, asleep, stopped
+    };
+
     a: u8 = undefined,
     x: u8 = undefined,
     y: u8 = undefined,
@@ -7,6 +11,8 @@ pub const SPCState = struct {
     pc: u16 = undefined,
 
     psw: u8 = undefined,
+
+    mode: Mode = Mode.normal,
 
     pub fn new(a: ?u8, x: ?u8, y: ?u8, sp: ?u8, pc: ?u16, psw: ?u8) SPCState {
         var cpu_state = SPCState { };
@@ -31,6 +37,8 @@ pub const SPCState = struct {
         self.pc = 0x0000;
 
         self.psw = 0b00000010;
+
+        self.mode = Mode.normal;
     }
 
     // PSW register flag getters

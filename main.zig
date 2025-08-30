@@ -38,6 +38,17 @@ pub fn main() !void {
     emu.step();
     emu.step();
 
+    //var last_second: u64 = 0;
+    //
+    //for (0..2048000000) |_| {
+    //    emu.step();
+    //    const cur_second = emu.s_dsp.cur_cycle() / 2048000;
+    //    if (cur_second != last_second) {
+    //        last_second = cur_second;
+    //        std.debug.print("{d}\n", .{last_second});
+    //    }
+    //}
+
     var cur_page: u8 = 0x00;
     var cur_offset: u8 = 0x00;
     var cur_mode: u8 = 'i';
@@ -114,6 +125,14 @@ pub fn main() !void {
 
                 const all_logs = emu.s_smp.get_access_logs(.{.exclude_at_end = 1});
                 var logs = db.filter_access_logs(all_logs);
+
+                //var buffer_writer = std.io.countingWriter(std.io.getStdOut().writer());
+                //var writer = buffer_writer.writer();
+//
+                //for (all_logs) |log| {
+                //    _ = db.print_log(&prev_state, &log, &writer, .{}) catch 0;
+                //    std.debug.print("\n", .{});
+                //}
 
                 emu.s_smp.clear_access_logs();
 

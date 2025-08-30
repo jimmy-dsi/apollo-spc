@@ -113,6 +113,10 @@ pub const SPC = struct {
         return self.state.c();
     }
 
+    pub inline fn mode(self: *const SPC) SPCState.Mode {
+        return self.state.mode;
+    }
+
     pub inline fn step_pc(self: *SPC) void {
         self.state.pc +%= 1;
     }
@@ -204,6 +208,28 @@ pub const SPC = struct {
     inline fn write_dp(self: *SPC, address: u8, data: u8, substate_offset: u32) !void {
         const real_address = @as(u9, self.p()) << 8 | address;
         return self.s_smp().write(real_address, data, substate_offset);
+    }
+
+    inline fn write_dp_word(self: *SPC, address: u8, data: u16, substate_offset: u32) !void {
+        const page_offset: u16 = @as(u9, self.p()) << 8;
+
+        const real_address_lo = page_offset | address;
+        const real_address_hi = page_offset | address +% 1;
+
+        switch (substate_offset) {
+            // First, write low byte:
+            0, 1 => {
+                try self.write(real_address_lo, @intCast(data & 0xFF), substate_offset);
+            },
+            // Next, write high byte:
+            2, 3 => {
+                try self.write(real_address_hi, @intCast(data >> 8), substate_offset - 2);
+            },
+            4 => {
+                return;
+            },
+            else => unreachable
+        }
     }
 
     inline fn idle(self: *const SPC) !void {
@@ -316,6 +342,14 @@ pub const SPC = struct {
     inline fn modify_1bit(_: *SPC, lhs: *u8, rhs: u1, bit: u3) void {
         lhs.* &= ~(@as(u8, 1) << bit);
         lhs.* |= @as(u8, rhs) << bit;
+    }
+
+    inline fn not_1bit(_: *SPC, lhs: *u8, bit: u3) void {
+        const negated = ~lhs.*;
+        const nbit: u1 = @intCast(negated >> bit & 1);
+
+        lhs.* &= ~(@as(u8, 1) << bit);
+        lhs.* |= @as(u8, nbit) << bit;
     }
 
     inline fn do_alu_modify_op(self: *SPC, value: *u8, comptime op: AluModifyOp) void {
@@ -1598,6 +1632,330 @@ pub const SPC = struct {
                         self.state.set_z(@intFromBool(self.y() == 0)); 
                         self.state.set_n(@intFromBool(self.y() & 0x80 != 0)); 
                         self.finish(0);                                        },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_d_x_from_a(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                                          }, // Fetch
+            2     => {  try self.idle();                                                   }, // Idle
+            3     => {  address.* = self.last_read_byte(); continue :sw 4;                 }, // Start of DP dummy read (3)
+            4     => {  try self.dummy_read_dp(address.* +% self.x(), substate - 3);       },
+            5, 6  => {  try self.write_dp(address.* +% self.x(), self.a(), substate - 5);  }, // Write DP
+            7     => {  self.finish(0);                                                    }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_abs_x_from_a(self: *SPC, substate: u32) !void {
+        const address = &self.data_u16[0];
+
+        sw: switch (substate) {
+            0...3 => {  try self.fetch_word(substate);                                  }, // Fetch word
+            4     => {  try self.idle();                                                }, // Idle
+            5     => {  address.* = self.last_read_word(); continue :sw 6;              }, // Start of dummy read (5)
+            6     => {  try self.dummy_read(address.* +% self.x(), substate - 5);       },
+            7, 8  => {  try self.write(address.* +% self.x(), self.a(), substate - 7);  }, // Write
+            9     => {  self.finish(0);                                                 }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_abs_y_from_a(self: *SPC, substate: u32) !void {
+        const address = &self.data_u16[0];
+
+        sw: switch (substate) {
+            0...3 => {  try self.fetch_word(substate);                                  }, // Fetch word
+            4     => {  try self.idle();                                                }, // Idle
+            5     => {  address.* = self.last_read_word(); continue :sw 6;              }, // Start of dummy read (5)
+            6     => {  try self.dummy_read(address.* +% self.y(), substate - 5);       },
+            7, 8  => {  try self.write(address.* +% self.y(), self.a(), substate - 7);  }, // Write
+            9     => {  self.finish(0);                                                 }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_d_ind_y_from_a(self: *SPC, substate: u32) !void {
+        const indirect = &self.data_u8[0];
+        const address  = &self.data_u16[0];
+
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                                       }, // Fetch
+            2     => {  indirect.* = self.last_read_byte(); continue :sw 3;             }, // Start of DP word read (2)
+            3...5 => {  try self.read_dp_word(indirect.*, substate - 2);                },
+            6     => {  try self.idle();                                                }, // Idle
+            7     => {  address.* = self.last_read_word(); continue :sw 8;              }, // Start of ABS dummy read (7)
+            8     => {  try self.dummy_read(address.*, substate - 7);                   },
+            9, 10 => {  try self.write(address.* +% self.y(), self.a(), substate - 9);  }, // Write
+            11    => {  self.finish(0);                                                 }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_d_from_x(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                              }, // Fetch
+            2    => {  address.* = self.last_read_byte(); continue :sw 3;     }, // Start of DP dummy read (2)
+            3    => {  try self.dummy_read_dp(address.*, substate - 2);       },
+            4, 5 => {  try self.write_dp(address.*, self.x(), substate - 4);  }, // DP write
+            6    => {  self.finish(0);                                        }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_d_y_from_x(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                                          }, // Fetch
+            2     => {  try self.idle();                                                   }, // Idle
+            3     => {  address.* = self.last_read_byte(); continue :sw 4;                 }, // Start of DP dummy read (3)
+            4     => {  try self.dummy_read_dp(address.* +% self.y(), substate - 3);       },
+            5, 6  => {  try self.write_dp(address.* +% self.y(), self.x(), substate - 5);  }, // Write DP
+            7     => {  self.finish(0);                                                    }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn movw_d_ya(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                                    }, // Fetch
+            2     => {  address.* = self.last_read_byte(); continue :sw 3;           }, // Start of DP dummy read (2)
+            3     => {  try self.dummy_read_dp(address.*, substate - 2);             },
+            4...7 => {  try self.write_dp_word(address.*, self.ya(), substate - 4);  }, // Write DP word
+            8     => {  self.finish(0);                                              }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_d_x_from_y(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+
+        sw: switch (substate) {
+            0, 1  => {  try self.fetch(substate);                                          }, // Fetch
+            2     => {  try self.idle();                                                   }, // Idle
+            3     => {  address.* = self.last_read_byte(); continue :sw 4;                 }, // Start of DP dummy read (3)
+            4     => {  try self.dummy_read_dp(address.* +% self.x(), substate - 3);       },
+            5, 6  => {  try self.write_dp(address.* +% self.x(), self.y(), substate - 5);  }, // Write DP
+            7     => {  self.finish(0);                                                    }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn alu_modify_y(self: *SPC, substate: u32, comptime op: AluModifyOp) !void {
+        switch (substate) {   
+            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2    => {  self.do_alu_modify_op(&self.state.y, op);     // Perform ALU operation - End
+                       self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn cbne_d_x(self: *SPC, substate: u32) !void {
+        const address = &self.data_u8[0];
+        const data    = &self.data_u8[1];
+        const offset  = &self.data_i8[0];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                               }, // Fetch
+            2    => {  try self.idle();                                        }, // Idle
+            3    => {  address.* = self.last_read_byte(); continue :sw 4;      }, // Start of DP read (3)
+            4    => {  try self.read_dp(address.* +% self.x(), substate - 3);  },
+            5    => {  try self.idle();                                        }, // Idle
+            6    => {  data.* = self.last_read_byte(); continue :sw 7;         }, // Start of next fetch (6)
+            7    => {  try self.fetch(substate - 6);                           },
+            8    => {  if (self.a() == data.*) { self.finish(0); }                // End if branch condition is false
+                       else { try self.idle(); }                               }, // Idle
+            9    => {  try self.idle();                                        }, // Idle
+            10   => {  offset.* = @bitCast(self.last_read_byte());                // End
+                       self.state.pc +%= @bitCast(@as(i16, offset.*));    
+                       self.finish(0);                                         },
+            
+            else => unreachable
+        }
+    }
+
+    pub inline fn daa(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);              }, // Dummy read
+            2    => {  try self.idle();                                       }, // Idle
+            3    => {  if (self.c() != 0 or self.a() > 0x99) {                   // Perform decimal adjust - End
+                           self.state.a +%= 0x60;
+                           self.state.set_c(1);
+                       }
+                       if (self.h() != 0 or self.a() & 0xF > 0x09) {
+                           self.state.a +%= 0x06;
+                       }
+                       self.state.set_z(@intFromBool(self.a() == 0));
+                       self.state.set_n(@intFromBool(self.a() & 0x80 != 0));
+                       self.finish(0);                                        },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn clrv(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2    => {  self.state.set_v(0);                          // Set flags - End
+                       self.state.set_h(0);
+                       self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn not1_mem_bit(self: *SPC, substate: u32) !void {
+        const address  = &self.data_u16[0];
+        const data     = &self.data_u8[0];
+        const bit      = &self.data_u8[1];
+
+        sw: switch (substate) {          
+            0...3 => {  try self.fetch_word(substate);                         }, // Fetch word
+            4     => {  address.* = self.last_read_word();                        // Start of ABS read (4)
+                        bit.* = @intCast(address.* >> 13);                      
+                        address.* &= 0x1FFF; continue :sw 5;                   }, 
+            5     => {  try self.read(address.*, substate - 4);                },
+            6     => {  data.* = self.last_read_byte();                           // Modify bit value - Start of ABS write (6)
+                        self.not_1bit(data, @intCast(bit.*)); continue :sw 7;  },
+            7     => {  try self.write(address.*, data.*, substate - 6);       },
+            8     => {  self.finish(0);                                        }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn notc(self: *SPC, substate: u32) !void {
+        switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2    => {  try self.idle();                           }, // Idle
+            3    => {  self.state.set_c(~self.c());                  // Set flag - End
+                       self.finish(0);                            },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn sleep(self: *SPC, substate: u32) !void {
+        sw: switch (substate) {
+            0 => {
+                if (self.mode() != SPCState.Mode.asleep) {
+                    // Upon entering sleep mode, step PC back one for the sake of debugging (will not be re-fetched while asleep)
+                    self.state.pc -%= 1;
+                }
+                continue :sw 1;
+            }, // Start of dummy read (0)
+            1 => {  try self.dummy_read(self.pc() +% 1, substate);  }, // Adjust read address by +1 since we stepped PC back (normally this would be a read to current PC)
+            2 => {  try self.idle();                                }, // Idle
+            3 => {  self.state.mode = SPCState.Mode.asleep;
+                    self.finish(0);                                 }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn alu_x_with_d_y(self: *SPC, substate: u32, comptime op: AluOp) !void {
+        const address = &self.data_u8[0];
+        const data    = &self.data_u8[1];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                               }, // Fetch
+            2    => {  try self.idle();                                        }, // Idle
+            3    => {  address.* = self.last_read_byte(); continue :sw 4;      }, // Start of DP read (3)
+            4    => {  try self.read_dp(address.* +% self.y(), substate - 3);  },
+            5    => {  data.* = self.last_read_byte();                            // Perform ALU operation - End
+                       self.do_alu_op(&self.state.x, data.*, op);           
+                       self.finish(0);                                         },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn mov_d_from_d(self: *SPC, substate: u32) !void {
+        const address_d = &self.data_u8[0];
+        const address_s = &self.data_u8[1];
+        const data_r    = &self.data_u8[2];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                                }, // Fetch
+            2    => {  address_s.* = self.last_read_byte(); continue :sw 3;     }, // Start of DP read (2)
+            3    => {  try self.read_dp(address_s.*, substate - 2);             },
+            4    => {  data_r.* = self.last_read_byte(); continue :sw 5;        }, // Start of fetch (4)
+            5    => {  try self.fetch(substate - 4);                            },
+            6    => {  address_d.* = self.last_read_byte(); continue :sw 7;     }, // Start of DP write (6)
+            7    => {  try self.write_dp(address_d.*, data_r.*, substate - 6);  },
+            8    => {  self.finish(0);                                          }, // End
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn alu_y_with_d_x(self: *SPC, substate: u32, comptime op: AluOp) !void {
+        const address = &self.data_u8[0];
+        const data    = &self.data_u8[1];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.fetch(substate);                               }, // Fetch
+            2    => {  try self.idle();                                        }, // Idle
+            3    => {  address.* = self.last_read_byte(); continue :sw 4;      }, // Start of DP read (3)
+            4    => {  try self.read_dp(address.* +% self.x(), substate - 3);  },
+            5    => {  data.* = self.last_read_byte();                            // Perform ALU operation - End
+                       self.do_alu_op(&self.state.y, data.*, op);           
+                       self.finish(0);                                         },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn dbnz_y(self: *SPC, substate: u32) !void {
+        const offset = &self.data_i8[0];
+
+        sw: switch (substate) {
+            0, 1 => {  try self.dummy_read(self.pc(), substate);        }, // Dummy read
+            2    => {  try self.idle();                                 }, // Idle
+            3    => {  self.state.y -%= 1; continue :sw 4;              }, // Start of fetch (3)
+            4    => {  try self.fetch(substate - 3);                    },
+            5    => {  if (self.y() == 0) { self.finish(0); }              // End if branch condition is false
+                       else { try self.idle(); }                        }, // Idle
+            6    => {  try self.idle();                                 },
+            7    => {  offset.* = @bitCast(self.last_read_byte());         // End
+                       self.state.pc +%= @bitCast(@as(i16, offset.*)); 
+                       self.finish(0);                                  },
+
+            else => unreachable
+        }
+    }
+
+    pub inline fn stop(self: *SPC, substate: u32) !void {
+        sw: switch (substate) {
+            0 => {
+                if (self.mode() != SPCState.Mode.stopped) {
+                    // Upon entering stop mode, step PC back one for the sake of debugging (will not be re-fetched while stopped)
+                    self.state.pc -%= 1;
+                }
+                continue :sw 1;
+            }, // Start of dummy read (0)
+            1 => {  try self.dummy_read(self.pc() +% 1, substate);  }, // Adjust read address by +1 since we stepped PC back (normally this would be a read to current PC)
+            2 => {  try self.idle();                                }, // Idle
+            3 => {  self.state.mode = SPCState.Mode.stopped;
+                    self.finish(0);                                 }, // End
 
             else => unreachable
         }

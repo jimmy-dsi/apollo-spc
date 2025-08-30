@@ -4,6 +4,7 @@ const Emu       = @import("emu.zig").Emu;
 const SDSP      = @import("s_dsp.zig").SDSP;
 const SMPState  = @import("smp_state.zig").SMPState;
 const SPC       = @import("spc.zig").SPC;
+const SPCState  = @import("spc_state.zig").SPCState;
 const CoManager = @import("co_mgr.zig").CoManager;
 const CoState   = @import("co_state.zig").CoState;
 
@@ -332,11 +333,11 @@ pub const SSMP = struct {
     }
 
     inline fn run_next_instr(self: *SSMP) !void {
-        @setEvalBranchQuota(8000);
+        @setEvalBranchQuota(10000);
 
         const substate = self.co.substate();
 
-        switch (substate) {
+        sw: switch (substate) {
             0, 1 => {
                 if (substate == 0) {
                     if (self.enable_access_logs) {
@@ -347,21 +348,38 @@ pub const SSMP = struct {
                     self.instr_counter += 1;
                     //std.debug.print("SMP | Current DSP cycle: {d} | PC: {d}\n", .{self.s_dsp().*.cur_cycle(), self.spc.pc()});
                 }
-                _ = try self.fetch(substate);
+
+                // Perform fetch only if SPC is in the normal mode of execution (ie. not asleep or stopped)
+                if (self.spc.mode() == SPCState.Mode.normal) {
+                    _ = try self.fetch(substate);
+                }
+                else {
+                    continue :sw 2;
+                }
             },
             else => {
                 // Store to last_opcode only when we first get to this step
                 // Otherwise, the emulator will attempt to repeatedly overwrite the last opcode while an instruction is still running
-                if (substate == 2) {
+                if (self.spc.mode() == SPCState.Mode.normal and substate == 2) {
                     self.last_opcode = self.last_read_bytes[0];
                 }
-                try self.exec_opcode(substate - 2);
+                try self.exec_opcode(
+                    if (self.spc.mode() == SPCState.Mode.normal)
+                        substate - 2
+                    else
+                        substate
+                );
             }
         }
     }
 
     inline fn exec_opcode(self: *SSMP, substate_offset: u32) !void {
-        const opcode = self.last_opcode;
+        const opcode =
+            switch (self.spc.mode()) {
+                SPCState.Mode.normal  => self.last_opcode,
+                SPCState.Mode.asleep  => 0xEF, // Hardcoded as SLEEP instruction
+                SPCState.Mode.stopped => 0xFF, // Hardcoded as STOP instruction
+            };
         
         switch (opcode) {
             0x00 => { try self.spc.nop(substate_offset);                                                }, // nop
@@ -572,7 +590,54 @@ pub const SSMP = struct {
             0xCD => { try self.spc.alu_x_with_imm(substate_offset, SPC.AluOp.mov);                      }, // mov x, #im
             0xCE => { try self.spc.pop_reg(substate_offset, &self.spc.state.x);                         }, // pop x
             0xCF => { try self.spc.mul(substate_offset);                                                }, // mul ya
-            else => { try self.spc.mul(substate_offset);                                                },
+            0xD0 => { try self.spc.branch(substate_offset, self.spc.z() == 0);                          }, // bne r
+            0xD1 => { try self.spc.tcall(substate_offset, 13);                                          }, // tcall 13
+            0xD2 => { try self.spc.clr1(substate_offset, 6);                                            }, // clr1 dp.6
+            0xD3 => { try self.spc.branch_bit(substate_offset, 6, 0);                                   }, // bbc dp.6, r
+            0xD4 => { try self.spc.mov_d_x_from_a(substate_offset);                                     }, // mov dp+x, a
+            0xD5 => { try self.spc.mov_abs_x_from_a(substate_offset);                                   }, // mov addr+x, a
+            0xD6 => { try self.spc.mov_abs_y_from_a(substate_offset);                                   }, // mov addr+y, a
+            0xD7 => { try self.spc.mov_d_ind_y_from_a(substate_offset);                                 }, // mov [dp]+y, a
+            0xD8 => { try self.spc.mov_d_from_x(substate_offset);                                       }, // mov dp, x
+            0xD9 => { try self.spc.mov_d_y_from_x(substate_offset);                                     }, // mov dp+y, x
+            0xDA => { try self.spc.movw_d_ya(substate_offset);                                          }, // movw dp, ya
+            0xDB => { try self.spc.mov_d_x_from_y(substate_offset);                                     }, // mov dp+x, y
+            0xDC => { try self.spc.alu_modify_y(substate_offset, SPC.AluModifyOp.dec);                  }, // dec y
+            0xDD => { try self.spc.mov_reg_reg(substate_offset, &self.spc.state.a, &self.spc.state.y);  }, // mov a, y
+            0xDE => { try self.spc.cbne_d_x(substate_offset);                                           }, // cbne dp+x, r
+            0xDF => { try self.spc.daa(substate_offset);                                                }, // daa a
+            0xE0 => { try self.spc.clrv(substate_offset);                                               }, // clrv
+            0xE1 => { try self.spc.tcall(substate_offset, 14);                                          }, // tcall 14
+            0xE2 => { try self.spc.set1(substate_offset, 7);                                            }, // set1 dp.7
+            0xE3 => { try self.spc.branch_bit(substate_offset, 7, 1);                                   }, // bbs dp.7, r
+            0xE4 => { try self.spc.alu_a_with_d(substate_offset, SPC.AluOp.mov);                        }, // mov a, dp
+            0xE5 => { try self.spc.alu_a_with_abs(substate_offset, SPC.AluOp.mov);                      }, // mov a, addr
+            0xE6 => { try self.spc.alu_a_with_x_ind(substate_offset, SPC.AluOp.mov);                    }, // mov a, (x)
+            0xE7 => { try self.spc.alu_a_with_d_x_ind(substate_offset, SPC.AluOp.mov);                  }, // mov a, [dp+x]
+            0xE8 => { try self.spc.alu_a_with_imm(substate_offset, SPC.AluOp.mov);                      }, // mov a, #im
+            0xE9 => { try self.spc.alu_x_with_abs(substate_offset, SPC.AluOp.mov);                      }, // mov x, addr
+            0xEA => { try self.spc.not1_mem_bit(substate_offset);                                       }, // not1 mem.b
+            0xEB => { try self.spc.alu_y_with_d(substate_offset, SPC.AluOp.mov);                        }, // mov y, dp
+            0xEC => { try self.spc.alu_y_with_abs(substate_offset, SPC.AluOp.mov);                      }, // mov y, addr
+            0xED => { try self.spc.notc(substate_offset);                                               }, // notc
+            0xEE => { try self.spc.pop_reg(substate_offset, &self.spc.state.y);                         }, // pop y
+            0xEF => { try self.spc.sleep(substate_offset);                                              }, // sleep
+            0xF0 => { try self.spc.branch(substate_offset, self.spc.z() != 0);                          }, // beq r
+            0xF1 => { try self.spc.tcall(substate_offset, 15);                                          }, // tcall 15
+            0xF2 => { try self.spc.clr1(substate_offset, 7);                                            }, // clr1 dp.7
+            0xF3 => { try self.spc.branch_bit(substate_offset, 7, 0);                                   }, // bbc dp.7, r
+            0xF4 => { try self.spc.alu_a_with_d_x(substate_offset, SPC.AluOp.mov);                      }, // mov a, dp+x
+            0xF5 => { try self.spc.alu_a_with_abs_x(substate_offset, SPC.AluOp.mov);                    }, // mov a, addr+x
+            0xF6 => { try self.spc.alu_a_with_abs_y(substate_offset, SPC.AluOp.mov);                    }, // mov a, addr+y
+            0xF7 => { try self.spc.alu_a_with_d_ind_y(substate_offset, SPC.AluOp.mov);                  }, // mov a, [dp]+y
+            0xF8 => { try self.spc.alu_x_with_d(substate_offset, SPC.AluOp.mov);                        }, // mov x, dp
+            0xF9 => { try self.spc.alu_x_with_d_y(substate_offset, SPC.AluOp.mov);                      }, // mov x, dp+y
+            0xFA => { try self.spc.mov_d_from_d(substate_offset);                                       }, // mov dp, dp
+            0xFB => { try self.spc.alu_y_with_d_x(substate_offset, SPC.AluOp.mov);                      }, // mov y, dp+x
+            0xFC => { try self.spc.alu_modify_y(substate_offset, SPC.AluModifyOp.inc);                  }, // inc y
+            0xFD => { try self.spc.mov_reg_reg(substate_offset, &self.spc.state.y, &self.spc.state.a);  }, // mov y, a
+            0xFE => { try self.spc.dbnz_y(substate_offset);                                             }, // dbnz y, r
+            0xFF => { try self.spc.stop(substate_offset);                                               }, // stop
         }
     }
 

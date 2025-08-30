@@ -45,7 +45,13 @@ pub fn print_opcode(emu: *Emu) void {
 
     const pc = s_smp.spc.pc();
 
-    const opcode    = s_smp.debug_read_data(pc);
+    const opcode =
+        switch (emu.s_smp.spc.mode()) {
+            SPCState.Mode.normal  => s_smp.debug_read_data(pc),
+            SPCState.Mode.asleep  => 0xEF,
+            SPCState.Mode.stopped => 0xFF
+        };
+
     const operand_1 = s_smp.debug_read_data(pc +% 1);
     const operand_2 = s_smp.debug_read_data(pc +% 2);
 
@@ -53,14 +59,14 @@ pub fn print_opcode(emu: *Emu) void {
 
     switch (opcode) {
         0x00 => {
-            std.debug.print("nop             ", .{});
+            std.debug.print("nop              ", .{});
         },
         0x01 => {
-            std.debug.print("tcall 0         ", .{});
+            std.debug.print("tcall 0          ", .{});
         },
         0x02 => {
             operand_count = 1;
-            std.debug.print("set1 ${X:0>2}.0      ", .{operand_1});
+            std.debug.print("set1 ${X:0>2}.0       ", .{operand_1});
         },
         0x03 => {
             operand_count = 2;
@@ -72,51 +78,51 @@ pub fn print_opcode(emu: *Emu) void {
         },
         0x04 => {
             operand_count = 1;
-            std.debug.print("or a, ${X:0>2}       ", .{operand_1});
+            std.debug.print("or a, ${X:0>2}        ", .{operand_1});
         },
         0x05 => {
             operand_count = 2;
-            std.debug.print("or a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("or a, ${X:0>4}      ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x06 => {
-            std.debug.print("or a, (x)       ", .{});
+            std.debug.print("or a, (x)        ", .{});
         },
         0x07 => {
             operand_count = 1;
-            std.debug.print("or a, [${X:0>2}+x]   ", .{operand_1});
+            std.debug.print("or a, [${X:0>2}+x]    ", .{operand_1});
         },
         0x08 => {
             operand_count = 1;
-            std.debug.print("or a, #${X:0>2}      ", .{operand_1});
+            std.debug.print("or a, #${X:0>2}       ", .{operand_1});
         },
         0x09 => {
             operand_count = 2;
-            std.debug.print("or ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
+            std.debug.print("or ${X:0>2}, ${X:0>2}      ", .{operand_2, operand_1});
         },
         0x0A => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("or1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
+            std.debug.print("or1 c, ${X:0>4}.{d}   ", .{addr & 0x1FFF, addr >> 13});
         },
         0x0B => {
             operand_count = 1;
-            std.debug.print("asl ${X:0>2}         ", .{operand_1});
+            std.debug.print("asl ${X:0>2}          ", .{operand_1});
         },
         0x0C => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("asl ${X:0>4}       ", .{addr});
+            std.debug.print("asl ${X:0>4}        ", .{addr});
         },
         0x0D => {
-            std.debug.print("push psw        ", .{});
+            std.debug.print("push psw         ", .{});
         },
         0x0E => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("tset1 ${X:0>4}     ", .{addr});
+            std.debug.print("tset1 ${X:0>4}      ", .{addr});
         },
         0x0F => {
-            std.debug.print("brk             ", .{});
+            std.debug.print("brk              ", .{});
         },
         0x10 => {
             operand_count = 1;
@@ -124,14 +130,14 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 2;
-            std.debug.print("bpl ${X:0>4}       ", .{target_address});
+            std.debug.print("bpl ${X:0>4}        ", .{target_address});
         },
         0x11 => {
-            std.debug.print("tcall 1         ", .{});
+            std.debug.print("tcall 1          ", .{});
         },
         0x12 => {
             operand_count = 1;
-            std.debug.print("clr1 ${X:0>2}.0      ", .{operand_1});
+            std.debug.print("clr1 ${X:0>2}.0       ", .{operand_1});
         },
         0x13 => {
             operand_count = 2;
@@ -139,62 +145,62 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbc ${X:0>2}.0, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbc ${X:0>2}.0, ${X:0>4} ", .{operand_1, target_address});
         },
         0x14 => {
             operand_count = 1;
-            std.debug.print("or a, ${X:0>2}+x     ", .{operand_1});
+            std.debug.print("or a, ${X:0>2}+x      ", .{operand_1});
         },
         0x15 => {
             operand_count = 2;
-            std.debug.print("or a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("or a, ${X:0>4}+x    ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x16 => {
             operand_count = 2;
-            std.debug.print("or a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("or a, ${X:0>4}+y    ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x17 => {
             operand_count = 1;
-            std.debug.print("or a, [${X:0>2}]+y   ", .{operand_1});
+            std.debug.print("or a, [${X:0>2}]+y    ", .{operand_1});
         },
         0x18 => {
             operand_count = 2;
-            std.debug.print("or ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+            std.debug.print("or ${X:0>2}, #${X:0>2}     ", .{operand_2, operand_1});
         },
         0x19 => {
-            std.debug.print("or (x), (y)     ", .{});
+            std.debug.print("or (x), (y)      ", .{});
         },
         0x1A => {
             operand_count = 1;
-            std.debug.print("decw ${X:0>2}        ", .{operand_1});
+            std.debug.print("decw ${X:0>2}         ", .{operand_1});
         },
         0x1B => {
             operand_count = 1;
-            std.debug.print("asl ${X:0>2}+x       ", .{operand_1});
+            std.debug.print("asl ${X:0>2}+x        ", .{operand_1});
         },
         0x1C => {
-            std.debug.print("asl a           ", .{});
+            std.debug.print("asl a            ", .{});
         },
         0x1D => {
-            std.debug.print("dec x           ", .{});
+            std.debug.print("dec x            ", .{});
         },
         0x1E => {
             operand_count = 2;
-            std.debug.print("cmp x, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("cmp x, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x1F => {
             operand_count = 2;
-            std.debug.print("jmp [${X:0>4}+x]   ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("jmp [${X:0>4}+x]    ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x20 => {
-            std.debug.print("clrp            ", .{});
+            std.debug.print("clrp             ", .{});
         },
         0x21 => {
-            std.debug.print("tcall 2         ", .{});
+            std.debug.print("tcall 2          ", .{});
         },
         0x22 => {
             operand_count = 1;
-            std.debug.print("set1 ${X:0>2}.1      ", .{operand_1});
+            std.debug.print("set1 ${X:0>2}.1       ", .{operand_1});
         },
         0x23 => {
             operand_count = 2;
@@ -202,47 +208,47 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbs ${X:0>2}.1, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbs ${X:0>2}.1, ${X:0>4} ", .{operand_1, target_address});
         },
         0x24 => {
             operand_count = 1;
-            std.debug.print("and a, ${X:0>2}      ", .{operand_1});
+            std.debug.print("and a, ${X:0>2}       ", .{operand_1});
         },
         0x25 => {
             operand_count = 2;
-            std.debug.print("and a, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("and a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x26 => {
-            std.debug.print("and a, (x)      ", .{});
+            std.debug.print("and a, (x)       ", .{});
         },
         0x27 => {
             operand_count = 1;
-            std.debug.print("and a, [${X:0>2}+x]  ", .{operand_1});
+            std.debug.print("and a, [${X:0>2}+x]   ", .{operand_1});
         },
         0x28 => {
             operand_count = 1;
-            std.debug.print("and a, #${X:0>2}     ", .{operand_1});
+            std.debug.print("and a, #${X:0>2}      ", .{operand_1});
         },
         0x29 => {
             operand_count = 2;
-            std.debug.print("and ${X:0>2}, ${X:0>2}    ", .{operand_2, operand_1});
+            std.debug.print("and ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
         },
         0x2A => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("or1 c, /${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
+            std.debug.print("or1 c, /${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
         },
         0x2B => {
             operand_count = 1;
-            std.debug.print("rol ${X:0>2}         ", .{operand_1});
+            std.debug.print("rol ${X:0>2}          ", .{operand_1});
         },
         0x2C => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("rol ${X:0>4}       ", .{addr});
+            std.debug.print("rol ${X:0>4}        ", .{addr});
         },
         0x2D => {
-            std.debug.print("push a          ", .{});
+            std.debug.print("push a           ", .{});
         },
         0x2E => {
             operand_count = 2;
@@ -250,7 +256,7 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("cbne ${X:0>2}, ${X:0>4} ", .{operand_1, target_address});
+            std.debug.print("cbne ${X:0>2}, ${X:0>4}  ", .{operand_1, target_address});
         },
         0x2F => {
             operand_count = 1;
@@ -258,7 +264,7 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 2;
-            std.debug.print("bra ${X:0>4}       ", .{target_address});
+            std.debug.print("bra ${X:0>4}        ", .{target_address});
         },
         0x30 => {
             operand_count = 1;
@@ -266,14 +272,14 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 2;
-            std.debug.print("bmi ${X:0>4}       ", .{target_address});
+            std.debug.print("bmi ${X:0>4}        ", .{target_address});
         },
         0x31 => {
-            std.debug.print("tcall 3         ", .{});
+            std.debug.print("tcall 3          ", .{});
         },
         0x32 => {
             operand_count = 1;
-            std.debug.print("clr1 ${X:0>2}.1      ", .{operand_1});
+            std.debug.print("clr1 ${X:0>2}.1       ", .{operand_1});
         },
         0x33 => {
             operand_count = 2;
@@ -281,62 +287,62 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbc ${X:0>2}.1, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbc ${X:0>2}.1, ${X:0>4} ", .{operand_1, target_address});
         },
         0x34 => {
             operand_count = 1;
-            std.debug.print("and a, ${X:0>2}+x    ", .{operand_1});
+            std.debug.print("and a, ${X:0>2}+x     ", .{operand_1});
         },
         0x35 => {
             operand_count = 2;
-            std.debug.print("and a, ${X:0>4}+x  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("and a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x36 => {
             operand_count = 2;
-            std.debug.print("and a, ${X:0>4}+y  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("and a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x37 => {
             operand_count = 1;
-            std.debug.print("and a, [${X:0>2}]+y  ", .{operand_1});
+            std.debug.print("and a, [${X:0>2}]+y   ", .{operand_1});
         },
         0x38 => {
             operand_count = 2;
-            std.debug.print("and ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+            std.debug.print("and ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
         },
         0x39 => {
-            std.debug.print("and (x), (y)    ", .{});
+            std.debug.print("and (x), (y)     ", .{});
         },
         0x3A => {
             operand_count = 1;
-            std.debug.print("incw ${X:0>2}        ", .{operand_1});
+            std.debug.print("incw ${X:0>2}         ", .{operand_1});
         },
         0x3B => {
             operand_count = 1;
-            std.debug.print("rol ${X:0>2}+x       ", .{operand_1});
+            std.debug.print("rol ${X:0>2}+x        ", .{operand_1});
         },
         0x3C => {
-            std.debug.print("rol a           ", .{});
+            std.debug.print("rol a            ", .{});
         },
         0x3D => {
-            std.debug.print("inc x           ", .{});
+            std.debug.print("inc x            ", .{});
         },
         0x3E => {
             operand_count = 1;
-            std.debug.print("cmp x, ${X:0>2}      ", .{operand_1});
+            std.debug.print("cmp x, ${X:0>2}       ", .{operand_1});
         },
         0x3F => {
             operand_count = 2;
-            std.debug.print("call ${X:0>4}      ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("call ${X:0>4}       ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x40 => {
-            std.debug.print("setp            ", .{});
+            std.debug.print("setp             ", .{});
         },
         0x41 => {
-            std.debug.print("tcall 4         ", .{});
+            std.debug.print("tcall 4          ", .{});
         },
         0x42 => {
             operand_count = 1;
-            std.debug.print("set1 ${X:0>2}.2      ", .{operand_1});
+            std.debug.print("set1 ${X:0>2}.2       ", .{operand_1});
         },
         0x43 => {
             operand_count = 2;
@@ -344,56 +350,56 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbs ${X:0>2}.2, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbs ${X:0>2}.2, ${X:0>4} ", .{operand_1, target_address});
         },
         0x44 => {
             operand_count = 1;
-            std.debug.print("eor a, ${X:0>2}      ", .{operand_1});
+            std.debug.print("eor a, ${X:0>2}       ", .{operand_1});
         },
         0x45 => {
             operand_count = 2;
-            std.debug.print("eor a, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("eor a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x46 => {
-            std.debug.print("eor a, (x)      ", .{});
+            std.debug.print("eor a, (x)       ", .{});
         },
         0x47 => {
             operand_count = 1;
-            std.debug.print("eor a, [${X:0>2}+x]  ", .{operand_1});
+            std.debug.print("eor a, [${X:0>2}+x]   ", .{operand_1});
         },
         0x48 => {
             operand_count = 1;
-            std.debug.print("eor a, #${X:0>2}     ", .{operand_1});
+            std.debug.print("eor a, #${X:0>2}      ", .{operand_1});
         },
         0x49 => {
             operand_count = 2;
-            std.debug.print("eor ${X:0>2}, ${X:0>2}    ", .{operand_2, operand_1});
+            std.debug.print("eor ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
         },
         0x4A => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("and1 c, ${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
+            std.debug.print("and1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
         },
         0x4B => {
             operand_count = 1;
-            std.debug.print("lsr ${X:0>2}         ", .{operand_1});
+            std.debug.print("lsr ${X:0>2}          ", .{operand_1});
         },
         0x4C => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("lsr ${X:0>4}       ", .{addr});
+            std.debug.print("lsr ${X:0>4}        ", .{addr});
         },
         0x4D => {
-            std.debug.print("push x          ", .{});
+            std.debug.print("push x           ", .{});
         },
         0x4E => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("tclr1 ${X:0>4}     ", .{addr});
+            std.debug.print("tclr1 ${X:0>4}      ", .{addr});
         },
         0x4F => {
             operand_count = 1;
-            std.debug.print("pcall ${X:0>2}       ", .{operand_1});
+            std.debug.print("pcall ${X:0>2}        ", .{operand_1});
         },
         0x50 => {
             operand_count = 1;
@@ -401,14 +407,14 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 2;
-            std.debug.print("bvc ${X:0>4}       ", .{target_address});
+            std.debug.print("bvc ${X:0>4}        ", .{target_address});
         },
         0x51 => {
-            std.debug.print("tcall 5         ", .{});
+            std.debug.print("tcall 5          ", .{});
         },
         0x52 => {
             operand_count = 1;
-            std.debug.print("clr1 ${X:0>2}.2      ", .{operand_1});
+            std.debug.print("clr1 ${X:0>2}.2       ", .{operand_1});
         },
         0x53 => {
             operand_count = 2;
@@ -416,62 +422,62 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbc ${X:0>2}.2, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbc ${X:0>2}.2, ${X:0>4} ", .{operand_1, target_address});
         },
         0x54 => {
             operand_count = 1;
-            std.debug.print("eor a, ${X:0>2}+x    ", .{operand_1});
+            std.debug.print("eor a, ${X:0>2}+x     ", .{operand_1});
         },
         0x55 => {
             operand_count = 2;
-            std.debug.print("eor a, ${X:0>4}+x  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("eor a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x56 => {
             operand_count = 2;
-            std.debug.print("eor a, ${X:0>4}+y  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("eor a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x57 => {
             operand_count = 1;
-            std.debug.print("eor a, [${X:0>2}]+y  ", .{operand_1});
+            std.debug.print("eor a, [${X:0>2}]+y   ", .{operand_1});
         },
         0x58 => {
             operand_count = 2;
-            std.debug.print("eor ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+            std.debug.print("eor ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
         },
         0x59 => {
-            std.debug.print("eor (x), (y)    ", .{});
+            std.debug.print("eor (x), (y)     ", .{});
         },
         0x5A => {
             operand_count = 1;
-            std.debug.print("cmpw ya, ${X:0>2}    ", .{operand_1});
+            std.debug.print("cmpw ya, ${X:0>2}     ", .{operand_1});
         },
         0x5B => {
             operand_count = 1;
-            std.debug.print("lsr ${X:0>2}+x       ", .{operand_1});
+            std.debug.print("lsr ${X:0>2}+x        ", .{operand_1});
         },
         0x5C => {
-            std.debug.print("lsr a           ", .{});
+            std.debug.print("lsr a            ", .{});
         },
         0x5D => {
-            std.debug.print("mov x, a        ", .{});
+            std.debug.print("mov x, a         ", .{});
         },
         0x5E => {
             operand_count = 2;
-            std.debug.print("cmp y, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("cmp y, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x5F => {
             operand_count = 2;
-            std.debug.print("jmp ${X:0>4}       ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("jmp ${X:0>4}        ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x60 => {
-            std.debug.print("clrc            ", .{});
+            std.debug.print("clrc             ", .{});
         },
         0x61 => {
-            std.debug.print("tcall 6         ", .{});
+            std.debug.print("tcall 6          ", .{});
         },
         0x62 => {
             operand_count = 1;
-            std.debug.print("set1 ${X:0>2}.3      ", .{operand_1});
+            std.debug.print("set1 ${X:0>2}.3       ", .{operand_1});
         },
         0x63 => {
             operand_count = 2;
@@ -479,47 +485,47 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbs ${X:0>2}.3, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbs ${X:0>2}.3, ${X:0>4} ", .{operand_1, target_address});
         },
         0x64 => {
             operand_count = 1;
-            std.debug.print("cmp a, ${X:0>2}      ", .{operand_1});
+            std.debug.print("cmp a, ${X:0>2}       ", .{operand_1});
         },
         0x65 => {
             operand_count = 2;
-            std.debug.print("cmp a, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("cmp a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x66 => {
-            std.debug.print("cmp a, (x)      ", .{});
+            std.debug.print("cmp a, (x)       ", .{});
         },
         0x67 => {
             operand_count = 1;
-            std.debug.print("cmp a, [${X:0>2}+x]  ", .{operand_1});
+            std.debug.print("cmp a, [${X:0>2}+x]   ", .{operand_1});
         },
         0x68 => {
             operand_count = 1;
-            std.debug.print("cmp a, #${X:0>2}     ", .{operand_1});
+            std.debug.print("cmp a, #${X:0>2}      ", .{operand_1});
         },
         0x69 => {
             operand_count = 2;
-            std.debug.print("cmp ${X:0>2}, ${X:0>2}    ", .{operand_2, operand_1});
+            std.debug.print("cmp ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
         },
         0x6A => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("and1 c, /${X:0>4}.{d}", .{addr & 0x1FFF, addr >> 13});
+            std.debug.print("and1 c, /${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
         },
         0x6B => {
             operand_count = 1;
-            std.debug.print("ror ${X:0>2}         ", .{operand_1});
+            std.debug.print("ror ${X:0>2}          ", .{operand_1});
         },
         0x6C => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("ror ${X:0>4}       ", .{addr});
+            std.debug.print("ror ${X:0>4}        ", .{addr});
         },
         0x6D => {
-            std.debug.print("push y          ", .{});
+            std.debug.print("push y           ", .{});
         },
         0x6E => {
             operand_count = 2;
@@ -527,10 +533,10 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("dbnz ${X:0>2}, ${X:0>4} ", .{operand_1, target_address});
+            std.debug.print("dbnz ${X:0>2}, ${X:0>4}  ", .{operand_1, target_address});
         },
         0x6F => {
-            std.debug.print("ret             ", .{});
+            std.debug.print("ret              ", .{});
         },
         0x70 => {
             operand_count = 1;
@@ -538,14 +544,14 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 2;
-            std.debug.print("bvc ${X:0>4}       ", .{target_address});
+            std.debug.print("bvc ${X:0>4}        ", .{target_address});
         },
         0x71 => {
-            std.debug.print("tcall 7         ", .{});
+            std.debug.print("tcall 7          ", .{});
         },
         0x72 => {
             operand_count = 1;
-            std.debug.print("clr1 ${X:0>2}.3      ", .{operand_1});
+            std.debug.print("clr1 ${X:0>2}.3       ", .{operand_1});
         },
         0x73 => {
             operand_count = 2;
@@ -553,61 +559,61 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbc ${X:0>2}.3, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbc ${X:0>2}.3, ${X:0>4} ", .{operand_1, target_address});
         },
         0x74 => {
             operand_count = 1;
-            std.debug.print("cmp a, ${X:0>2}+x    ", .{operand_1});
+            std.debug.print("cmp a, ${X:0>2}+x     ", .{operand_1});
         },
         0x75 => {
             operand_count = 2;
-            std.debug.print("cmp a, ${X:0>4}+x  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("cmp a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x76 => {
             operand_count = 2;
-            std.debug.print("cmp a, ${X:0>4}+y  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("cmp a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x77 => {
             operand_count = 1;
-            std.debug.print("cmp a, [${X:0>2}]+y  ", .{operand_1});
+            std.debug.print("cmp a, [${X:0>2}]+y   ", .{operand_1});
         },
         0x78 => {
             operand_count = 2;
-            std.debug.print("cmp ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+            std.debug.print("cmp ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
         },
         0x79 => {
-            std.debug.print("cmp (x), (y)    ", .{});
+            std.debug.print("cmp (x), (y)     ", .{});
         },
         0x7A => {
             operand_count = 1;
-            std.debug.print("addw ya, ${X:0>2}    ", .{operand_1});
+            std.debug.print("addw ya, ${X:0>2}     ", .{operand_1});
         },
         0x7B => {
             operand_count = 1;
-            std.debug.print("ror ${X:0>2}+x       ", .{operand_1});
+            std.debug.print("ror ${X:0>2}+x        ", .{operand_1});
         },
         0x7C => {
-            std.debug.print("ror a           ", .{});
+            std.debug.print("ror a            ", .{});
         },
         0x7D => {
-            std.debug.print("mov a, x        ", .{});
+            std.debug.print("mov a, x         ", .{});
         },
         0x7E => {
             operand_count = 1;
-            std.debug.print("cmp y, ${X:0>2}      ", .{operand_1});
+            std.debug.print("cmp y, ${X:0>2}       ", .{operand_1});
         },
         0x7F => {
-            std.debug.print("reti            ", .{});
+            std.debug.print("reti             ", .{});
         },
         0x80 => {
-            std.debug.print("setc            ", .{});
+            std.debug.print("setc             ", .{});
         },
         0x81 => {
-            std.debug.print("tcall 6         ", .{});
+            std.debug.print("tcall 6          ", .{});
         },
         0x82 => {
             operand_count = 1;
-            std.debug.print("set1 ${X:0>2}.4      ", .{operand_1});
+            std.debug.print("set1 ${X:0>2}.4       ", .{operand_1});
         },
         0x83 => {
             operand_count = 2;
@@ -615,55 +621,55 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbs ${X:0>2}.4, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbs ${X:0>2}.4, ${X:0>4} ", .{operand_1, target_address});
         },
         0x84 => {
             operand_count = 1;
-            std.debug.print("adc a, ${X:0>2}      ", .{operand_1});
+            std.debug.print("adc a, ${X:0>2}       ", .{operand_1});
         },
         0x85 => {
             operand_count = 2;
-            std.debug.print("adc a, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("adc a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x86 => {
-            std.debug.print("adc a, (x)      ", .{});
+            std.debug.print("adc a, (x)       ", .{});
         },
         0x87 => {
             operand_count = 1;
-            std.debug.print("adc a, [${X:0>2}+x]  ", .{operand_1});
+            std.debug.print("adc a, [${X:0>2}+x]   ", .{operand_1});
         },
         0x88 => {
             operand_count = 1;
-            std.debug.print("adc a, #${X:0>2}     ", .{operand_1});
+            std.debug.print("adc a, #${X:0>2}      ", .{operand_1});
         },
         0x89 => {
             operand_count = 2;
-            std.debug.print("adc ${X:0>2}, ${X:0>2}    ", .{operand_2, operand_1});
+            std.debug.print("adc ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
         },
         0x8A => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("eor1 c, ${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
+            std.debug.print("eor1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
         },
         0x8B => {
             operand_count = 1;
-            std.debug.print("dec ${X:0>2}         ", .{operand_1});
+            std.debug.print("dec ${X:0>2}          ", .{operand_1});
         },
         0x8C => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("dec ${X:0>4}       ", .{addr});
+            std.debug.print("dec ${X:0>4}        ", .{addr});
         },
         0x8D => {
             operand_count = 1;
-            std.debug.print("mov y, #${X:0>2}     ", .{operand_1});
+            std.debug.print("mov y, #${X:0>2}      ", .{operand_1});
         },
         0x8E => {
-            std.debug.print("pop psw         ", .{});
+            std.debug.print("pop psw          ", .{});
         },
         0x8F => {
             operand_count = 2;
-            std.debug.print("mov ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+            std.debug.print("mov ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
         },
         0x90 => {
             operand_count = 1;
@@ -671,14 +677,14 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 2;
-            std.debug.print("bvc ${X:0>4}       ", .{target_address});
+            std.debug.print("bvc ${X:0>4}        ", .{target_address});
         },
         0x91 => {
-            std.debug.print("tcall 9         ", .{});
+            std.debug.print("tcall 9          ", .{});
         },
         0x92 => {
             operand_count = 1;
-            std.debug.print("clr1 ${X:0>2}.4      ", .{operand_1});
+            std.debug.print("clr1 ${X:0>2}.4       ", .{operand_1});
         },
         0x93 => {
             operand_count = 2;
@@ -686,60 +692,60 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbc ${X:0>2}.4, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbc ${X:0>2}.4, ${X:0>4} ", .{operand_1, target_address});
         },
         0x94 => {
             operand_count = 1;
-            std.debug.print("adc a, ${X:0>2}+x    ", .{operand_1});
+            std.debug.print("adc a, ${X:0>2}+x     ", .{operand_1});
         },
         0x95 => {
             operand_count = 2;
-            std.debug.print("adc a, ${X:0>4}+x  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("adc a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x96 => {
             operand_count = 2;
-            std.debug.print("adc a, ${X:0>4}+y  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("adc a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0x97 => {
             operand_count = 1;
-            std.debug.print("adc a, [${X:0>2}]+y  ", .{operand_1});
+            std.debug.print("adc a, [${X:0>2}]+y   ", .{operand_1});
         },
         0x98 => {
             operand_count = 2;
-            std.debug.print("adc ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+            std.debug.print("adc ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
         },
         0x99 => {
-            std.debug.print("adc (x), (y)    ", .{});
+            std.debug.print("adc (x), (y)     ", .{});
         },
         0x9A => {
             operand_count = 1;
-            std.debug.print("subw ya, ${X:0>2}    ", .{operand_1});
+            std.debug.print("subw ya, ${X:0>2}     ", .{operand_1});
         },
         0x9B => {
             operand_count = 1;
-            std.debug.print("dec ${X:0>2}+x       ", .{operand_1});
+            std.debug.print("dec ${X:0>2}+x        ", .{operand_1});
         },
         0x9C => {
-            std.debug.print("dec a           ", .{});
+            std.debug.print("dec a            ", .{});
         },
         0x9D => {
-            std.debug.print("mov x, sp       ", .{});
+            std.debug.print("mov x, sp        ", .{});
         },
         0x9E => {
-            std.debug.print("div ya, x       ", .{});
+            std.debug.print("div ya, x        ", .{});
         },
         0x9F => {
-            std.debug.print("xcn a           ", .{});
+            std.debug.print("xcn a            ", .{});
         },
         0xA0 => {
-            std.debug.print("ei              ", .{});
+            std.debug.print("ei               ", .{});
         },
         0xA1 => {
-            std.debug.print("tcall 10        ", .{});
+            std.debug.print("tcall 10         ", .{});
         },
         0xA2 => {
             operand_count = 1;
-            std.debug.print("set1 ${X:0>2}.5      ", .{operand_1});
+            std.debug.print("set1 ${X:0>2}.5       ", .{operand_1});
         },
         0xA3 => {
             operand_count = 2;
@@ -747,54 +753,54 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbs ${X:0>2}.5, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbs ${X:0>2}.5, ${X:0>4} ", .{operand_1, target_address});
         },
         0xA4 => {
             operand_count = 1;
-            std.debug.print("sbc a, ${X:0>2}      ", .{operand_1});
+            std.debug.print("sbc a, ${X:0>2}       ", .{operand_1});
         },
         0xA5 => {
             operand_count = 2;
-            std.debug.print("sbc a, ${X:0>4}    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("sbc a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0xA6 => {
-            std.debug.print("sbc a, (x)      ", .{});
+            std.debug.print("sbc a, (x)       ", .{});
         },
         0xA7 => {
             operand_count = 1;
-            std.debug.print("sbc a, [${X:0>2}+x]  ", .{operand_1});
+            std.debug.print("sbc a, [${X:0>2}+x]   ", .{operand_1});
         },
         0xA8 => {
             operand_count = 1;
-            std.debug.print("sbc a, #${X:0>2}     ", .{operand_1});
+            std.debug.print("sbc a, #${X:0>2}      ", .{operand_1});
         },
         0xA9 => {
             operand_count = 2;
-            std.debug.print("sbc ${X:0>2}, ${X:0>2}    ", .{operand_2, operand_1});
+            std.debug.print("sbc ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
         },
         0xAA => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("mov1 c, ${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
+            std.debug.print("mov1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
         },
         0xAB => {
             operand_count = 1;
-            std.debug.print("inc ${X:0>2}         ", .{operand_1});
+            std.debug.print("inc ${X:0>2}          ", .{operand_1});
         },
         0xAC => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("inc ${X:0>4}       ", .{addr});
+            std.debug.print("inc ${X:0>4}        ", .{addr});
         },
         0xAD => {
             operand_count = 1;
-            std.debug.print("cmp y, #${X:0>2}     ", .{operand_1});
+            std.debug.print("cmp y, #${X:0>2}      ", .{operand_1});
         },
         0xAE => {
-            std.debug.print("pop a           ", .{});
+            std.debug.print("pop a            ", .{});
         },
         0xAF => {
-            std.debug.print("mov (x)+, a     ", .{});
+            std.debug.print("mov (x)+, a      ", .{});
         },
         0xB0 => {
             operand_count = 1;
@@ -802,14 +808,14 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 2;
-            std.debug.print("bcs ${X:0>4}       ", .{target_address});
+            std.debug.print("bcs ${X:0>4}        ", .{target_address});
         },
         0xB1 => {
-            std.debug.print("tcall 11        ", .{});
+            std.debug.print("tcall 11         ", .{});
         },
         0xB2 => {
             operand_count = 1;
-            std.debug.print("clr1 ${X:0>2}.5      ", .{operand_1});
+            std.debug.print("clr1 ${X:0>2}.5       ", .{operand_1});
         },
         0xB3 => {
             operand_count = 2;
@@ -817,60 +823,60 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbc ${X:0>2}.5, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbc ${X:0>2}.5, ${X:0>4} ", .{operand_1, target_address});
         },
         0xB4 => {
             operand_count = 1;
-            std.debug.print("sbc a, ${X:0>2}+x    ", .{operand_1});
+            std.debug.print("sbc a, ${X:0>2}+x     ", .{operand_1});
         },
         0xB5 => {
             operand_count = 2;
-            std.debug.print("sbc a, ${X:0>4}+x  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("sbc a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0xB6 => {
             operand_count = 2;
-            std.debug.print("sbc a, ${X:0>4}+y  ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("sbc a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0xB7 => {
             operand_count = 1;
-            std.debug.print("sbc a, [${X:0>2}]+y  ", .{operand_1});
+            std.debug.print("sbc a, [${X:0>2}]+y   ", .{operand_1});
         },
         0xB8 => {
             operand_count = 2;
-            std.debug.print("sbc ${X:0>2}, #${X:0>2}   ", .{operand_2, operand_1});
+            std.debug.print("sbc ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
         },
         0xB9 => {
-            std.debug.print("sbc (x), (y)    ", .{});
+            std.debug.print("sbc (x), (y)     ", .{});
         },
         0xBA => {
             operand_count = 1;
-            std.debug.print("movw ya, ${X:0>2}    ", .{operand_1});
+            std.debug.print("movw ya, ${X:0>2}     ", .{operand_1});
         },
         0xBB => {
             operand_count = 1;
-            std.debug.print("inc ${X:0>2}+x       ", .{operand_1});
+            std.debug.print("inc ${X:0>2}+x        ", .{operand_1});
         },
         0xBC => {
-            std.debug.print("inc a           ", .{});
+            std.debug.print("inc a            ", .{});
         },
         0xBD => {
-            std.debug.print("mov sp, x       ", .{});
+            std.debug.print("mov sp, x        ", .{});
         },
         0xBE => {
-            std.debug.print("das a           ", .{});
+            std.debug.print("das a            ", .{});
         },
         0xBF => {
-            std.debug.print("mov a, (x)+     ", .{});
+            std.debug.print("mov a, (x)+      ", .{});
         },
         0xC0 => {
-            std.debug.print("di              ", .{});
+            std.debug.print("di               ", .{});
         },
         0xC1 => {
-            std.debug.print("tcall 12        ", .{});
+            std.debug.print("tcall 12         ", .{});
         },
         0xC2 => {
             operand_count = 1;
-            std.debug.print("set1 ${X:0>2}.6      ", .{operand_1});
+            std.debug.print("set1 ${X:0>2}.6       ", .{operand_1});
         },
         0xC3 => {
             operand_count = 2;
@@ -878,57 +884,261 @@ pub fn print_opcode(emu: *Emu) void {
             const offset_i16: i16 = @as(i16, offset);
             const offset_u16: u16 = @bitCast(offset_i16);
             const target_address: u16 = pc +% offset_u16 +% 3;
-            std.debug.print("bbs ${X:0>2}.6, ${X:0>4}", .{operand_1, target_address});
+            std.debug.print("bbs ${X:0>2}.6, ${X:0>4} ", .{operand_1, target_address});
         },
         0xC4 => {
             operand_count = 1;
-            std.debug.print("mov ${X:0>2}, a      ", .{operand_1});
+            std.debug.print("mov ${X:0>2}, a       ", .{operand_1});
         },
         0xC5 => {
             operand_count = 2;
-            std.debug.print("mov ${X:0>4}, a    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("mov ${X:0>4}, a     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0xC6 => {
-            std.debug.print("mov (x), a      ", .{});
+            std.debug.print("mov (x), a       ", .{});
         },
         0xC7 => {
             operand_count = 1;
-            std.debug.print("mov [${X:0>2}+x], a  ", .{operand_1});
+            std.debug.print("mov [${X:0>2}+x], a   ", .{operand_1});
         },
         0xC8 => {
             operand_count = 1;
-            std.debug.print("cmp x, #${X:0>2}     ", .{operand_1});
+            std.debug.print("cmp x, #${X:0>2}      ", .{operand_1});
         },
         0xC9 => {
             operand_count = 2;
-            std.debug.print("mov ${X:0>4}, x    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("mov ${X:0>4}, x     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0xCA => {
             operand_count = 2;
             const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-            std.debug.print("mov1 ${X:0>4}.{d}, c ", .{addr & 0x1FFF, addr >> 13});
+            std.debug.print("mov1 ${X:0>4}.{d}, c  ", .{addr & 0x1FFF, addr >> 13});
         },
         0xCB => {
             operand_count = 1;
-            std.debug.print("mov ${X:0>2}, y      ", .{operand_1});
+            std.debug.print("mov ${X:0>2}, y       ", .{operand_1});
         },
         0xCC => {
             operand_count = 2;
-            std.debug.print("mov ${X:0>4}, y    ", .{operand_1 | @as(u16, operand_2) << 8});
+            std.debug.print("mov ${X:0>4}, y     ", .{operand_1 | @as(u16, operand_2) << 8});
         },
         0xCD => {
             operand_count = 1;
-            std.debug.print("mov x, #${X:0>2}     ", .{operand_1});
+            std.debug.print("mov x, #${X:0>2}      ", .{operand_1});
         },
         0xCE => {
-            std.debug.print("pop x           ", .{});
+            std.debug.print("pop x            ", .{});
         },
         0xCF => {
-            std.debug.print("mul ya          ", .{});
+            std.debug.print("mul ya           ", .{});
         },
-        else => {
-            std.debug.print("mul ya          ", .{});
-        }
+        0xD0 => {
+            operand_count = 1;
+            const offset: i8 = @bitCast(operand_1);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 2;
+            std.debug.print("bne ${X:0>4}        ", .{target_address});
+        },
+        0xD1 => {
+            std.debug.print("tcall 13         ", .{});
+        },
+        0xD2 => {
+            operand_count = 1;
+            std.debug.print("clr1 ${X:0>2}.6       ", .{operand_1});
+        },
+        0xD3 => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("bbc ${X:0>2}.6, ${X:0>4} ", .{operand_1, target_address});
+        },
+        0xD4 => {
+            operand_count = 1;
+            std.debug.print("mov ${X:0>2}+x, a     ", .{operand_1});
+        },
+        0xD5 => {
+            operand_count = 2;
+            std.debug.print("mov ${X:0>4}+x, a   ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0xD6 => {
+            operand_count = 2;
+            std.debug.print("mov ${X:0>4}+y, a   ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0xD7 => {
+            operand_count = 1;
+            std.debug.print("mov [${X:0>2}]+y, a   ", .{operand_1});
+        },
+        0xD8 => {
+            operand_count = 1;
+            std.debug.print("mov ${X:0>2}, x       ", .{operand_1});
+        },
+        0xD9 => {
+            operand_count = 1;
+            std.debug.print("mov ${X:0>2}+y, x     ", .{operand_1});
+        },
+        0xDA => {
+            operand_count = 1;
+            std.debug.print("movw ${X:0>2}, ya     ", .{operand_1});
+        },
+        0xDB => {
+            operand_count = 1;
+            std.debug.print("mov ${X:0>2}+x, y     ", .{operand_1});
+        },
+        0xDC => {
+            std.debug.print("dec y            ", .{});
+        },
+        0xDD => {
+            std.debug.print("mov a, y         ", .{});
+        },
+        0xDE => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("cbne ${X:0>2}+x, ${X:0>4}", .{operand_1, target_address});
+        },
+        0xDF => {
+            std.debug.print("daa a            ", .{});
+        },
+        0xE0 => {
+            std.debug.print("clrv             ", .{});
+        },
+        0xE1 => {
+            std.debug.print("tcall 14         ", .{});
+        },
+        0xE2 => {
+            operand_count = 1;
+            std.debug.print("set1 ${X:0>2}.7       ", .{operand_1});
+        },
+        0xE3 => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("bbs ${X:0>2}.7, ${X:0>4} ", .{operand_1, target_address});
+        },
+        0xE4 => {
+            operand_count = 1;
+            std.debug.print("mov a, ${X:0>2}       ", .{operand_1});
+        },
+        0xE5 => {
+            operand_count = 2;
+            std.debug.print("mov a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0xE6 => {
+            std.debug.print("mov a, (x)       ", .{});
+        },
+        0xE7 => {
+            operand_count = 1;
+            std.debug.print("mov a, [${X:0>2}+x]   ", .{operand_1});
+        },
+        0xE8 => {
+            operand_count = 1;
+            std.debug.print("mov a, #${X:0>2}      ", .{operand_1});
+        },
+        0xE9 => {
+            operand_count = 2;
+            std.debug.print("mov x, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0xEA => {
+            operand_count = 2;
+            const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
+            std.debug.print("not1 ${X:0>4}.{d}     ", .{addr & 0x1FFF, addr >> 13});
+        },
+        0xEB => {
+            operand_count = 1;
+            std.debug.print("mov y, ${X:0>2}       ", .{operand_1});
+        },
+        0xEC => {
+            operand_count = 2;
+            std.debug.print("mov y, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0xED => {
+            std.debug.print("notc             ", .{});
+        },
+        0xEE => {
+            std.debug.print("pop y            ", .{});
+        },
+        0xEF => {
+            std.debug.print("sleep            ", .{});
+        },
+        0xF0 => {
+            operand_count = 1;
+            const offset: i8 = @bitCast(operand_1);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 2;
+            std.debug.print("beq ${X:0>4}        ", .{target_address});
+        },
+        0xF1 => {
+            std.debug.print("tcall 15         ", .{});
+        },
+        0xF2 => {
+            operand_count = 1;
+            std.debug.print("clr1 ${X:0>2}.7       ", .{operand_1});
+        },
+        0xF3 => {
+            operand_count = 2;
+            const offset: i8 = @bitCast(operand_2);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 3;
+            std.debug.print("bbc ${X:0>2}.7, ${X:0>4} ", .{operand_1, target_address});
+        },
+        0xF4 => {
+            operand_count = 1;
+            std.debug.print("mov a, ${X:0>2}+x     ", .{operand_1});
+        },
+        0xF5 => {
+            operand_count = 2;
+            std.debug.print("mov a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0xF6 => {
+            operand_count = 2;
+            std.debug.print("mov a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+        },
+        0xF7 => {
+            operand_count = 1;
+            std.debug.print("mov a, [${X:0>2}]+y   ", .{operand_1});
+        },
+        0xF8 => {
+            operand_count = 1;
+            std.debug.print("mov x, ${X:0>2}       ", .{operand_1});
+        },
+        0xF9 => {
+            operand_count = 1;
+            std.debug.print("mov x, ${X:0>2}+y     ", .{operand_1});
+        },
+        0xFA => {
+            operand_count = 2;
+            std.debug.print("mov ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+        },
+        0xFB => {
+            operand_count = 1;
+            std.debug.print("mov y, ${X:0>2}+x     ", .{operand_1});
+        },
+        0xFC => {
+            std.debug.print("inc y            ", .{});
+        },
+        0xFD => {
+            std.debug.print("mov y, a         ", .{});
+        },
+        0xFE => {
+            operand_count = 1;
+            const offset: i8 = @bitCast(operand_1);
+            const offset_i16: i16 = @as(i16, offset);
+            const offset_u16: u16 = @bitCast(offset_i16);
+            const target_address: u16 = pc +% offset_u16 +% 2;
+            std.debug.print("dbnz y, ${X:0>4}    ", .{target_address});
+        },
+        0xFF => {
+            std.debug.print("stop             ", .{});
+        },
     }
 
     switch (operand_count) {
