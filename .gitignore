@@ -3,4 +3,5 @@ data/*
 !data/bootrom.bin
 !data/gauss.bin
 apollo
+apollo-spc-program
 *.o
