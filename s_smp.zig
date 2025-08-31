@@ -174,6 +174,14 @@ pub const SSMP = struct {
         }
     }
 
+    pub fn receive_port_value(self: *SSMP, port_index: u2, value: u8) void {
+        self.state.input_ports[port_index] = value;
+    }
+
+    pub fn trigger_interrupt(self: *SSMP, vector: ?u16) void {
+        self.spc.trigger_interrupt(vector);
+    }
+
     pub fn get_access_logs(self: *SSMP, options: struct { exclude_at_end: u32 = 0 }) []AccessLog {
         if (options.exclude_at_end > self.last_log_index) {
             return self.access_logs[0..self.last_log_index];
@@ -340,6 +348,16 @@ pub const SSMP = struct {
         sw: switch (substate) {
             0, 1 => {
                 if (substate == 0) {
+                    if (self.spc.pending_interrupt()) {
+                        // If previously pending interrupt, kick off the execution of interrupt mode for this "instruction"
+                        self.spc.state.pending_interrupt = false;
+                        self.spc.state.mode = SPCState.Mode.interrupt;
+                    }
+                    else if (self.spc.mode() == SPCState.Mode.interrupt) {
+                        // End interrupt mode if SPC was in interrupt mode for the previous "instruction"
+                        self.spc.state.mode = SPCState.Mode.normal;
+                    }
+
                     if (self.enable_access_logs) {
                         self.append_exec_log(self.spc.pc());
                     }
@@ -376,9 +394,10 @@ pub const SSMP = struct {
     inline fn exec_opcode(self: *SSMP, substate_offset: u32) !void {
         const opcode =
             switch (self.spc.mode()) {
-                SPCState.Mode.normal  => self.last_opcode,
-                SPCState.Mode.asleep  => 0xEF, // Hardcoded as SLEEP instruction
-                SPCState.Mode.stopped => 0xFF, // Hardcoded as STOP instruction
+                SPCState.Mode.normal    => self.last_opcode,
+                SPCState.Mode.asleep    => 0xEF, // Hardcoded as SLEEP instruction
+                SPCState.Mode.stopped   => 0xFF, // Hardcoded as STOP instruction
+                SPCState.Mode.interrupt => 0x0F, // Hardcoded as BRK instruction
             };
         
         switch (opcode) {

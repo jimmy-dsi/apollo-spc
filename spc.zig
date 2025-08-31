@@ -27,9 +27,13 @@ pub const SPC = struct {
         addw, subw, cmpw
     };
 
+    const default_int_vector: u16 = 0xFFDE;
+
     emu: *Emu,
 
     state: SPCState,
+    interrupt_vector: u16 = default_int_vector, // Some guesswork here: Interrupt vector might have been intended to share the same location as the BRK vector, similar to 6502.
+                                                // Using that as the default, but made to be overrideable when debugging.
 
     // Temporary persistent working variables across coroutine states
     data_u8:  [4]u8  = [4]u8  { 0, 0, 0, 0 },
@@ -50,6 +54,16 @@ pub const SPC = struct {
 
     pub fn reset(self: *SPC) void {
         _  = self;
+    }
+
+    pub fn trigger_interrupt(self: *SPC, vector: ?u16) void {
+        // Don't allow interrupt through if interrupts are disabled or SPC is stopped
+        if (self.state.i() == 0 or self.mode() == SPCState.Mode.stopped) {
+            return;
+        }
+
+        self.interrupt_vector = vector orelse default_int_vector;
+        self.state.pending_interrupt = true;
     }
 
     pub inline fn s_smp(self: *const SPC) *SSMP {
@@ -115,6 +129,10 @@ pub const SPC = struct {
 
     pub inline fn mode(self: *const SPC) SPCState.Mode {
         return self.state.mode;
+    }
+
+    pub inline fn pending_interrupt(self: *const SPC) bool {
+        return self.state.pending_interrupt;
     }
 
     pub inline fn step_pc(self: *SPC) void {
@@ -704,6 +722,10 @@ pub const SPC = struct {
     }
 
     pub inline fn brk(self: *SPC, substate: u32) !void {
+        // Some more guesswork here: If the SPC700 is anything ilke the 6502, then it is likely that interrupts would go through the BRK pipeline as well
+        // With the exception of setting the break flag.
+        // Would be nice if this could be confirmed somehow
+
         switch (substate) {
             0, 1   => {  try self.dummy_read(self.pc(), substate);     }, // Dummy read
             2...5  => {  try self.push_word(self.pc(), substate - 2);  }, // Push PC
@@ -712,7 +734,9 @@ pub const SPC = struct {
             9...12 => {  try self.read_word(0xFFDE, substate - 9);     }, // Read address
             13     => {  self.state.pc = self.last_read_word();           // Set registers - End
                          self.state.set_i(0); 
-                         self.state.set_b(1); 
+                         if (self.mode() != SPCState.Mode.interrupt) {
+                             self.state.set_b(1); 
+                         }
                          self.finish(0);                               },
 
             else => unreachable
@@ -1864,7 +1888,11 @@ pub const SPC = struct {
             }, // Start of dummy read (0)
             1 => {  try self.dummy_read(self.pc() +% 1, substate);  }, // Adjust read address by +1 since we stepped PC back (normally this would be a read to current PC)
             2 => {  try self.idle();                                }, // Idle
-            3 => {  self.state.mode = SPCState.Mode.asleep;
+            3 => {  if (self.pending_interrupt()) {
+                        // Restore PC if SPC is about to be awakened
+                        self.state.pc +%= 1;
+                    }
+                    self.state.mode = SPCState.Mode.asleep;
                     self.finish(0);                                 }, // End
 
             else => unreachable

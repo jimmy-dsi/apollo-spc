@@ -20,6 +20,8 @@ pub fn main() !void {
     std.debug.print("   v = Memory viewer \n", .{});
     std.debug.print("Action commands: \n", .{});
     std.debug.print("   s = Step instruction [default] \n", .{});
+    std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
+    std.debug.print("   x = Send interrupt signal \n", .{});
     std.debug.print("   p = View previous page \n", .{});
     std.debug.print("   n = View next page \n", .{});
     std.debug.print("   u = Shift memory view up one row \n", .{});
@@ -109,6 +111,34 @@ pub fn main() !void {
                 cur_mode = 'v';
                 std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
+            },
+            'w' => {
+                cur_action = 'w';
+
+                std.debug.print("\nEnter APU IO port and byte value. Format: PP XX (Example: F4 0A)\n", .{});
+                _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+
+                const port_num = std.fmt.parseInt(u8, buffer[0..2], 16) catch 0x00;
+                const value    = std.fmt.parseInt(u8, buffer[3..5], 16) catch null;
+
+                if (port_num >= 0xF4 and port_num <= 0xF7 and value != null) {
+                    const v = value.?;
+                    const prev_port_val = emu.s_smp.state.input_ports[port_num - 0xF4];
+
+                    emu.s_smp.receive_port_value(@intCast(port_num - 0xF4), v);
+
+                    std.debug.print("\x1B[34m", .{});
+                    std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive"});
+                    std.debug.print("[{X:0>4}]={X:0>2}->{X:0>2}", .{port_num, prev_port_val, v});
+                    std.debug.print("\x1B[0m\n", .{});
+                }
+            },
+            'x' => {
+                emu.s_smp.trigger_interrupt(null);
+
+                std.debug.print("\n\x1B[34m", .{});
+                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive interrupt"});
+                std.debug.print("\x1B[0m\n", .{});
             },
             's' => {
                 cur_action = 's';
