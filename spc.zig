@@ -530,7 +530,7 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn alu_a_with_d(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_d(self: *SPC, substate: u32, reg: *u8, comptime op: AluOp) !void {
         const address = &self.data_u8[0];
         const data    = &self.data_u8[1];
 
@@ -539,14 +539,14 @@ pub const SPC = struct {
             2    => {  address.* = self.last_read_byte(); continue :sw 3;  }, // Start of DP read (2)
             3    => {  try self.read_dp(address.*, substate - 2);          },
             4    => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                       self.do_alu_op(&self.state.a, data.*, op);           
+                       self.do_alu_op(reg, data.*, op);           
                        self.finish(0);                                     },
 
             else => unreachable
         }
     }
 
-    pub inline fn alu_a_with_abs(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_abs(self: *SPC, substate: u32, reg: *u8, comptime op: AluOp) !void {
         const address = &self.data_u16[0];
         const data    = &self.data_u8[0];
 
@@ -555,28 +555,28 @@ pub const SPC = struct {
             4     => {  address.* = self.last_read_word(); continue :sw 5;  }, // Start of ABS read (4)
             5     => {  try self.read(address.*, substate - 4);             },
             6     => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                        self.do_alu_op(&self.state.a, data.*, op);           
+                        self.do_alu_op(reg, data.*, op);           
                         self.finish(0);                                     },
             
             else => unreachable
         }
     }
 
-    pub inline fn alu_a_with_x_ind(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_x_ind(self: *SPC, substate: u32, reg: *u8, comptime op: AluOp) !void {
         const data = &self.data_u8[0];
 
         switch (substate) {
-            0, 1 => {  try self.dummy_read(self.pc(), substate);   }, // Dummy read
-            2, 3 => {  try self.read_dp(self.x(), substate - 2);   }, // DP read from X
-            4    => {  data.* = self.last_read_byte();                // Perform ALU operation - End
-                       self.do_alu_op(&self.state.a, data.*, op);    
-                       self.finish(0);                             },
+            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
+            2, 3 => {  try self.read_dp(self.x(), substate - 2);  }, // DP read from X
+            4    => {  data.* = self.last_read_byte();               // Perform ALU operation - End
+                       self.do_alu_op(reg, data.*, op);    
+                       self.finish(0);                            },
             
             else => unreachable
         }
     }
 
-    pub inline fn alu_a_with_d_x_ind(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_d_x_ind(self: *SPC, substate: u32, reg: *u8, comptime op: AluOp) !void {
         const indirect = &self.data_u8[0];
         const data     = &self.data_u8[1];
         const address  = &self.data_u16[0];
@@ -589,21 +589,21 @@ pub const SPC = struct {
             7     => {  address.* = self.last_read_word(); continue :sw 8;            }, // Start of ABS read (7)
             8     => {  try self.read(address.*, substate - 7);                       },
             9     => {  data.* = self.last_read_byte();                                  // Perform ALU operation - End
-                        self.do_alu_op(&self.state.a, data.*, op);           
+                        self.do_alu_op(reg, data.*, op);           
                         self.finish(0);                                               },
 
             else => unreachable
         }
     }
 
-    pub inline fn alu_a_with_imm(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_imm(self: *SPC, substate: u32, reg: *u8, comptime op: AluOp) !void {
         const data = &self.data_u8[0];
         
         switch (substate) {
-            0, 1  => {  try self.fetch(substate);                   }, // Fetch
-            2     => {  data.* = self.last_read_byte();                // Perform ALU operation - End
-                        self.do_alu_op(&self.state.a, data.*, op);
-                        self.finish(0);                             },
+            0, 1  => {  try self.fetch(substate);         }, // Fetch
+            2     => {  data.* = self.last_read_byte();      // Perform ALU operation - End
+                        self.do_alu_op(reg, data.*, op);
+                        self.finish(0);                   },
 
             else => unreachable
         }
@@ -773,72 +773,55 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn alu_a_with_d_x(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_d_reg(self: *SPC, substate: u32, reg: *u8, idx_reg: *u8, comptime op: AluOp) !void {
         const address = &self.data_u8[0];
         const data    = &self.data_u8[1];
 
         sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                               }, // Fetch
-            2    => {  try self.idle();                                        }, // Idle
-            3    => {  address.* = self.last_read_byte(); continue :sw 4;      }, // Start of DP read (3)
-            4    => {  try self.read_dp(address.* +% self.x(), substate - 3);  },
-            5    => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                       self.do_alu_op(&self.state.a, data.*, op);           
-                       self.finish(0);                                         },
+            0, 1 => {  try self.fetch(substate);                                }, // Fetch
+            2    => {  try self.idle();                                         }, // Idle
+            3    => {  address.* = self.last_read_byte(); continue :sw 4;       }, // Start of DP read (3)
+            4    => {  try self.read_dp(address.* +% idx_reg.*, substate - 3);  },
+            5    => {  data.* = self.last_read_byte();                             // Perform ALU operation - End
+                       self.do_alu_op(reg, data.*, op);            
+                       self.finish(0);                                          },
 
             else => unreachable
         }
     }
 
-    pub inline fn alu_a_with_abs_x(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_abs_reg(self: *SPC, substate: u32, reg: *u8, idx_reg: *u8, comptime op: AluOp) !void {
         const address = &self.data_u16[0];
         const data    = &self.data_u8[0];
 
         sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                       }, // Fetch
-            4     => {  try self.idle();                                     }, // Idle
-            5     => {  address.* = self.last_read_word(); continue :sw 6;   }, // Start of ABS read (5)
-            6     => {  try self.read(address.* +% self.x(), substate - 5);  },
-            7     => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                        self.do_alu_op(&self.state.a, data.*, op);           
-                        self.finish(0);                                      },
+            0...3 => {  try self.fetch_word(substate);                        }, // Fetch
+            4     => {  try self.idle();                                      }, // Idle
+            5     => {  address.* = self.last_read_word(); continue :sw 6;    }, // Start of ABS read (5)
+            6     => {  try self.read(address.* +% idx_reg.*, substate - 5);  },
+            7     => {  data.* = self.last_read_byte();                          // Perform ALU operation - End
+                        self.do_alu_op(reg, data.*, op);            
+                        self.finish(0);                                       },
             
             else => unreachable
         }
     }
 
-    pub inline fn alu_a_with_abs_y(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const address = &self.data_u16[0];
-        const data    = &self.data_u8[0];
-
-        sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                       }, // Fetch
-            4     => {  try self.idle();                                     }, // Idle
-            5     => {  address.* = self.last_read_word(); continue :sw 6;   }, // Start of ABS read (5)
-            6     => {  try self.read(address.* +% self.y(), substate - 5);  },
-            7     => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                        self.do_alu_op(&self.state.a, data.*, op);           
-                        self.finish(0);                                      },
-            
-            else => unreachable
-        }
-    }
-
-    pub inline fn alu_a_with_d_ind_y(self: *SPC, substate: u32, comptime op: AluOp) !void {
+    pub inline fn alu_reg_with_d_ind_y(self: *SPC, substate: u32, reg: *u8, comptime op: AluOp) !void {
         const indirect = &self.data_u8[0];
         const data     = &self.data_u8[1];
         const address  = &self.data_u16[0];
 
         sw: switch (substate) {
-            0, 1  => {  try self.fetch(substate);                                     }, // Fetch
-            2     => {  try self.idle();                                              }, // Idle
-            3     => {  indirect.* = self.last_read_byte(); continue :sw 4;           }, // Start of DP word read (3)
-            4...6 => {  try self.read_dp_word(indirect.*, substate - 3);              },
-            7     => {  address.* = self.last_read_word(); continue :sw 8;            }, // Start of ABS read (7)
-            8     => {  try self.read(address.* +% self.y(), substate - 7);           },
-            9     => {  data.* = self.last_read_byte();                                  // Perform ALU operation - End
-                        self.do_alu_op(&self.state.a, data.*, op);           
-                        self.finish(0);                                               },
+            0, 1  => {  try self.fetch(substate);                            }, // Fetch
+            2     => {  try self.idle();                                     }, // Idle
+            3     => {  indirect.* = self.last_read_byte(); continue :sw 4;  }, // Start of DP word read (3)
+            4...6 => {  try self.read_dp_word(indirect.*, substate - 3);     },
+            7     => {  address.* = self.last_read_word(); continue :sw 8;   }, // Start of ABS read (7)
+            8     => {  try self.read(address.* +% self.y(), substate - 7);  },
+            9     => {  data.* = self.last_read_byte();                         // Perform ALU operation - End
+                        self.do_alu_op(reg, data.*, op);           
+                        self.finish(0);                                      },
 
             else => unreachable
         }
@@ -921,38 +904,12 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn alu_modify_a(self: *SPC, substate: u32, comptime op: AluModifyOp) !void {
+    pub inline fn alu_modify_reg(self: *SPC, substate: u32, reg: *u8, comptime op: AluModifyOp) !void {
         switch (substate) {   
             0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
-            2    => {  self.do_alu_modify_op(&self.state.a, op);     // Perform ALU operation - End
+            2    => {  self.do_alu_modify_op(reg, op);               // Perform ALU operation - End
                        self.finish(0);                            },
 
-            else => unreachable
-        }
-    }
-
-    pub inline fn alu_modify_x(self: *SPC, substate: u32, comptime op: AluModifyOp) !void {
-        switch (substate) {   
-            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
-            2    => {  self.do_alu_modify_op(&self.state.x, op);     // Perform ALU operation - End
-                       self.finish(0);                            },
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn alu_x_with_abs(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const address = &self.data_u16[0];
-        const data    = &self.data_u8[0];
-
-        sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                      }, // Fetch
-            4     => {  address.* = self.last_read_word(); continue :sw 5;  }, // Start of ABS read (4)
-            5     => {  try self.read(address.*, substate - 4);             },
-            6     => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                        self.do_alu_op(&self.state.x, data.*, op);           
-                        self.finish(0);                                     },
-            
             else => unreachable
         }
     }
@@ -1021,22 +978,6 @@ pub const SPC = struct {
             10   => {  self.state.set_z(@intFromBool(data.* == 0));                                // Perform ALU operation - End
                        self.state.set_n(@intFromBool(data.* & 0x8000 != 0));       
                        self.finish(0);                                                          },
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn alu_x_with_d(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const address = &self.data_u8[0];
-        const data    = &self.data_u8[1];
-
-        sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                           }, // Fetch
-            2    => {  address.* = self.last_read_byte(); continue :sw 3;  }, // Start of DP read (2)
-            3    => {  try self.read_dp(address.*, substate - 2);          },
-            4    => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                       self.do_alu_op(&self.state.x, data.*, op);           
-                       self.finish(0);                                     },
 
             else => unreachable
         }
@@ -1137,22 +1078,6 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn alu_y_with_abs(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const address = &self.data_u16[0];
-        const data    = &self.data_u8[0];
-
-        sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                      }, // Fetch
-            4     => {  address.* = self.last_read_word(); continue :sw 5;  }, // Start of ABS read (4)
-            5     => {  try self.read(address.*, substate - 4);             },
-            6     => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                        self.do_alu_op(&self.state.y, data.*, op);           
-                        self.finish(0);                                     },
-            
-            else => unreachable
-        }
-    }
-
     pub inline fn jmp_abs(self: *SPC, substate: u32) !void {
         switch (substate) {
             0...3 => {  try self.fetch_word(substate);          }, // Fetch
@@ -1172,8 +1097,6 @@ pub const SPC = struct {
             else => unreachable
         }
     }
-
-
 
     pub inline fn cmp_d_with_d(self: *SPC, substate: u32) !void {
         const op = AluOp.cmp;
@@ -1235,8 +1158,6 @@ pub const SPC = struct {
             else => unreachable
         }
     }
-
-
 
     pub inline fn cmp_d_with_imm(self: *SPC, substate: u32) !void {
         const op = AluOp.cmp;
@@ -1300,22 +1221,6 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn alu_y_with_d(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const address = &self.data_u8[0];
-        const data    = &self.data_u8[1];
-
-        sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                           }, // Fetch
-            2    => {  address.* = self.last_read_byte(); continue :sw 3;  }, // Start of DP read (2)
-            3    => {  try self.read_dp(address.*, substate - 2);          },
-            4    => {  data.* = self.last_read_byte();                        // Perform ALU operation - End
-                       self.do_alu_op(&self.state.y, data.*, op);           
-                       self.finish(0);                                     },
-
-            else => unreachable
-        }
-    }
-
     pub inline fn reti(self: *SPC, substate: u32) !void {
         sw: switch (substate) {
             0, 1  => {  try self.dummy_read(self.pc(), substate);                }, // Dummy read
@@ -1335,19 +1240,6 @@ pub const SPC = struct {
             0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
             2    => {  self.state.set_c(1);                          // Set flag - End
                        self.finish(0);                            },
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn alu_y_with_imm(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const data = &self.data_u8[0];
-        
-        switch (substate) {
-            0, 1  => {  try self.fetch(substate);                   }, // Fetch
-            2     => {  data.* = self.last_read_byte();                // Perform ALU operation - End
-                        self.do_alu_op(&self.state.y, data.*, op);
-                        self.finish(0);                             },
 
             else => unreachable
         }
@@ -1514,28 +1406,28 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn mov_d_from_a(self: *SPC, substate: u32) !void {
+    pub inline fn mov_d_from_reg(self: *SPC, substate: u32, reg: *u8) !void {
         const address = &self.data_u8[0];
 
         sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                              }, // Fetch
-            2    => {  address.* = self.last_read_byte(); continue :sw 3;     }, // Start of DP dummy read (2)
-            3    => {  try self.dummy_read_dp(address.*, substate - 2);       },
-            4, 5 => {  try self.write_dp(address.*, self.a(), substate - 4);  }, // DP write
-            6    => {  self.finish(0);                                        }, // End
+            0, 1 => {  try self.fetch(substate);                           }, // Fetch
+            2    => {  address.* = self.last_read_byte(); continue :sw 3;  }, // Start of DP dummy read (2)
+            3    => {  try self.dummy_read_dp(address.*, substate - 2);    },
+            4, 5 => {  try self.write_dp(address.*, reg.*, substate - 4);  }, // DP write
+            6    => {  self.finish(0);                                     }, // End
 
             else => unreachable
         }
     }
 
-    pub inline fn mov_abs_from_a(self: *SPC, substate: u32) !void {
+    pub inline fn mov_abs_from_reg(self: *SPC, substate: u32, reg: *u8) !void {
         const address = &self.data_u16[0];
 
         sw: switch (substate) {
             0...3 => {  try self.fetch_word(substate);                      }, // Fetch word
             4     => {  address.* = self.last_read_word(); continue :sw 5;  }, // Start of dummy read (4)
             5     => {  try self.dummy_read(address.*, substate - 4);       },
-            6, 7  => {  try self.write(address.*, self.a(), substate - 6);  }, // Write
+            6, 7  => {  try self.write(address.*, reg.*, substate - 6);  }, // Write
             8     => {  self.finish(0);                                     }, // End
 
             else => unreachable
@@ -1571,33 +1463,6 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn alu_x_with_imm(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const data = &self.data_u8[0];
-        
-        switch (substate) {
-            0, 1  => {  try self.fetch(substate);                   }, // Fetch
-            2     => {  data.* = self.last_read_byte();                // Perform ALU operation - End
-                        self.do_alu_op(&self.state.x, data.*, op);
-                        self.finish(0);                             },
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn mov_abs_from_x(self: *SPC, substate: u32) !void {
-        const address = &self.data_u16[0];
-
-        sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                      }, // Fetch word
-            4     => {  address.* = self.last_read_word(); continue :sw 5;  }, // Start of dummy read (4)
-            5     => {  try self.dummy_read(address.*, substate - 4);       },
-            6, 7  => {  try self.write(address.*, self.x(), substate - 6);  }, // Write
-            8     => {  self.finish(0);                                     }, // End
-
-            else => unreachable
-        }
-    }
-
     pub inline fn mov1_mem_bit_with_c(self: *SPC, substate: u32) !void {
         const address  = &self.data_u16[0];
         const data     = &self.data_u8[0];
@@ -1619,34 +1484,6 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn mov_d_from_y(self: *SPC, substate: u32) !void {
-        const address = &self.data_u8[0];
-
-        sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                              }, // Fetch
-            2    => {  address.* = self.last_read_byte(); continue :sw 3;     }, // Start of DP dummy read (2)
-            3    => {  try self.dummy_read_dp(address.*, substate - 2);       },
-            4, 5 => {  try self.write_dp(address.*, self.y(), substate - 4);  }, // DP write
-            6    => {  self.finish(0);                                        }, // End
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn mov_abs_from_y(self: *SPC, substate: u32) !void {
-        const address = &self.data_u16[0];
-
-        sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                      }, // Fetch word
-            4     => {  address.* = self.last_read_word(); continue :sw 5;  }, // Start of dummy read (4)
-            5     => {  try self.dummy_read(address.*, substate - 4);       },
-            6, 7  => {  try self.write(address.*, self.y(), substate - 6);  }, // Write
-            8     => {  self.finish(0);                                     }, // End
-
-            else => unreachable
-        }
-    }
-
     pub inline fn mul(self: *SPC, substate: u32) !void {
         switch (substate) {
             0, 1  => {  try self.dummy_read(self.pc(), substate);              }, // Dummy read
@@ -1661,46 +1498,31 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn mov_d_x_from_a(self: *SPC, substate: u32) !void {
+    pub inline fn mov_d_reg_from_reg(self: *SPC, substate: u32, idx_reg: *u8, reg: *u8) !void {
         const address = &self.data_u8[0];
 
         sw: switch (substate) {
-            0, 1  => {  try self.fetch(substate);                                          }, // Fetch
-            2     => {  try self.idle();                                                   }, // Idle
-            3     => {  address.* = self.last_read_byte(); continue :sw 4;                 }, // Start of DP dummy read (3)
-            4     => {  try self.dummy_read_dp(address.* +% self.x(), substate - 3);       },
-            5, 6  => {  try self.write_dp(address.* +% self.x(), self.a(), substate - 5);  }, // Write DP
-            7     => {  self.finish(0);                                                    }, // End
+            0, 1  => {  try self.fetch(substate);                                        }, // Fetch
+            2     => {  try self.idle();                                                 }, // Idle
+            3     => {  address.* = self.last_read_byte(); continue :sw 4;               }, // Start of DP dummy read (3)
+            4     => {  try self.dummy_read_dp(address.* +% idx_reg.*, substate - 3);    },
+            5, 6  => {  try self.write_dp(address.* +% idx_reg.*, reg.*, substate - 5);  }, // Write DP
+            7     => {  self.finish(0);                                                  }, // End
 
             else => unreachable
         }
     }
 
-    pub inline fn mov_abs_x_from_a(self: *SPC, substate: u32) !void {
+    pub inline fn mov_abs_reg_from_a(self: *SPC, substate: u32, idx_reg: *u8) !void {
         const address = &self.data_u16[0];
 
         sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                                  }, // Fetch word
-            4     => {  try self.idle();                                                }, // Idle
-            5     => {  address.* = self.last_read_word(); continue :sw 6;              }, // Start of dummy read (5)
-            6     => {  try self.dummy_read(address.* +% self.x(), substate - 5);       },
-            7, 8  => {  try self.write(address.* +% self.x(), self.a(), substate - 7);  }, // Write
-            9     => {  self.finish(0);                                                 }, // End
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn mov_abs_y_from_a(self: *SPC, substate: u32) !void {
-        const address = &self.data_u16[0];
-
-        sw: switch (substate) {
-            0...3 => {  try self.fetch_word(substate);                                  }, // Fetch word
-            4     => {  try self.idle();                                                }, // Idle
-            5     => {  address.* = self.last_read_word(); continue :sw 6;              }, // Start of dummy read (5)
-            6     => {  try self.dummy_read(address.* +% self.y(), substate - 5);       },
-            7, 8  => {  try self.write(address.* +% self.y(), self.a(), substate - 7);  }, // Write
-            9     => {  self.finish(0);                                                 }, // End
+            0...3 => {  try self.fetch_word(substate);                                   }, // Fetch word
+            4     => {  try self.idle();                                                 }, // Idle
+            5     => {  address.* = self.last_read_word(); continue :sw 6;               }, // Start of dummy read (5)
+            6     => {  try self.dummy_read(address.* +% idx_reg.*, substate - 5);       },
+            7, 8  => {  try self.write(address.* +% idx_reg.*, self.a(), substate - 7);  }, // Write
+            9     => {  self.finish(0);                                                  }, // End
 
             else => unreachable
         }
@@ -1724,35 +1546,6 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn mov_d_from_x(self: *SPC, substate: u32) !void {
-        const address = &self.data_u8[0];
-
-        sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                              }, // Fetch
-            2    => {  address.* = self.last_read_byte(); continue :sw 3;     }, // Start of DP dummy read (2)
-            3    => {  try self.dummy_read_dp(address.*, substate - 2);       },
-            4, 5 => {  try self.write_dp(address.*, self.x(), substate - 4);  }, // DP write
-            6    => {  self.finish(0);                                        }, // End
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn mov_d_y_from_x(self: *SPC, substate: u32) !void {
-        const address = &self.data_u8[0];
-
-        sw: switch (substate) {
-            0, 1  => {  try self.fetch(substate);                                          }, // Fetch
-            2     => {  try self.idle();                                                   }, // Idle
-            3     => {  address.* = self.last_read_byte(); continue :sw 4;                 }, // Start of DP dummy read (3)
-            4     => {  try self.dummy_read_dp(address.* +% self.y(), substate - 3);       },
-            5, 6  => {  try self.write_dp(address.* +% self.y(), self.x(), substate - 5);  }, // Write DP
-            7     => {  self.finish(0);                                                    }, // End
-
-            else => unreachable
-        }
-    }
-
     pub inline fn movw_d_ya(self: *SPC, substate: u32) !void {
         const address = &self.data_u8[0];
 
@@ -1762,31 +1555,6 @@ pub const SPC = struct {
             3     => {  try self.dummy_read_dp(address.*, substate - 2);             },
             4...7 => {  try self.write_dp_word(address.*, self.ya(), substate - 4);  }, // Write DP word
             8     => {  self.finish(0);                                              }, // End
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn mov_d_x_from_y(self: *SPC, substate: u32) !void {
-        const address = &self.data_u8[0];
-
-        sw: switch (substate) {
-            0, 1  => {  try self.fetch(substate);                                          }, // Fetch
-            2     => {  try self.idle();                                                   }, // Idle
-            3     => {  address.* = self.last_read_byte(); continue :sw 4;                 }, // Start of DP dummy read (3)
-            4     => {  try self.dummy_read_dp(address.* +% self.x(), substate - 3);       },
-            5, 6  => {  try self.write_dp(address.* +% self.x(), self.y(), substate - 5);  }, // Write DP
-            7     => {  self.finish(0);                                                    }, // End
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn alu_modify_y(self: *SPC, substate: u32, comptime op: AluModifyOp) !void {
-        switch (substate) {   
-            0, 1 => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
-            2    => {  self.do_alu_modify_op(&self.state.y, op);     // Perform ALU operation - End
-                       self.finish(0);                            },
 
             else => unreachable
         }
@@ -1899,23 +1667,6 @@ pub const SPC = struct {
         }
     }
 
-    pub inline fn alu_x_with_d_y(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const address = &self.data_u8[0];
-        const data    = &self.data_u8[1];
-
-        sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                               }, // Fetch
-            2    => {  try self.idle();                                        }, // Idle
-            3    => {  address.* = self.last_read_byte(); continue :sw 4;      }, // Start of DP read (3)
-            4    => {  try self.read_dp(address.* +% self.y(), substate - 3);  },
-            5    => {  data.* = self.last_read_byte();                            // Perform ALU operation - End
-                       self.do_alu_op(&self.state.x, data.*, op);           
-                       self.finish(0);                                         },
-
-            else => unreachable
-        }
-    }
-
     pub inline fn mov_d_from_d(self: *SPC, substate: u32) !void {
         const address_d = &self.data_u8[0];
         const address_s = &self.data_u8[1];
@@ -1930,23 +1681,6 @@ pub const SPC = struct {
             6    => {  address_d.* = self.last_read_byte(); continue :sw 7;     }, // Start of DP write (6)
             7    => {  try self.write_dp(address_d.*, data_r.*, substate - 6);  },
             8    => {  self.finish(0);                                          }, // End
-
-            else => unreachable
-        }
-    }
-
-    pub inline fn alu_y_with_d_x(self: *SPC, substate: u32, comptime op: AluOp) !void {
-        const address = &self.data_u8[0];
-        const data    = &self.data_u8[1];
-
-        sw: switch (substate) {
-            0, 1 => {  try self.fetch(substate);                               }, // Fetch
-            2    => {  try self.idle();                                        }, // Idle
-            3    => {  address.* = self.last_read_byte(); continue :sw 4;      }, // Start of DP read (3)
-            4    => {  try self.read_dp(address.* +% self.x(), substate - 3);  },
-            5    => {  data.* = self.last_read_byte();                            // Perform ALU operation - End
-                       self.do_alu_op(&self.state.y, data.*, op);           
-                       self.finish(0);                                         },
 
             else => unreachable
         }
