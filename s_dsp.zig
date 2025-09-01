@@ -49,6 +49,8 @@ pub const SDSP = struct {
     last_processed_cycle: u64 = 0,
     clock_counter: u64 = 0,
 
+    paused: bool = false,
+
     pub fn new(emu: *Emu) SDSP {
         var s_dsp = SDSP {
             .emu = emu,
@@ -110,6 +112,14 @@ pub const SDSP = struct {
                 //std.debug.print("Finished S-DSP sample loop\n", .{});
             }
         }
+    }
+
+    pub fn pause(self: *SDSP) void {
+        self.paused = true;
+    }
+
+    pub fn unpause(self: *SDSP) void {
+        self.paused = false;
     }
 
     pub fn proc(self: *SDSP, substate: u32) !void {

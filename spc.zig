@@ -41,10 +41,20 @@ pub const SPC = struct {
     data_u16: [2]u16 = [2]u16 { 0, 0 },
     data_u32: [2]u32 = [2]u32 { 0, 0 },
 
+    // Used for the Shadow Execution debugging mode 
+    shadow_exec: bool = false,
+    shadow_mem: [0x1_0000] u8 = undefined, // Special SPC-side-only memory used for Shadow Execution debugging
+    shadow_start:  u16 = 0x0000,           // The first Shadow Execution PC address
+    shadow_length: u32 = 0x0000,           // The length of Shadow Execution code
+
+    return_state: SPCState,
+
+    // Methods
     pub fn new(emu: *Emu, a_: ?u8, x_: ?u8, y_: ?u8, sp_: ?u8, pc_: ?u16, psw_: ?u8) SPC {
         return SPC {
             .emu = emu,
-            .state = SPCState.new(a_, x_, y_, sp_, pc_, psw_)
+            .state = SPCState.new(a_, x_, y_, sp_, pc_, psw_),
+            .return_state = SPCState.new(a_, x_, y_, sp_, pc_, psw_),
         };
     }
 
@@ -54,6 +64,32 @@ pub const SPC = struct {
 
     pub fn reset(self: *SPC) void {
         _  = self;
+    }
+
+    pub fn enable_shadow_execution(self: *SPC) void {
+        self.shadow_exec = true;
+        self.return_state = self.state;
+        self.state.pc = self.shadow_start;
+    }
+
+    pub fn disable_shadow_execution(self: *SPC) void {
+        self.shadow_exec = false;
+        if (self.emu.debug_persist_spc_state) {
+            self.state.pc = self.return_state.pc; // Restore PC only if SPC state is set to persist
+        }
+        else {
+            self.state = self.return_state;
+        }
+    }
+
+    pub fn upload_shadow_code(self: *SPC, start: u16, code: []const u8) void {
+        self.shadow_start  = start;
+        self.shadow_length = @intCast(code.len);
+
+        for (code, 0..) |data_byte, i| {
+            const offset = start +% i;
+            self.shadow_mem[offset] = data_byte;
+        }
     }
 
     pub fn trigger_interrupt(self: *SPC, vector: ?u16) void {

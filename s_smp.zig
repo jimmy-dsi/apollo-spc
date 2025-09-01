@@ -72,6 +72,8 @@ pub const SSMP = struct {
     co:    CoManager,
 
     exec_state: State = State.init,
+    cur_debug_mode:  Emu.DebugMode = Emu.DebugMode.none,
+    next_debug_mode: Emu.DebugMode = Emu.DebugMode.none,
 
     last_opcode:        u8 = 0x00,
     last_read_bytes: [3]u8 = [3]u8 { 0x00, 0x00, 0x00 },
@@ -124,15 +126,31 @@ pub const SSMP = struct {
         self.spc.state.pc = self.boot_rom[0x3E] | @as(u16, self.boot_rom[0x3F]) << 8;
     }
 
+    pub fn enable_shadow_mode(self: *SSMP) void {
+        self.next_debug_mode = Emu.DebugMode.shadow_mode;
+    }
+
+    pub fn enable_shadow_execution(self: *SSMP) void {
+        self.next_debug_mode = Emu.DebugMode.shadow_exec;
+    }
+
+    pub fn disable_shadow_mode(self: *SSMP) void {
+        self.next_debug_mode = Emu.DebugMode.shadow_exec;
+    }
+
+    pub fn disable_shadow_execution(self: *SSMP) void {
+        self.next_debug_mode = Emu.DebugMode.none;
+    }
+
     pub fn step(self: *SSMP) void {
         if (!self.co.waiting()) {
-            if (self.timer_wait_cycles > 0) {
+            if (self.timer_wait_cycles > 0 and self.cur_debug_mode != Emu.DebugMode.shadow_mode) {
                 self.step_timers();
             }
             self.main() catch {};
         }
         if (self.co.null_transition()) {
-            if (self.timer_wait_cycles > 0) {
+            if (self.timer_wait_cycles > 0 and self.cur_debug_mode != Emu.DebugMode.shadow_mode) {
                 self.step_timers();
             }
             self.main() catch {};
@@ -348,6 +366,22 @@ pub const SSMP = struct {
         sw: switch (substate) {
             0, 1 => {
                 if (substate == 0) {
+                    // Apply debug mode transitions if applicable
+                    self.maybe_debug_mode_transition();
+
+                    // Initiate debug mode change on the start of the instruction
+                    if (self.next_debug_mode != self.cur_debug_mode) {
+                        if (self.next_debug_mode == Emu.DebugMode.shadow_mode) {
+                            self.emu.pause_sdsp();
+                        }
+                        else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode) {
+                            self.emu.unpause_sdsp();
+                        }
+
+                        self.apply_spc_debug_mode_transition();
+                        self.cur_debug_mode = self.next_debug_mode;
+                    }
+
                     if (self.spc.pending_interrupt()) {
                         // If previously pending interrupt, kick off the execution of interrupt mode for this "instruction"
                         self.spc.state.pending_interrupt = false;
@@ -388,6 +422,47 @@ pub const SSMP = struct {
                         substate
                 );
             }
+        }
+    }
+
+    inline fn maybe_debug_mode_transition(self: *SSMP) void {
+        const pc = self.spc.pc();
+
+        // If PC is on the outer cusp of the end of the shadow region, automatically disable Shadow Execution/Shadow Mode
+        if (self.cur_debug_mode != Emu.DebugMode.none and self.in_shadow_region(pc, 3) and !self.in_shadow_region(pc, 0)) {
+            self.emu.disable_shadow_execution(.{.set_as_master = true});
+        }
+        // Otherwise, if the shadow region is exited via other means (i.e. call instruction), end Shadow Mode if applicable
+        else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode and !self.in_shadow_region(pc, 0) and !self.emu.debug_persist_shadow_mode) {
+            self.emu.disable_shadow_mode(.{});
+        }
+        // Otherwise, if the shadow region has been *re-entered* (i.e. via ret instruction), reapply Shadow Mode if applicable
+        else if (self.cur_debug_mode == Emu.DebugMode.shadow_exec and self.in_shadow_region(pc, 0) and self.emu.master_debug_mode == Emu.DebugMode.shadow_mode) {
+            self.emu.enable_shadow_mode(.{});
+        }
+    }
+
+    inline fn apply_spc_debug_mode_transition(self: *SSMP) void {
+        if (self.cur_debug_mode == Emu.DebugMode.none) {
+            self.spc.enable_shadow_execution();
+        }
+        else if (self.next_debug_mode == Emu.DebugMode.none) {
+            self.spc.disable_shadow_execution();
+        }
+    }
+
+    inline fn in_shadow_region(self: *const SSMP, address: u16, padding: u16) bool {
+        const length_until_end: u32 = @intCast(0x1_0000 - @as(u32, self.spc.shadow_start));
+
+        if (self.spc.shadow_length + padding <= length_until_end) { // Case when Shadow Execution region does not overflow memory space
+            return
+                address >= self.spc.shadow_start
+                and address < self.spc.shadow_start + self.spc.shadow_length + padding;
+        }
+        else { // Case when Shadow Execution *does* overflow memory space
+            return
+                address >= self.spc.shadow_start
+                or address < (self.spc.shadow_start + self.spc.shadow_length + padding) & 0xFFFF;
         }
     }
 
@@ -868,6 +943,10 @@ pub const SSMP = struct {
             const result = self.read_io(address);
             return result;
         }
+        else if (self.cur_debug_mode != Emu.DebugMode.none and self.in_shadow_region(address, 0)) {
+            const result = self.spc.shadow_mem[address];
+            return result;
+        }
         else {
             const result = self.read_ram(address);
             return result;
@@ -928,6 +1007,10 @@ pub const SSMP = struct {
     pub inline fn debug_read_data(self: *const SSMP, address: u16) u8 {
         if (address & 0xFFF0 == 0x00F0) {
             const result = self.debug_read_io(address);
+            return result;
+        }
+        else if (self.cur_debug_mode != Emu.DebugMode.none and self.in_shadow_region(address, 0)) {
+            const result = self.spc.shadow_mem[address];
             return result;
         }
         else {

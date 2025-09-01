@@ -4,11 +4,27 @@ const SDSP = @import("s_dsp.zig").SDSP;
 const SSMP = @import("s_smp.zig").SSMP;
 
 pub const Emu = struct {
+    pub const DebugMode = enum {
+        none, shadow_mode, shadow_exec
+    };
+
+    pub const DebugModeOptions = struct {
+        set_as_master: bool = false
+    };
+
     pub var rand: std.Random = undefined;
     var prng: std.Random.DefaultPrng = undefined;
 
     s_dsp: SDSP,
     s_smp: SSMP,
+
+    master_debug_mode: DebugMode = DebugMode.none,
+    cur_debug_mode:    DebugMode = DebugMode.none,
+
+    pre_shadow_cycle: u64 = 0,
+
+    debug_persist_shadow_mode: bool = false,
+    debug_persist_spc_state: bool = false,
 
     pub fn static_init() void {
         prng = std.Random.DefaultPrng.init(blk: {
@@ -22,13 +38,104 @@ pub const Emu = struct {
     pub fn new() Emu {
         return Emu {
             .s_dsp = undefined,
-            .s_smp = undefined
+            .s_smp = undefined,
+            .cur_debug_mode = DebugMode.none,
         };
     }
 
     pub fn init(self: *Emu, s_dsp: SDSP, s_smp: SSMP) void {
-        self.s_dsp = s_dsp;
-        self.s_smp = s_smp;
+        self.s_dsp          = s_dsp;
+        self.s_smp          = s_smp;
+        self.cur_debug_mode = DebugMode.none;
+    }
+
+    pub fn enable_shadow_mode(self: *Emu, options: DebugModeOptions) void {
+        if (options.set_as_master) {
+            switch (self.cur_debug_mode) {
+                DebugMode.none => {
+                    self.s_smp.enable_shadow_execution();
+                    self.s_smp.enable_shadow_mode();
+                    self.cur_debug_mode = DebugMode.shadow_mode;
+                },
+                DebugMode.shadow_mode => { },
+                DebugMode.shadow_exec => {
+                    self.s_smp.enable_shadow_mode();
+                    self.cur_debug_mode = DebugMode.shadow_mode;
+                },
+            }
+
+            self.master_debug_mode = DebugMode.shadow_mode;
+        }
+        else {
+            switch (self.cur_debug_mode) {
+                DebugMode.none => {
+                    self.s_smp.enable_shadow_execution();
+                    self.s_smp.enable_shadow_mode();
+                    self.cur_debug_mode = DebugMode.shadow_mode;
+                    self.master_debug_mode = DebugMode.shadow_mode;
+                },
+                DebugMode.shadow_mode => { },
+                DebugMode.shadow_exec => {
+                    self.s_smp.enable_shadow_mode();
+                    self.cur_debug_mode = DebugMode.shadow_mode;
+                },
+            }
+        }
+    }
+
+    pub fn enable_shadow_execution(self: *Emu, _: DebugModeOptions) void {
+        switch (self.cur_debug_mode) {
+            DebugMode.none => {
+                self.s_smp.enable_shadow_execution();
+                self.cur_debug_mode = DebugMode.shadow_exec;
+                self.master_debug_mode = DebugMode.shadow_exec;
+            },
+            DebugMode.shadow_mode => { },
+            DebugMode.shadow_exec => { },
+        }
+    }
+
+    pub fn disable_shadow_mode(self: *Emu, options: DebugModeOptions) void {
+        if (options.set_as_master) {
+            switch (self.cur_debug_mode) {
+                DebugMode.none => { },
+                DebugMode.shadow_mode => {
+                    self.cur_debug_mode = DebugMode.shadow_exec;
+                    self.master_debug_mode = DebugMode.shadow_exec;
+                    self.s_smp.disable_shadow_mode();
+                },
+                DebugMode.shadow_exec => {
+                    self.master_debug_mode = DebugMode.shadow_exec;
+                },
+            }
+        }
+        else {
+            switch (self.cur_debug_mode) {
+                DebugMode.none => { },
+                DebugMode.shadow_mode => {
+                    self.cur_debug_mode = DebugMode.shadow_exec;
+                    self.s_smp.disable_shadow_mode();
+                },
+                DebugMode.shadow_exec => { },
+            }
+        }
+    }
+
+    pub fn disable_shadow_execution(self: *Emu, _: DebugModeOptions) void {
+        switch (self.cur_debug_mode) {
+            DebugMode.none => { },
+            DebugMode.shadow_mode => {
+                self.s_smp.disable_shadow_mode();
+                self.s_smp.disable_shadow_execution();
+                self.cur_debug_mode = DebugMode.none;
+                self.master_debug_mode = DebugMode.none;
+            },
+            DebugMode.shadow_exec => {
+                self.s_smp.disable_shadow_execution();
+                self.cur_debug_mode = DebugMode.none;
+                self.master_debug_mode = DebugMode.none;
+            }
+        }
     }
 
     pub fn step_instruction(self: *Emu) void {
@@ -56,8 +163,21 @@ pub const Emu = struct {
         self.s_dsp.last_processed_cycle = self.s_dsp.clock_counter;
 
         self.s_smp.step();
-        self.s_dsp.step();
+
+        if (!self.s_dsp.paused) { // Don't step S-DSP while paused (Shadow Mode enabled)
+            self.s_dsp.step();
+        }
 
         self.s_dsp.inc_cycle(); // Increment clock counter by 1 DSP cycle.
+    }
+
+    pub fn pause_sdsp(self: *Emu) void {
+        self.pre_shadow_cycle = self.s_dsp.clock_counter;
+        self.s_dsp.pause();
+    }
+
+    pub fn unpause_sdsp(self: *Emu) void {
+        self.s_dsp.clock_counter = self.pre_shadow_cycle;
+        self.s_dsp.unpause();
     }
 };

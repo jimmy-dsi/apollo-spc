@@ -1171,8 +1171,8 @@ pub fn print_opcode(emu: *Emu) void {
 pub fn print_dsp_cycle(emu: *Emu) void {
     const s_smp = &emu.s_smp;
 
-    const prev_cycle = s_smp.prev_exec_cycle;
-    const cycle      = s_smp.cur_exec_cycle;
+    const prev_cycle: i64 = @intCast(s_smp.prev_exec_cycle);
+    const cycle:      i64 = @intCast(s_smp.cur_exec_cycle);
 
     std.debug.print("Cycle: {d} -> {d} (+{d})", .{prev_cycle, cycle, cycle - prev_cycle});
 }

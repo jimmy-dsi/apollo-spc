@@ -55,6 +55,8 @@ pub fn main() !void {
     var cur_offset: u8 = 0x00;
     var cur_mode: u8 = 'i';
     var cur_action: u8 = 's';
+    
+    //var shadow_uploaded = false;
 
     while (true) {
         _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
@@ -63,6 +65,18 @@ pub fn main() !void {
 
         const last_pc = emu.s_smp.spc.pc();
         const prev_state = emu.s_smp.state;
+
+        //const shadow_routine: [19]u8 = [19]u8 {
+        //    0x20,             //    clrp
+        //    0xE5, 0x00, 0x02, //    mov a, $0200
+        //    0xBC,             //    inc a
+        //    0xC5, 0x00, 0x02, //    mov $0200, a
+        //    0x8F, 0x01, 0xFC, //    mov $FC, #$01 (Set timer 2 period to 1)
+        //    0x8F, 0x84, 0xF1, //    mov $F1, #$84 (Enable timer 2)
+        //    0x8D, 0x3F,       //    mov y, #$3F
+        //    0xFE, 0xFE,       // -: dbnz y, -
+        //    0xC5,             //    mov ----, a
+        //};
 
         sw: switch (std.ascii.toLower(buffer[0])) {
             'n' => {
@@ -165,6 +179,16 @@ pub fn main() !void {
                 //}
 
                 emu.s_smp.clear_access_logs();
+
+                // Test:
+                //if (last_pc == 0x0001 and !shadow_uploaded) {
+                //    emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
+                //    emu.enable_shadow_mode(.{.set_as_master = true});
+                //    shadow_uploaded = true;
+                //}
+                //else if (last_pc == 0x0210) {
+                //    emu.disable_shadow_execution(.{});
+                //}
 
                 if (cur_mode == 'i') {
                     db.print_logs(&prev_state, logs[0..]) catch {
