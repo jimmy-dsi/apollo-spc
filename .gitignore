@@ -5,3 +5,6 @@ data/*
 apollo
 apollo-spc-program
 *.o
+*.exe
+*.obj
+*.pdb
