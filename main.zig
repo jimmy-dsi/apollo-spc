@@ -2,7 +2,7 @@ const std = @import("std");
 
 const db = @import("debug.zig");
 
-const Emu = @import("emu.zig").Emu;
+const Emu  = @import("emu.zig").Emu;
 const SDSP = @import("s_dsp.zig").SDSP;
 const SSMP = @import("s_smp.zig").SSMP;
 
@@ -10,7 +10,10 @@ pub fn main() !void {
     Emu.static_init();
 
     var emu = Emu.new();
-    emu.init(SDSP.new(&emu), SSMP.new(&emu, .{}));
+    emu.init(
+        SDSP.new(&emu),
+        SSMP.new(&emu, .{})
+    );
 
     std.debug.print("Mode commands: \n", .{});
     std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
@@ -54,19 +57,19 @@ pub fn main() !void {
     var cur_mode: u8 = 'i';
     var cur_action: u8 = 's';
 
-    const shadow_routine: [20]u8 = [20]u8{
-        0x20, //    clrp
+    const shadow_routine: [20]u8 = [20]u8 {
+        0x20,             //    clrp
         0xE5, 0x00, 0x02, //    mov a, $0200
-        0xBC, //    inc a
+        0xBC,             //    inc a
         0xC5, 0x00, 0x02, //    mov $0200, a
         0x8F, 0x01, 0x00, //    mov $FC, #$01 (Set timer 2 period to 1)
         0x8F, 0x84, 0x00, //    mov $F1, #$84 (Enable timer 2)
-        0x8D, 0x03, //    mov y, #$03
-        0xFE, 0xFE, // -: dbnz y, -
-        0xFF, //    stop
-        0xC5, //    mov ----, a
+        0x8D, 0x03,       //    mov y, #$03
+        0xFE, 0xFE,       // -: dbnz y, -
+        0xFF,             //    stop
+        0xC5,             //    mov ----, a
     };
-
+    
     emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
 
     //emu.s_dsp.audio_ram[0x0002] = 0x40;
@@ -142,7 +145,7 @@ pub fn main() !void {
                 _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
                 const port_num = std.fmt.parseInt(u8, buffer[0..2], 16) catch 0x00;
-                const value = std.fmt.parseInt(u8, buffer[3..5], 16) catch null;
+                const value    = std.fmt.parseInt(u8, buffer[3..5], 16) catch null;
 
                 if (port_num >= 0xF4 and port_num <= 0xF7 and value != null) {
                     const v = value.?;
@@ -151,8 +154,8 @@ pub fn main() !void {
                     emu.s_smp.receive_port_value(@intCast(port_num - 0xF4), v);
 
                     std.debug.print("\x1B[34m", .{});
-                    std.debug.print("[{d}]\t {s}: ", .{ emu.s_dsp.last_processed_cycle, "receive" });
-                    std.debug.print("[{X:0>4}]={X:0>2}->{X:0>2}", .{ port_num, prev_port_val, v });
+                    std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive"});
+                    std.debug.print("[{X:0>4}]={X:0>2}->{X:0>2}", .{port_num, prev_port_val, v});
                     std.debug.print("\x1B[0m\n", .{});
                 }
             },
@@ -160,14 +163,14 @@ pub fn main() !void {
                 emu.s_smp.trigger_interrupt(null);
 
                 std.debug.print("\n\x1B[34m", .{});
-                std.debug.print("[{d}]\t {s}: ", .{ emu.s_dsp.last_processed_cycle, "receive interrupt" });
+                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive interrupt"});
                 std.debug.print("\x1B[0m\n", .{});
             },
             'q' => {
-                emu.enable_shadow_mode(.{ .set_as_master = true });
+                emu.enable_shadow_mode(.{.set_as_master = true});
 
                 std.debug.print("\n\x1B[34m", .{});
-                std.debug.print("[{d}]\t {s}: ", .{ emu.s_dsp.last_processed_cycle, "entering shadow mode" });
+                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "entering shadow mode"});
                 std.debug.print("\x1B[0m\n", .{});
             },
             's' => {
@@ -183,12 +186,12 @@ pub fn main() !void {
 
                 emu.step_instruction();
 
-                const all_logs = emu.s_smp.get_access_logs(.{ .exclude_at_end = 0 });
+                const all_logs = emu.s_smp.get_access_logs(.{.exclude_at_end = 0});
                 var logs = db.filter_access_logs(all_logs);
 
                 //var buffer_writer = std.io.countingWriter(std.io.getStdOut().writer());
                 //var writer = buffer_writer.writer();
-                //
+//
                 //for (all_logs) |log| {
                 //    _ = db.print_log(&prev_state, &log, &writer, .{}) catch 0;
                 //    std.debug.print("\n", .{});
@@ -215,17 +218,18 @@ pub fn main() !void {
                             break;
                         }
                         std.debug.print("\x1B[32m", .{});
-                        db.print_timer_log(&log.?, .{ .prefix = true });
+                        db.print_timer_log(&log.?, .{ .prefix =true });
                         std.debug.print("\x1B[39m\n", .{});
                     }
-                } else if (cur_mode == 'v') {
+                }
+                else if (cur_mode == 'v') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_memory_page(&emu, cur_page, cur_offset, .{ .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..] });
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
                 }
             },
             else => {
                 continue :sw cur_action;
-            },
+            }
         }
         std.debug.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
 
@@ -235,13 +239,13 @@ pub fn main() !void {
     emu.event_loop();
 
     //std.debug.print("Hello, {d}!\n", .{emu.s_smp.?.boot_rom.len});
-    //
+//
     //for (emu.s_smp.?.boot_rom) |item| {
     //    std.debug.print("{X:0>2}\n", .{item});
     //}
-    //
+//
     //std.debug.print("Hello, {d}!\n", .{SDSP.gauss_table.len});
-    //
+//
     //for (SDSP.gauss_table) |item| {
     //    std.debug.print("{X:0>4}\n", .{item});
     //}
