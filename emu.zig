@@ -139,8 +139,8 @@ pub const Emu = struct {
     }
 
     pub fn step_instruction(self: *Emu) void {
-        const last_instr = self.s_smp.instr_counter;
-        while (self.s_smp.instr_counter == last_instr) {
+        self.step();
+        while (!self.s_smp.instr_boundary) {
             self.step();
         }
     }
@@ -162,13 +162,27 @@ pub const Emu = struct {
 
         self.s_dsp.last_processed_cycle = self.s_dsp.clock_counter;
 
-        self.s_smp.step();
+        var null_transition = false;
 
-        if (!self.s_dsp.paused) { // Don't step S-DSP while paused (Shadow Mode enabled)
-            self.s_dsp.step();
+        if (!self.s_dsp.co.null_transition(.{.no_reset = true})) {
+            self.s_smp.step();
+        }
+        else {
+            null_transition = true;
         }
 
-        self.s_dsp.inc_cycle(); // Increment clock counter by 1 DSP cycle.
+        if (!self.s_smp.co.null_transition(.{.no_reset = true})) {
+            if (!self.s_dsp.paused) { // Don't step S-DSP while paused (Shadow Mode enabled)
+                self.s_dsp.step();
+            }
+        }
+        else {
+            null_transition = true;
+        }
+
+        if (!null_transition) {
+            self.s_dsp.inc_cycle(); // Increment clock counter by 1 DSP cycle.
+        }
     }
 
     pub fn pause_sdsp(self: *Emu) void {

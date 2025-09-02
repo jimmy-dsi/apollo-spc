@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const CoState = struct {
     pub const Co = error { Yield };
 
@@ -33,6 +35,7 @@ pub const CoState = struct {
         self.wait_cycles     = 0;
         self.cur_substate    = 0;
         self.finish_delay    = delay_amt;
-        self.null_transition = false;
+        self.null_transition = delay_amt == 0;
+        //std.debug.print("{d} {d}\n", .{@intFromBool(self.null_transition), self.cur_substate});
     }
 };

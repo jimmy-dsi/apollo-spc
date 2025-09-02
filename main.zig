@@ -22,6 +22,7 @@ pub fn main() !void {
     std.debug.print("   s = Step instruction [default] \n", .{});
     std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
     std.debug.print("   x = Send interrupt signal \n", .{});
+    std.debug.print("   q = Run shadow code \n", .{});
     std.debug.print("   p = View previous page \n", .{});
     std.debug.print("   n = View next page \n", .{});
     std.debug.print("   u = Shift memory view up one row \n", .{});
@@ -55,8 +56,31 @@ pub fn main() !void {
     var cur_offset: u8 = 0x00;
     var cur_mode: u8 = 'i';
     var cur_action: u8 = 's';
+
+    const shadow_routine: [20]u8 = [20]u8 {
+        0x20,             //    clrp
+        0xE5, 0x00, 0x02, //    mov a, $0200
+        0xBC,             //    inc a
+        0xC5, 0x00, 0x02, //    mov $0200, a
+        0x8F, 0x01, 0x00, //    mov $FC, #$01 (Set timer 2 period to 1)
+        0x8F, 0x84, 0x00, //    mov $F1, #$84 (Enable timer 2)
+        0x8D, 0x03,       //    mov y, #$03
+        0xFE, 0xFE,       // -: dbnz y, -
+        0xFF,             //    stop
+        0xC5,             //    mov ----, a
+    };
     
-    //var shadow_uploaded = false;
+    emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
+
+    //emu.s_dsp.audio_ram[0x0002] = 0x40;
+    //emu.s_dsp.audio_ram[0x0003] = 0x00;
+    //emu.s_dsp.audio_ram[0x0004] = 0x20;
+    //emu.s_dsp.audio_ram[0x0005] = 0x8F;
+    //emu.s_dsp.audio_ram[0x0006] = 0x01;
+    //emu.s_dsp.audio_ram[0x0007] = 0xFC;
+    //emu.s_dsp.audio_ram[0x0008] = 0x8F;
+    //emu.s_dsp.audio_ram[0x0009] = 0x84;
+    //emu.s_dsp.audio_ram[0x000A] = 0xF1;
 
     while (true) {
         _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
@@ -65,18 +89,6 @@ pub fn main() !void {
 
         const last_pc = emu.s_smp.spc.pc();
         const prev_state = emu.s_smp.state;
-
-        //const shadow_routine: [19]u8 = [19]u8 {
-        //    0x20,             //    clrp
-        //    0xE5, 0x00, 0x02, //    mov a, $0200
-        //    0xBC,             //    inc a
-        //    0xC5, 0x00, 0x02, //    mov $0200, a
-        //    0x8F, 0x01, 0xFC, //    mov $FC, #$01 (Set timer 2 period to 1)
-        //    0x8F, 0x84, 0xF1, //    mov $F1, #$84 (Enable timer 2)
-        //    0x8D, 0x3F,       //    mov y, #$3F
-        //    0xFE, 0xFE,       // -: dbnz y, -
-        //    0xC5,             //    mov ----, a
-        //};
 
         sw: switch (std.ascii.toLower(buffer[0])) {
             'n' => {
@@ -154,6 +166,13 @@ pub fn main() !void {
                 std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive interrupt"});
                 std.debug.print("\x1B[0m\n", .{});
             },
+            'q' => {
+                emu.enable_shadow_mode(.{.set_as_master = true});
+
+                std.debug.print("\n\x1B[34m", .{});
+                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "entering shadow mode"});
+                std.debug.print("\x1B[0m\n", .{});
+            },
             's' => {
                 cur_action = 's';
                 // Default behavior: Step instruction
@@ -167,7 +186,7 @@ pub fn main() !void {
 
                 emu.step_instruction();
 
-                const all_logs = emu.s_smp.get_access_logs(.{.exclude_at_end = 1});
+                const all_logs = emu.s_smp.get_access_logs(.{.exclude_at_end = 0});
                 var logs = db.filter_access_logs(all_logs);
 
                 //var buffer_writer = std.io.countingWriter(std.io.getStdOut().writer());
@@ -180,20 +199,8 @@ pub fn main() !void {
 
                 emu.s_smp.clear_access_logs();
 
-                // Test:
-                //if (last_pc == 0x0001 and !shadow_uploaded) {
-                //    emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
-                //    emu.enable_shadow_mode(.{.set_as_master = true});
-                //    shadow_uploaded = true;
-                //}
-                //else if (last_pc == 0x0210) {
-                //    emu.disable_shadow_execution(.{});
-                //}
-
                 if (cur_mode == 'i') {
-                    db.print_logs(&prev_state, logs[0..]) catch {
-                        std.debug.print("                                                ", .{});
-                    };
+                    try db.print_logs(&prev_state, logs[0..]);
 
                     db.print_spc_state(&emu);
                     std.debug.print(" | ", .{});
@@ -211,7 +218,7 @@ pub fn main() !void {
                             break;
                         }
                         std.debug.print("\x1B[32m", .{});
-                        db.print_timer_log(&log.?, .{.prefix =true });
+                        db.print_timer_log(&log.?, .{ .prefix =true });
                         std.debug.print("\x1B[39m\n", .{});
                     }
                 }
@@ -224,7 +231,7 @@ pub fn main() !void {
                 continue :sw cur_action;
             }
         }
-        std.debug.print("Current DSP cycle: {d}\n", .{emu.s_dsp.last_processed_cycle});
+        std.debug.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
 
         //std.debug.print("\n", .{});
     }

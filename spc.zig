@@ -1752,7 +1752,13 @@ pub const SPC = struct {
             }, // Start of dummy read (0)
             1 => {  try self.dummy_read(self.pc() +% 1, substate);  }, // Adjust read address by +1 since we stepped PC back (normally this would be a read to current PC)
             2 => {  try self.idle();                                }, // Idle
-            3 => {  self.state.mode = SPCState.Mode.stopped;
+            3 => {  if (self.shadow_exec) {
+                        // Restore PC
+                        self.state.pc +%= 1;
+                    }
+                    else {
+                        self.state.mode = SPCState.Mode.stopped;
+                    }
                     self.finish(0);                                 }, // End
 
             else => unreachable

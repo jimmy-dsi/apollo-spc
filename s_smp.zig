@@ -86,7 +86,7 @@ pub const SSMP = struct {
     timer_logs: [256]TimerLog = undefined,
     last_timer_log_index: u32 = 0,
 
-    instr_counter: u64 = 0,
+    instr_boundary: bool = false,
 
     timer_wait_cycles: u32 = 0,
 
@@ -128,34 +128,63 @@ pub const SSMP = struct {
 
     pub fn enable_shadow_mode(self: *SSMP) void {
         self.next_debug_mode = Emu.DebugMode.shadow_mode;
+        self.attempt_shadow_transition();
     }
 
     pub fn enable_shadow_execution(self: *SSMP) void {
         self.next_debug_mode = Emu.DebugMode.shadow_exec;
+        self.attempt_shadow_transition();
     }
 
     pub fn disable_shadow_mode(self: *SSMP) void {
         self.next_debug_mode = Emu.DebugMode.shadow_exec;
+        self.attempt_shadow_transition();
     }
 
     pub fn disable_shadow_execution(self: *SSMP) void {
         self.next_debug_mode = Emu.DebugMode.none;
+        self.attempt_shadow_transition();
+    }
+
+    pub inline fn attempt_shadow_transition(self: *SSMP) void {
+        if (self.instr_boundary) { // Only allow shadow mode transitions in between instruction executions
+            self.apply_spc_debug_mode_transition();
+        }
     }
 
     pub fn step(self: *SSMP) void {
+        if (self.co.null_transition(.{})) {
+            self.instr_boundary = false;
+        }
+        
         if (!self.co.waiting()) {
-            if (self.timer_wait_cycles > 0 and self.cur_debug_mode != Emu.DebugMode.shadow_mode) {
+            if (self.cur_debug_mode == Emu.DebugMode.shadow_mode) {
+                self.timer_wait_cycles = 0; // Don't allow SMP timers to step while shadow mode is enabled
+            }
+
+            if (self.timer_wait_cycles > 0) {
                 self.step_timers();
             }
+
             self.main() catch {};
         }
-        if (self.co.null_transition()) {
-            if (self.timer_wait_cycles > 0 and self.cur_debug_mode != Emu.DebugMode.shadow_mode) {
-                self.step_timers();
+
+        if (self.co.null_transition(.{.no_reset = true})) {
+            const substate = self.co.substate();
+            if (substate == 0) {
+                self.instr_boundary = true;
+                self.prev_exec_cycle = self.cur_exec_cycle;
+                self.cur_exec_cycle  = self.s_dsp().cur_cycle();
+
+                self.change_interrupt_mode();
+
+                // Apply debug mode transitions if applicable
+                self.maybe_transition_debug_mode();
             }
-            self.main() catch {};
         }
-        self.co.step();
+        else {
+            self.co.step();
+        }
     }
 
     inline fn step_timers(self: *SSMP) void {
@@ -183,11 +212,11 @@ pub const SSMP = struct {
     }
 
     pub fn main(self: *SSMP) !void {
-        sw: switch (self.exec_state) {
+        switch (self.exec_state) {
             State.init => { },
             State.main => {
                 try self.run_next_instr();
-                continue :sw State.main;
+                //continue :sw State.main;
             }
         }
     }
@@ -198,6 +227,9 @@ pub const SSMP = struct {
 
     pub fn trigger_interrupt(self: *SSMP, vector: ?u16) void {
         self.spc.trigger_interrupt(vector);
+        if (self.instr_boundary) {
+            self.change_interrupt_mode();
+        }
     }
 
     pub fn get_access_logs(self: *SSMP, options: struct { exclude_at_end: u32 = 0 }) []AccessLog {
@@ -366,38 +398,9 @@ pub const SSMP = struct {
         sw: switch (substate) {
             0, 1 => {
                 if (substate == 0) {
-                    // Apply debug mode transitions if applicable
-                    self.maybe_debug_mode_transition();
-
-                    // Initiate debug mode change on the start of the instruction
-                    if (self.next_debug_mode != self.cur_debug_mode) {
-                        if (self.next_debug_mode == Emu.DebugMode.shadow_mode) {
-                            self.emu.pause_sdsp();
-                        }
-                        else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode) {
-                            self.emu.unpause_sdsp();
-                        }
-
-                        self.apply_spc_debug_mode_transition();
-                        self.cur_debug_mode = self.next_debug_mode;
-                    }
-
-                    if (self.spc.pending_interrupt()) {
-                        // If previously pending interrupt, kick off the execution of interrupt mode for this "instruction"
-                        self.spc.state.pending_interrupt = false;
-                        self.spc.state.mode = SPCState.Mode.interrupt;
-                    }
-                    else if (self.spc.mode() == SPCState.Mode.interrupt) {
-                        // End interrupt mode if SPC was in interrupt mode for the previous "instruction"
-                        self.spc.state.mode = SPCState.Mode.normal;
-                    }
-
                     if (self.enable_access_logs) {
                         self.append_exec_log(self.spc.pc());
                     }
-                    self.prev_exec_cycle = self.cur_exec_cycle;
-                    self.cur_exec_cycle  = self.s_dsp().*.cur_cycle();
-                    self.instr_counter += 1;
                     //std.debug.print("SMP | Current DSP cycle: {d} | PC: {d}\n", .{self.s_dsp().*.cur_cycle(), self.spc.pc()});
                 }
 
@@ -411,7 +414,7 @@ pub const SSMP = struct {
             },
             else => {
                 // Store to last_opcode only when we first get to this step
-                // Otherwise, the emulator will attempt to repeatedly overwrite the last opcode while an instruction is still running
+                // Or else, if we didn't do this, the emulator would attempt to repeatedly overwrite the last opcode while an instruction is still running
                 if (self.spc.mode() == SPCState.Mode.normal and substate == 2) {
                     self.last_opcode = self.last_read_bytes[0];
                 }
@@ -425,7 +428,7 @@ pub const SSMP = struct {
         }
     }
 
-    inline fn maybe_debug_mode_transition(self: *SSMP) void {
+    inline fn maybe_transition_debug_mode(self: *SSMP) void {
         const pc = self.spc.pc();
 
         // If PC is on the outer cusp of the end of the shadow region, automatically disable Shadow Execution/Shadow Mode
@@ -436,18 +439,45 @@ pub const SSMP = struct {
         else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode and !self.in_shadow_region(pc, 0) and !self.emu.debug_persist_shadow_mode) {
             self.emu.disable_shadow_mode(.{});
         }
-        // Otherwise, if the shadow region has been *re-entered* (i.e. via ret instruction), reapply Shadow Mode if applicable
+        // If the shadow region has been *re-entered* (i.e. via ret instruction), reapply Shadow Mode if applicable
         else if (self.cur_debug_mode == Emu.DebugMode.shadow_exec and self.in_shadow_region(pc, 0) and self.emu.master_debug_mode == Emu.DebugMode.shadow_mode) {
             self.emu.enable_shadow_mode(.{});
+        }
+        // If shadow execution is enabled and a STOP instruction has been hit, end shadow execution
+        else if (self.cur_debug_mode != Emu.DebugMode.none and self.last_opcode == 0xFF) {
+            self.emu.disable_shadow_execution(.{.set_as_master = true});
         }
     }
 
     inline fn apply_spc_debug_mode_transition(self: *SSMP) void {
-        if (self.cur_debug_mode == Emu.DebugMode.none) {
-            self.spc.enable_shadow_execution();
+        if (self.next_debug_mode != self.cur_debug_mode) {
+            if (self.cur_debug_mode == Emu.DebugMode.shadow_mode) {
+                self.emu.unpause_sdsp();
+            }
+            else if (self.next_debug_mode == Emu.DebugMode.shadow_mode) {
+                self.emu.pause_sdsp();
+            }
+        
+            if (self.cur_debug_mode == Emu.DebugMode.none) {
+                self.spc.enable_shadow_execution();
+            }
+            else if (self.next_debug_mode == Emu.DebugMode.none) {
+                self.spc.disable_shadow_execution();
+            }
+
+            self.cur_debug_mode = self.next_debug_mode;
         }
-        else if (self.next_debug_mode == Emu.DebugMode.none) {
-            self.spc.disable_shadow_execution();
+    }
+
+    inline fn change_interrupt_mode(self: *SSMP) void {
+        if (self.spc.pending_interrupt()) {
+            // If previously pending interrupt, kick off the execution of interrupt mode for this "instruction"
+            self.spc.state.pending_interrupt = false;
+            self.spc.state.mode = SPCState.Mode.interrupt;
+        }
+        else if (self.spc.mode() == SPCState.Mode.interrupt) {
+            // End interrupt mode if SPC was in interrupt mode for the previous "instruction"
+            self.spc.state.mode = SPCState.Mode.normal;
         }
     }
 

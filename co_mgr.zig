@@ -3,6 +3,10 @@ const CoState = @import("co_state.zig").CoState;
 const Co = CoState.Co;
 
 pub const CoManager = struct {
+    pub const Options = struct {
+        no_reset: bool = false
+    };
+
     co_state: CoState,
 
     pub fn new() CoManager {
@@ -27,9 +31,11 @@ pub const CoManager = struct {
         self.co_state.step();
     }
 
-    pub inline fn null_transition(self: *CoManager) bool {
+    pub inline fn null_transition(self: *CoManager, options: Options) bool {
         const result = self.co_state.null_transition;
-        self.co_state.null_transition = false;
+        if (!options.no_reset) {
+            self.co_state.null_transition = false;
+        }
         return result;
     }
 

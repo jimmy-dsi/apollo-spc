@@ -14,7 +14,7 @@ pub fn print_pc(emu: *Emu) void {
 }
 
 pub fn print_spc_state(emu: *Emu) void {
-    const state = emu.*.s_smp.spc.state;
+    const state = emu.s_smp.spc.state;
 
     const a  = state.a;
     const x  = state.x;
