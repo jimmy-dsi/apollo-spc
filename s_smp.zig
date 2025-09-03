@@ -1251,6 +1251,45 @@ pub const SSMP = struct {
         }
     }
 
+    pub fn debug_write_io(self: *SSMP, address: u16, data: u8) void {
+        switch (address) {
+            0x00F0 => { // TEST (Normal behavior, but needs to work regardless of P state)
+                const p_ = self.spc.p();
+                self.spc.state.set_p(0);
+                self.write_io(address, data);
+                self.spc.state.set_p(p_);
+            },
+            0x00F1...0x00F3 => { // Normal behavior
+                self.write_io(address, data);
+            },
+            0x00F4 => { // CPUIO0 (Overwrite the input data (from S-CPU) as opposed to output)
+                self.state.input_ports[0] = data;
+            },
+            0x00F5 => { // CPUIO1 (Overwrite the input data (from S-CPU) as opposed to output)
+                self.state.input_ports[1] = data;
+            },
+            0x00F6 => { // CPUIO2 (Overwrite the input data (from S-CPU) as opposed to output)
+                self.state.input_ports[2] = data;
+            },
+            0x00F7 => { // CPUIO3 (Overwrite the input data (from S-CPU) as opposed to output)
+                self.state.input_ports[3] = data;
+            },
+            0x00F8...0x00FC => { // Normal behavior
+                self.write_io(address, data);
+            },
+            0x00FD => { // T0OUT
+                self.state.timer_outputs[0] = @intCast(data & 0x0F);
+            },
+            0x00FE => { // T1OUT
+                self.state.timer_outputs[1] = @intCast(data & 0x0F);
+            },
+            0x00FF => { // T2OUT
+                self.state.timer_outputs[2] = @intCast(data & 0x0F);
+            },
+            else => unreachable
+        }
+    }
+
     pub fn idle(self: *SSMP) !void {
         const wait_states  = self.state.io_waitstates;
         const dsp_cycles   = cycle_wait_states[wait_states];

@@ -171,6 +171,12 @@ pub const SDSP = struct {
         }
     }
 
+    pub fn debug_write(self: *SDSP, address: u8, data: u8) void {
+        if (address & 0x80 == 0) {
+            self.dsp_map[address] = data;
+        }
+    }
+
     inline fn proc_t0(self: *SDSP) void {
         _ = self;
     }

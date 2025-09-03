@@ -6,7 +6,28 @@ const Emu  = @import("emu.zig").Emu;
 const SDSP = @import("s_dsp.zig").SDSP;
 const SSMP = @import("s_smp.zig").SSMP;
 
+const spc_loader = @import("spc_loader.zig");
+
 pub fn main() !void {
+    // Get SPC file path from cmd line argument - if present
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer _ = gpa.deinit();
+
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
+
+    var spc_file_path: ?[]const u8 = null;
+
+    var i: usize = 0;
+    while (args.next()) |arg| {
+        if (i == 1) {
+            spc_file_path = arg;
+            break;
+        }
+        i += 1;
+    }
+
     Emu.static_init();
 
     var emu = Emu.new();
@@ -14,6 +35,24 @@ pub fn main() !void {
         SDSP.new(&emu),
         SSMP.new(&emu, .{})
     );
+
+    // Load SPC file from path if present
+    if (spc_file_path) |path| {
+        var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
+        defer file.close();
+
+        const file_size = try file.getEndPos();
+
+        const file_alloc = std.heap.page_allocator;
+        const buffer = try file_alloc.alloc(u8, file_size);
+        //defer allocator.free(buffer); // The entire app appears to just die after exiting scope if this is uncommented. No idea why
+
+        _ = try file.readAll(buffer);
+        const metadata = try spc_loader.load_spc(&emu, buffer);
+
+        std.debug.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
+        try metadata.print();
+    }
 
     std.debug.print("Mode commands: \n", .{});
     std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
@@ -38,8 +77,8 @@ pub fn main() !void {
     emu.s_smp.enable_timer_logs = true;
     emu.s_smp.clear_access_logs();
     emu.s_smp.clear_timer_logs();
-    emu.step();
-    emu.step();
+    //emu.step();
+    //emu.step();
 
     //var last_second: u64 = 0;
     //

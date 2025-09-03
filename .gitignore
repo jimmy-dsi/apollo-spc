@@ -1,5 +1,6 @@
 zig-out/
 data/*
+test/*
 !data/bootrom.bin
 !data/gauss.bin
 apollo
