@@ -54,6 +54,7 @@ pub fn main() !void {
         try metadata.print();
     }
 
+    std.debug.print("----------------------------------------------------------------------------------\n", .{});
     std.debug.print("Mode commands: \n", .{});
     std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
     std.debug.print("   v = Memory viewer \n", .{});
@@ -66,7 +67,7 @@ pub fn main() !void {
     std.debug.print("   n = View next page \n", .{});
     std.debug.print("   u = Shift memory view up one row \n", .{});
     std.debug.print("   d = Shift memory view down one row \n", .{});
-    std.debug.print("\n", .{});
+    std.debug.print("----------------------------------------------------------------------------------\n\n", .{});
     std.debug.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
     std.debug.print("\n", .{});
 

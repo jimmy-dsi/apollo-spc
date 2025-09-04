@@ -29,15 +29,15 @@ pub const SongMetadata = struct {
     // ID666 Extended
     ost_title: ?[257] u8 = null,
     ost_disc:  ?u8 = null,
-    ost_track: ?u8 = null,
+    ost_track: ?[2] u8 = null,
 
     publisher: ?[257] u8 = null,
     copyright_year: ?u32 = null,
 
-    intro_length_in_dsp_cycles: ?u32 = null,
-    loop_length_in_dsp_cycles:  ?u32 = null,
-    end_length_in_dsp_cycles:   ?u32 = null,
-    loop_times:                 ?u8  = null,
+    intro_length_in_timer2_steps: ?u32 = null,
+    loop_length_in_timer2_steps:  ?u32 = null,
+    end_length_in_timer2_steps:   ?u32 = null,
+    loop_times:                   ?u8  = null,
 
     mixing_level: ?u8 = null,
 
@@ -115,20 +115,208 @@ pub const SongMetadata = struct {
             }
         }
 
-        _ = id666_ext;
+        if (id666_ext.len < 8) {
+            return r;
+        }
+
+        if (!std.mem.eql(u8, id666_ext[0..4], "xid6")) {
+            return r;
+        }
+
+        const chunk_len = read_u32_le(id666_ext[4..8], 0);
+        if (id666_ext.len < 8 + chunk_len) {
+            return r;
+        }
+
+        const chunk = id666_ext[8..(8 + chunk_len)];
+        //const chunk_end = (chunk_len + 3) / 4 * 4; // Round up to next multiple of 4
+
+        var remainder = chunk[0..];
+        while (remainder.len > 0) {
+            const header = read_4(&remainder);
+
+            const id   = header[0];
+            const typ  = header[1];
+            const data = read_u16_le(header[2..], 0);
+
+            if (typ != 0) {
+                const length:     u8 = @intCast(data & 0xFF);
+                const num_dwords: u8 = @intCast((@as(u16, length) + 3) / 4); // Round up to next multiple of 4
+
+                var valid = false;
+                var str_buffer: ?[]u8 = null;
+
+                for (0..num_dwords) |i| {
+                    const dword = read_4(&remainder);
+                    switch (id) {
+                        0x01 => { // Song Name
+                            if (typ == 1) { // Must be a string
+                                valid = true;
+                                if (r.title == null) {
+                                    r.title = [_]u8 {0x00} ** 257;
+                                }
+                                str_buffer = r.title.?[0..];
+                                @memcpy(r.title.?[(i * 4)..(i * 4 + 4)], dword[0..]);
+                            }
+                        },
+                        0x02 => { // Game Name
+                            if (typ == 1) { // Must be a string
+                                valid = true;
+                                if (r.game == null) {
+                                    r.game = [_]u8 {0x00} ** 257;
+                                }
+                                str_buffer = r.game.?[0..]; 
+                                @memcpy(r.game.?[(i * 4)..(i * 4 + 4)], dword[0..]);
+                            }
+                        },
+                        0x03 => { // Artist's Name
+                            if (typ == 1) { // Must be a string
+                                valid = true;
+                                if (r.artist == null) {
+                                    r.artist = [_]u8 {0x00} ** 257;
+                                }
+                                str_buffer = r.artist.?[0..];
+                                @memcpy(r.artist.?[(i * 4)..(i * 4 + 4)], dword[0..]);
+                            }
+                        },
+                        0x04 => { // Dumper's Name
+                            if (typ == 1) { // Must be a string
+                                valid = true;
+                                if (r.dumper == null) {
+                                    r.dumper = [_]u8 {0x00} ** 257;
+                                }
+                                str_buffer = r.dumper.?[0..];
+                                @memcpy(r.dumper.?[(i * 4)..(i * 4 + 4)], dword[0..]);
+                            }
+                        },
+                        0x05 => { // Date Song was Dumped
+                            if (typ == 4 and length == 4) { // Must be an integer with only one dword length
+                                const value = dword[0..];
+
+                                r.month = value[1];
+                                r.day   = value[0];
+                                r.year  = read_u16_le(value, 2);
+
+                                r.date_other = null;
+                            }
+                        },
+                        0x07 => { // Comments
+                            if (typ == 1) { // Must be a string
+                                valid = true;
+                                if (r.comments == null) {
+                                    r.comments = [_]u8 {0x00} ** 257;
+                                }
+                                str_buffer = r.comments.?[0..];
+                                @memcpy(r.comments.?[(i * 4)..(i * 4 + 4)], dword[0..]);
+                            }
+                        },
+                        0x10 => { // Official Soundtrack Title
+                            if (typ == 1) { // Must be a string
+                                valid = true;
+                                if (r.ost_title == null) {
+                                    r.ost_title = [_]u8 {0x00} ** 257;
+                                }
+                                str_buffer = r.ost_title.?[0..];
+                                @memcpy(r.ost_title.?[(i * 4)..(i * 4 + 4)], dword[0..]);
+                            }
+                        },
+                        0x13 => { // Publisher's Name
+                            if (typ == 1) { // Must be a string
+                                valid = true;
+                                if (r.publisher == null) {
+                                    r.publisher = [_]u8 {0x00} ** 257;
+                                }
+                                str_buffer = r.publisher.?[0..];
+                                @memcpy(r.publisher.?[(i * 4)..(i * 4 + 4)], dword[0..]);
+                            }
+                        },
+                        0x30 => { // Introduction Length
+                            if (typ == 4 and length == 4) { // Must be an integer with only one dword length
+                                const value = dword[0..];
+                                r.intro_length_in_timer2_steps = read_u32_le(value, 0);
+                            }
+                        },
+                        0x31 => { // Loop Length
+                            if (typ == 4 and length == 4) { // Must be an integer with only one dword length
+                                const value = dword[0..];
+                                r.loop_length_in_timer2_steps = read_u32_le(value, 0);
+                            }
+                        },
+                        0x32 => { // End Length
+                            if (typ == 4 and length == 4) { // Must be an integer with only one dword length
+                                const value = dword[0..];
+                                r.end_length_in_timer2_steps = read_u32_le(value, 0);
+                            }
+                        },
+                        0x33 => { // Fade Length
+                            if (typ == 4 and length == 4) { // Must be an integer with only one dword length
+                                const value = dword[0..];
+                                const fade_length_in_timer2_steps = read_u32_le(value, 0);
+                                r.fade_length_in_ms = fade_length_in_timer2_steps / 64; // Convert from timer2 steps to milliseconds
+                            }
+                        },
+                        else => {
+                            // Do nothing if ID, type, and size don't match what they should be, or if ID is not in the list of known Extended ID666 IDs
+                        }
+                    }
+                }
+
+                if (valid and typ == 1) {
+                    // Fill in the remainder portion of the string with zeroes if we have a valid string
+                    const filled_amt: u16 = @as(u16, num_dwords) * 4;
+                    for (filled_amt..257) |i| {
+                        str_buffer.?[i] = 0;
+                    }
+                }
+            }
+            else {
+                switch (id) {
+                    0x06 => { // Emulator Used
+                        r.emulator_id = @intCast(data & 0xFF);
+                    },
+                    0x11 => { // OST Disc
+                        r.ost_disc = @intCast(data & 0xFF);
+                    },
+                    0x12 => { // OST Track (optional ASCII char (first byte) + track number (second byte))
+                        r.ost_track = [_]u8 {0} ** 2;
+                        r.ost_track.?[0] = @intCast(data & 0xFF);
+                        r.ost_track.?[1] = @intCast(data >> 8);
+                    },
+                    0x14 => { // Copyright Year
+                        r.copyright_year = @intCast(data);
+                    },
+                    0x34 => { // Muted Voices (a bit is set for each voice that's muted)
+                        r.set_chan_disables(@intCast(data & 0xFF));
+                    },
+                    0x35 => { // Number of Times to Loop
+                        r.loop_times = @intCast(data & 0xFF);
+                    },
+                    0x36 => { // Mixing (Preamp) Level
+                        r.mixing_level = @intCast(data & 0xFF);
+                    },
+                    else => {
+                        // Do nothing if ID and type don't match what they should be, or if ID is not in the list of known Extended ID666 IDs
+                    }
+                }
+            }
+        }
 
         return r;
     }
 
     pub fn print(self: *const SongMetadata) !void {
-        const padding: u32 = 13;
+        const padding: u32 = 16;
         const max_len: u32 = 64;
 
-        print_str("Title:",       if (self.title != null)    null_term(self.title.?[0..])    else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Artist:",      if (self.artist != null)   null_term(self.artist.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Game:",        if (self.game != null)     null_term(self.game.?[0..])     else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Dumper:",      if (self.dumper != null)   null_term(self.dumper.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Comments:",    if (self.comments != null) null_term(self.comments.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        var md_copy = self.*;
+        md_copy.strip_newlines();
+
+        std.debug.print("----------------------------------------------------------------------------------\n", .{});
+        print_str("Title:",       if (md_copy.title != null)    null_term(md_copy.title.?[0..])    else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        print_str("Artist:",      if (md_copy.artist != null)   null_term(md_copy.artist.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        print_str("Game:",        if (md_copy.game != null)     null_term(md_copy.game.?[0..])     else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        print_str("Dumper:",      if (md_copy.dumper != null)   null_term(md_copy.dumper.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        print_str("Comments:",    if (md_copy.comments != null) null_term(md_copy.comments.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
 
         if (self.date_other) |d| {
             print_str("Date Dumped:", d[0..], padding, max_len);
@@ -162,19 +350,34 @@ pub const SongMetadata = struct {
             print_str("Fade Time:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
-        std.debug.print("Initial Channel States:\n", .{});
+        const chan_states: [8]u1 =
+            if (self.channels_disabled == null)
+                [_]u1 {0} ** 8
+            else
+                self.channels_disabled.?;
+
+        var chan_buf = [_]u8 {' '} ** 128;
+
         for (0..8) |i| {
-            std.debug.print("    #{d}: ", .{i});
-            if (self.channels_disabled == null) {
-                std.debug.print("Enabled\n", .{});
-            }
-            else if (self.channels_disabled.?[i] == 0) {
-                std.debug.print("Enabled\n", .{});
-            }
-            else {
-                std.debug.print("Disabled\n", .{});
-            }
+            const ii: u8 = @intCast(i);
+
+            chan_buf[16 * i]     = '#';
+            chan_buf[16 * i + 1] = ii + '0';
+            chan_buf[16 * i + 2] = ':';
+
+            _ = try std.fmt.bufPrint(
+                chan_buf[(16 * i + 4)..(16 * i + 16)],
+                "{s}",
+                .{
+                    if (chan_states[i] != 0)
+                        "Disabled    "
+                    else
+                        " Enabled    "
+                }
+            );
         }
+
+        print_str("Channel States:", chan_buf[0..], padding, max_len);
 
         if (self.emulator_id) |emu_id| {
             var emu_buf = [_]u8 {' ', ' ', ' '};
@@ -184,8 +387,157 @@ pub const SongMetadata = struct {
         else {
             print_str("Emulator ID:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
+
+        print_str("OST Title:", if (md_copy.ost_title != null) null_term(md_copy.ost_title.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        if (self.ost_disc) |ost_disc| {
+            var disc_buf = [_]u8 {' ', ' ', ' '};
+            const disc_str = try std.fmt.bufPrint(disc_buf[0..], "{}", .{ost_disc});
+            print_str("OST Disc:", disc_str, padding, max_len);
+        }
+        else {
+            print_str("OST Disc:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
+
+        if (self.ost_track) |ost_track| {
+            if (ost_track[0] >= 0x21 and ost_track[0] <= 0x7E) {
+                var track_buf = [_]u8 {ost_track[0], ' ', ' ', ' '};
+                _ = try std.fmt.bufPrint(track_buf[1..], "{}", .{ost_track[1]});
+                print_str("OST Track:", track_buf[0..], padding, max_len);
+            }
+            else {
+                var track_buf = [_]u8 {' ', ' ', ' '};
+                const track_str = try std.fmt.bufPrint(track_buf[0..], "{}", .{ost_track[1]});
+                print_str("OST Track:", track_str, padding, max_len);
+            }
+        }
+        else {
+            print_str("OST Track:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
+
+        print_str("Publisher:", if (md_copy.publisher != null) null_term(md_copy.publisher.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
+
+        if (self.copyright_year) |cpr_year| {
+            var cpr_buf = [_]u8 {' ', ' ', ' ', ' '};
+            const cpr_str = try std.fmt.bufPrint(cpr_buf[0..], "{}", .{cpr_year});
+            print_str("Copyright Year:", cpr_str, padding, max_len);
+        }
+        else {
+            print_str("Copyright Year:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
+
+        if (self.intro_length_in_timer2_steps) |int_len| {
+            const intro_length = try buf_print_time(int_len / 64, false);
+            print_str("Intro Length:", intro_length[0..], padding, max_len);
+        }
+        else {
+            print_str("Intro Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
+
+        if (self.loop_length_in_timer2_steps) |loop_len| {
+            const loop_length = try buf_print_time(loop_len / 64, false);
+            print_str("Loop Length:", loop_length[0..], padding, max_len);
+        }
+        else {
+            print_str("Loop Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
+
+        if (self.end_length_in_timer2_steps) |end_len| {
+            const end_length = try buf_print_time(end_len / 64, false);
+            print_str("End Length:", end_length[0..], padding, max_len);
+        }
+        else {
+            print_str("End Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
+
+        if (self.loop_times) |loop_times| {
+            var loop_buf = [_]u8 {' ', ' ', ' '};
+            const loop_str = try std.fmt.bufPrint(loop_buf[0..], "{}", .{loop_times});
+            print_str("Loop Count:", loop_str, padding, max_len);
+        }
+        else {
+            print_str("Loop Count:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
+
+        if (self.mixing_level) |mix_lvl| {
+            var mix_buf = [_]u8 {' ', ' ', ' ', '/', '2', '5', '5'};
+            const mix_str = try std.fmt.bufPrint(mix_buf[0..3], "{}", .{mix_lvl});
+            print_str("Mixing Level:", mix_str, padding, max_len);
+        }
+        else {
+            print_str("Mixing Level:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+        }
         
+        std.debug.print("----------------------------------------------------------------------------------\n", .{});
         std.debug.print("\n", .{});
+    }
+
+    pub fn strip_newlines(self: *SongMetadata) void {
+        if (self.title != null) {
+            strip(self.title.?[0..]);
+        }
+
+        if (self.artist != null) {
+            strip(self.artist.?[0..]);
+        }
+
+        if (self.game != null) {
+            strip(self.game.?[0..]);
+        }
+
+        if (self.dumper != null) {
+            strip(self.dumper.?[0..]);
+        }
+
+        if (self.comments != null) {
+            strip(self.comments.?[0..]);
+        }
+
+        if (self.date_other != null) {
+            strip(self.date_other.?[0..]);
+        }
+
+        if (self.ost_title != null) {
+            strip(self.ost_title.?[0..]);
+        }
+
+        if (self.publisher != null) {
+            strip(self.publisher.?[0..]);
+        }
+    }
+
+    fn strip(buf: []u8) void {
+        for (buf, 0..) |char, i| {
+            if (char == '\r' or char == '\n') {
+                buf[i] = ' ';
+            }
+        }
+    }
+
+    fn at(buf: []const u8, index: u32) u8 {
+        if (index >= buf.len) {
+            return 0x00;
+        }
+        else {
+            return buf[index];
+        }
+    }
+
+    fn read_4(stream: *[]const u8) [4]u8 {
+        const res_buf = [_]u8 {
+            at(stream.*, 0),
+            at(stream.*, 1),
+            at(stream.*, 2),
+            at(stream.*, 3),
+        };
+
+        if (stream.len < 4) {
+            stream.* = stream.*[stream.len..];
+        }
+        else {
+            stream.* = stream.*[4..];
+        }
+
+        return res_buf;
     }
 
     fn buf_print_time(amount: u32, use_ms: bool) ![13]u8 {
