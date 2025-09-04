@@ -89,8 +89,8 @@ pub const SongMetadata = struct {
                         @memcpy(r.date_other.?[0..11], id666_main[0x70..0x7B]); r.date_other.?[11] = 0;
                     }
 
-                    r.length_in_seconds = std.fmt.parseInt(u32, id666_main[0x7B..0x7E], 10) catch null;
-                    r.fade_length_in_ms = std.fmt.parseInt(u32, id666_main[0x7E..0x83], 10) catch null;
+                    r.length_in_seconds = parse_int_null_term(id666_main[0x7B..0x7E]);
+                    r.fade_length_in_ms = parse_int_null_term(id666_main[0x7E..0x83]);
 
                     @memcpy(r.artist.?[0..32], id666_main[0x83..0xA3]); r.artist.?[32] = 0;
 
@@ -503,6 +503,26 @@ pub const SongMetadata = struct {
         if (self.publisher != null) {
             strip(self.publisher.?[0..]);
         }
+    }
+
+    fn parse_int_null_term(buf: []const u8) ?u32 {
+        var first_null: u8 = @intCast(buf.len);
+        //std.debug.print("fn: {d}\n", .{first_null});
+
+        for (buf, 0..) |char, i| {
+            if (char == 0) {
+                first_null = @intCast(i);
+                break;
+            }
+        }
+
+        const valid = first_null == buf.len or std.mem.allEqual(u8, buf[first_null..], 0);
+
+        if (!valid) {
+            return null;
+        }
+
+        return std.fmt.parseInt(u32, buf[0..first_null], 10) catch null;
     }
 
     fn strip(buf: []u8) void {
