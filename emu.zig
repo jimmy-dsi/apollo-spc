@@ -9,7 +9,8 @@ pub const Emu = struct {
     };
 
     pub const DebugModeOptions = struct {
-        set_as_master: bool = false
+        set_as_master: bool = false,
+        force_exit:    bool = false
     };
 
     pub var rand: std.Random = undefined;
@@ -23,8 +24,9 @@ pub const Emu = struct {
 
     pre_shadow_cycle: u64 = 0,
 
-    debug_persist_shadow_mode: bool = false,
-    debug_persist_spc_state: bool = false,
+    debug_persist_shadow_mode:  bool = false,
+    debug_persist_spc_state:    bool = false,
+    debug_return_on_force_exit: bool = true,
 
     pub fn static_init() void {
         prng = std.Random.DefaultPrng.init(blk: {
@@ -121,17 +123,21 @@ pub const Emu = struct {
         }
     }
 
-    pub fn disable_shadow_execution(self: *Emu, _: DebugModeOptions) void {
+    pub fn disable_shadow_execution(self: *Emu, options: DebugModeOptions) void {
         switch (self.cur_debug_mode) {
-            DebugMode.none => { },
+            DebugMode.none => {
+                self.s_smp.disable_shadow_mode();
+                self.s_smp.disable_shadow_execution(options.force_exit);
+            },
             DebugMode.shadow_mode => {
                 self.s_smp.disable_shadow_mode();
-                self.s_smp.disable_shadow_execution();
+                self.s_smp.disable_shadow_execution(options.force_exit);
                 self.cur_debug_mode = DebugMode.none;
                 self.master_debug_mode = DebugMode.none;
             },
             DebugMode.shadow_exec => {
-                self.s_smp.disable_shadow_execution();
+                self.s_smp.disable_shadow_mode();
+                self.s_smp.disable_shadow_execution(options.force_exit);
                 self.cur_debug_mode = DebugMode.none;
                 self.master_debug_mode = DebugMode.none;
             }

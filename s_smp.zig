@@ -86,7 +86,8 @@ pub const SSMP = struct {
     timer_logs: [256]TimerLog = undefined,
     last_timer_log_index: u32 = 0,
 
-    instr_boundary: bool = false,
+    instr_boundary:     bool = false,
+    next_is_force_exit: bool = false,
 
     timer_wait_cycles: u32 = 0,
 
@@ -141,8 +142,9 @@ pub const SSMP = struct {
         self.attempt_shadow_transition();
     }
 
-    pub fn disable_shadow_execution(self: *SSMP) void {
-        self.next_debug_mode = Emu.DebugMode.none;
+    pub fn disable_shadow_execution(self: *SSMP, force_exit: bool) void {
+        self.next_debug_mode    = Emu.DebugMode.none;
+        self.next_is_force_exit = force_exit;
         self.attempt_shadow_transition();
     }
 
@@ -436,7 +438,7 @@ pub const SSMP = struct {
             self.emu.disable_shadow_execution(.{.set_as_master = true});
         }
         // Otherwise, if the shadow region is exited via other means (i.e. call instruction), end Shadow Mode if applicable
-        else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode and !self.in_shadow_region(pc, 0) and !self.emu.debug_persist_shadow_mode) {
+        else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode and self.next_debug_mode != Emu.DebugMode.none and !self.in_shadow_region(pc, 0) and !self.emu.debug_persist_shadow_mode) {
             self.emu.disable_shadow_mode(.{});
         }
         // If the shadow region has been *re-entered* (i.e. via ret instruction), reapply Shadow Mode if applicable
@@ -445,6 +447,10 @@ pub const SSMP = struct {
         }
         // If shadow execution is enabled and a STOP instruction has been hit, end shadow execution
         else if (self.cur_debug_mode != Emu.DebugMode.none and self.last_opcode == 0xFF) {
+            self.emu.disable_shadow_execution(.{.set_as_master = true});
+        }
+        // Or if we are pending a change to the current debug mode for any other reason
+        else if (self.cur_debug_mode != Emu.DebugMode.none and self.next_debug_mode == Emu.DebugMode.none) {
             self.emu.disable_shadow_execution(.{.set_as_master = true});
         }
     }
@@ -462,7 +468,8 @@ pub const SSMP = struct {
                 self.spc.enable_shadow_execution();
             }
             else if (self.next_debug_mode == Emu.DebugMode.none) {
-                self.spc.disable_shadow_execution();
+                self.spc.disable_shadow_execution(self.next_is_force_exit);
+                self.next_is_force_exit = false;
             }
 
             self.cur_debug_mode = self.next_debug_mode;

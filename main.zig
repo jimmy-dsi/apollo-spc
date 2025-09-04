@@ -63,6 +63,7 @@ pub fn main() !void {
     std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
     std.debug.print("   x = Send interrupt signal \n", .{});
     std.debug.print("   q = Run shadow code \n", .{});
+    std.debug.print("   e = Exit shadow execution \n", .{});
     std.debug.print("   p = View previous page \n", .{});
     std.debug.print("   n = View next page \n", .{});
     std.debug.print("   u = Shift memory view up one row \n", .{});
@@ -97,16 +98,17 @@ pub fn main() !void {
     var cur_mode: u8 = 'i';
     var cur_action: u8 = 's';
 
-    const shadow_routine: [20]u8 = [20]u8 {
+    const shadow_routine: [23]u8 = [23]u8 {
         0x20,             //    clrp
         0xE5, 0x00, 0x02, //    mov a, $0200
         0xBC,             //    inc a
         0xC5, 0x00, 0x02, //    mov $0200, a
         0x8F, 0x01, 0x00, //    mov $FC, #$01 (Set timer 2 period to 1)
         0x8F, 0x84, 0x00, //    mov $F1, #$84 (Enable timer 2)
-        0x8D, 0x03,       //    mov y, #$03
+        0x8D, 0x03,       //    mov y, #$10
+        0x3F, 0x8A, 0x15, //    call $158A
         0xFE, 0xFE,       // -: dbnz y, -
-        0xFF,             //    stop
+        0x7F,             //    reti
         0xC5,             //    mov ----, a
     };
     
@@ -211,6 +213,13 @@ pub fn main() !void {
 
                 std.debug.print("\n\x1B[34m", .{});
                 std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "entering shadow mode"});
+                std.debug.print("\x1B[0m\n", .{});
+            },
+            'e' => {
+                emu.disable_shadow_execution(.{.force_exit = true});
+
+                std.debug.print("\n\x1B[34m", .{});
+                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "exiting shadow execution"});
                 std.debug.print("\x1B[0m\n", .{});
             },
             's' => {

@@ -72,9 +72,13 @@ pub const SPC = struct {
         self.state.pc = self.shadow_start;
     }
 
-    pub fn disable_shadow_execution(self: *SPC) void {
+    pub fn disable_shadow_execution(self: *SPC, force_exit: bool) void {
         self.shadow_exec = false;
-        if (self.emu.debug_persist_spc_state) {
+
+        if (force_exit and !self.emu.debug_return_on_force_exit) { // Don't restore either PC or state if the user has forced ending shadow execution and is set to not return PC
+            return;
+        }
+        else if (self.emu.debug_persist_spc_state) {
             self.state.pc = self.return_state.pc; // Restore PC only if SPC state is set to persist
         }
         else {
@@ -1184,12 +1188,22 @@ pub const SPC = struct {
     }
 
     pub inline fn ret(self: *SPC, substate: u32) !void {
+        const prev_sp = &self.data_u8[0];
+
         switch (substate) {
-            0, 1  => {  try self.dummy_read(self.pc(), substate);  }, // Dummy read
-            2     => {  try self.idle();                           }, // Idle
-            3...6 => {  try self.pull_word(substate - 3);          }, // Pull word
-            7     => {  self.state.pc = self.last_read_word();        // End
-                        self.finish(0);                            },
+            0, 1  => {  try self.dummy_read(self.pc(), substate);            }, // Dummy read
+            2     => {  prev_sp.* = self.state.sp; try self.idle();          }, // Idle
+            3...6 => {  try self.pull_word(substate - 3);                    }, // Pull word
+            7     => {  self.state.pc = self.last_read_word();                  // End
+                        if (self.shadow_exec) {
+                            const next_sp: u16 = @as(u16, prev_sp.*) + 2;
+                            if (next_sp > @as(u16, self.return_state.sp)) {
+                                // Disable shadow execution if ret is executed and stack underflows initial SP state upon entering shadow execution
+                                self.state.sp = self.return_state.sp; // Force reset of SP, even if set to only restore PC
+                                self.emu.disable_shadow_execution(.{});
+                            }
+                        }
+                        self.finish(0);                                      },
 
             else => unreachable
         }
@@ -1258,14 +1272,26 @@ pub const SPC = struct {
     }
 
     pub inline fn reti(self: *SPC, substate: u32) !void {
+        const prev_sp  = &self.data_u8[0];
+        const prev_psw = &self.data_u8[1];
+
         sw: switch (substate) {
-            0, 1  => {  try self.dummy_read(self.pc(), substate);                }, // Dummy read
-            2     => {  try self.idle();                                         }, // Idle
-            3, 4  => {  try self.pull(substate - 3);                             }, // Pull 
-            5     => {  self.state.psw = self.last_read_byte(); continue :sw 6;  }, // Start of pull word (5)
-            6...8 => {  try self.pull_word(substate - 5);                        }, 
-            9     => {  self.state.pc = self.last_read_word();                      // End
-                        self.finish(0);                                          },
+            0, 1  => {  try self.dummy_read(self.pc(), substate);                                 }, // Dummy read
+            2     => {  prev_sp.* = self.state.sp; prev_psw.* = self.state.psw; try self.idle();  }, // Idle
+            3, 4  => {  try self.pull(substate - 3);                                              }, // Pull 
+            5     => {  self.state.psw = self.last_read_byte(); continue :sw 6;                   }, // Start of pull word (5)
+            6...8 => {  try self.pull_word(substate - 5);                                         }, 
+            9     => {  self.state.pc = self.last_read_word();                                       // End
+                        if (self.shadow_exec) {
+                            const next_sp: u16 = @as(u16, prev_sp.*) + 3;
+                            if (next_sp > @as(u16, self.return_state.sp)) {
+                                // Disable shadow execution if reti is executed and stack underflows initial SP state upon entering shadow execution
+                                self.state.sp  = self.return_state.sp; // Force reset of SP, even if set to only restore PC
+                                self.state.psw = prev_psw.*;           // Reset PSW to what it was before this instruction, in case PSW restore is skipped
+                                self.emu.disable_shadow_execution(.{});
+                            }
+                        }
+                        self.finish(0);                                                           },
 
             else => unreachable
         }
