@@ -426,7 +426,7 @@ pub const SongMetadata = struct {
         }
 
         if (self.intro_length_in_timer2_steps) |int_len| {
-            const intro_length = try buf_print_time(int_len / 64, false);
+            const intro_length = try buf_print_time(int_len / 64, true);
             print_str("Intro Length:", intro_length[0..], padding, max_len);
         }
         else {
@@ -434,7 +434,7 @@ pub const SongMetadata = struct {
         }
 
         if (self.loop_length_in_timer2_steps) |loop_len| {
-            const loop_length = try buf_print_time(loop_len / 64, false);
+            const loop_length = try buf_print_time(loop_len / 64, true);
             print_str("Loop Length:", loop_length[0..], padding, max_len);
         }
         else {
@@ -442,7 +442,7 @@ pub const SongMetadata = struct {
         }
 
         if (self.end_length_in_timer2_steps) |end_len| {
-            const end_length = try buf_print_time(end_len / 64, false);
+            const end_length = try buf_print_time(end_len / 64, true);
             print_str("End Length:", end_length[0..], padding, max_len);
         }
         else {
