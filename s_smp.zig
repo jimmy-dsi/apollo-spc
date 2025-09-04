@@ -488,7 +488,7 @@ pub const SSMP = struct {
         }
     }
 
-    inline fn in_shadow_region(self: *const SSMP, address: u16, padding: u16) bool {
+    pub inline fn in_shadow_region(self: *const SSMP, address: u16, padding: u16) bool {
         const length_until_end: u32 = @intCast(0x1_0000 - @as(u32, self.spc.shadow_start));
 
         if (self.spc.shadow_length + padding <= length_until_end) { // Case when Shadow Execution region does not overflow memory space

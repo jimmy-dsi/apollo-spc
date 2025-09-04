@@ -26,7 +26,7 @@ pub const Emu = struct {
 
     debug_persist_shadow_mode:  bool = false,
     debug_persist_spc_state:    bool = false,
-    debug_return_on_force_exit: bool = true,
+    debug_return_on_force_exit: bool = false,
 
     pub fn static_init() void {
         prng = std.Random.DefaultPrng.init(blk: {
@@ -126,8 +126,10 @@ pub const Emu = struct {
     pub fn disable_shadow_execution(self: *Emu, options: DebugModeOptions) void {
         switch (self.cur_debug_mode) {
             DebugMode.none => {
-                self.s_smp.disable_shadow_mode();
-                self.s_smp.disable_shadow_execution(options.force_exit);
+                if (!options.force_exit) {
+                    self.s_smp.disable_shadow_mode();
+                    self.s_smp.disable_shadow_execution(options.force_exit);
+                }
             },
             DebugMode.shadow_mode => {
                 self.s_smp.disable_shadow_mode();

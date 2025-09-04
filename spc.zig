@@ -75,7 +75,8 @@ pub const SPC = struct {
     pub fn disable_shadow_execution(self: *SPC, force_exit: bool) void {
         self.shadow_exec = false;
 
-        if (force_exit and !self.emu.debug_return_on_force_exit) { // Don't restore either PC or state if the user has forced ending shadow execution and is set to not return PC
+        if (force_exit and !self.emu.debug_return_on_force_exit and !self.s_smp().in_shadow_region(self.state.pc, 0)) {
+            // Don't restore either PC or state if the user has forced ending shadow execution and is set to not return PC (unless PC is still in the shadow region)
             return;
         }
         else if (self.emu.debug_persist_spc_state) {
