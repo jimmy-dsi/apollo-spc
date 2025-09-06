@@ -1378,6 +1378,7 @@ pub fn print_timer_log(log: *const SSMP.TimerLog, options: struct { prefix: bool
 const OptionStruct = struct {
     prev_pc: ?u16 = null,
     prev_state: ?*const SMPState = null,
+    is_dsp: bool = false,
     logs: ?[]SSMP.AccessLog = null
 };
 
@@ -1411,6 +1412,190 @@ pub fn print_memory_page(emu: *Emu, page: u8, offset: u8, options: OptionStruct)
     }
 }
 
+pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
+    for (0..8) |y| {
+        const yy: u8 = @intCast(y);
+        const line_start: u8 = 16 * yy;
+        std.debug.print("{X:0>2} | ", .{line_start});
+
+        for (0..16) |x| {
+            const xx: u8 = @intCast(x);
+            const address: u8 = line_start + xx;
+            const data: u8 = emu.s_dsp.dsp_map[address];
+
+            print_mem_cell(emu, @as(u16, address), data, false, options);
+        }
+
+        std.debug.print("| ", .{});
+
+        for (0..16) |x| {
+            const xx: u8 = @intCast(x);
+            const address: u8 = line_start + xx;
+            const data: u8 = emu.s_dsp.dsp_map[address];
+
+            print_mem_cell(emu, @as(u16, address), data, true, options);
+        }
+
+        std.debug.print("\n", .{});
+    }
+}
+
+pub fn print_dsp_state(emu: *Emu, options: OptionStruct) void {
+    const s = &emu.s_dsp.state;
+
+    // Print voice registers
+    print_dsp_voices(emu, 0, options);
+    std.debug.print("\n", .{});
+    print_dsp_voices(emu, 4, options);
+    std.debug.print("\n", .{});
+
+    const kon =
+          @as(u8, s.voice[0].keyon)      | @as(u8, s.voice[1].keyon) << 1
+        | @as(u8, s.voice[2].keyon) << 2 | @as(u8, s.voice[3].keyon) << 3
+        | @as(u8, s.voice[4].keyon) << 4 | @as(u8, s.voice[5].keyon) << 5
+        | @as(u8, s.voice[6].keyon) << 6 | @as(u8, s.voice[7].keyon) << 7;
+
+    const koff =
+          @as(u8, s.voice[0].keyoff)      | @as(u8, s.voice[1].keyoff) << 1
+        | @as(u8, s.voice[2].keyoff) << 2 | @as(u8, s.voice[3].keyoff) << 3
+        | @as(u8, s.voice[4].keyoff) << 4 | @as(u8, s.voice[5].keyoff) << 5
+        | @as(u8, s.voice[6].keyoff) << 6 | @as(u8, s.voice[7].keyoff) << 7;
+
+    const pmon =
+          @as(u8, s.voice[0].pitch_mod_on)      | @as(u8, s.voice[1].pitch_mod_on) << 1
+        | @as(u8, s.voice[2].pitch_mod_on) << 2 | @as(u8, s.voice[3].pitch_mod_on) << 3
+        | @as(u8, s.voice[4].pitch_mod_on) << 4 | @as(u8, s.voice[5].pitch_mod_on) << 5
+        | @as(u8, s.voice[6].pitch_mod_on) << 6 | @as(u8, s.voice[7].pitch_mod_on) << 7;
+
+    const non =
+          @as(u8, s.voice[0].noise_on)      | @as(u8, s.voice[1].noise_on) << 1
+        | @as(u8, s.voice[2].noise_on) << 2 | @as(u8, s.voice[3].noise_on) << 3
+        | @as(u8, s.voice[4].noise_on) << 4 | @as(u8, s.voice[5].noise_on) << 5
+        | @as(u8, s.voice[6].noise_on) << 6 | @as(u8, s.voice[7].noise_on) << 7;
+
+    const eon =
+          @as(u8, s.voice[0].echo_on)      | @as(u8, s.voice[1].echo_on) << 1
+        | @as(u8, s.voice[2].echo_on) << 2 | @as(u8, s.voice[3].echo_on) << 3
+        | @as(u8, s.voice[4].echo_on) << 4 | @as(u8, s.voice[5].echo_on) << 5
+        | @as(u8, s.voice[6].echo_on) << 6 | @as(u8, s.voice[7].echo_on) << 7;
+
+    const fir = [8]u8 {
+        @bitCast(s.echo.fir[0]), @bitCast(s.echo.fir[1]),
+        @bitCast(s.echo.fir[2]), @bitCast(s.echo.fir[3]),
+        @bitCast(s.echo.fir[4]), @bitCast(s.echo.fir[5]),
+        @bitCast(s.echo.fir[6]), @bitCast(s.echo.fir[7])
+    };
+
+    // Print general registers
+    const mvoll: u8 = @bitCast(s.main_vol_left);
+    const mvolr: u8 = @bitCast(s.main_vol_right);
+    const evoll: u8 = @bitCast(s.echo.vol_left);
+    const evolr: u8 = @bitCast(s.echo.vol_right);
+    const efb:   u8 = @bitCast(s.echo.feedback);
+
+    std.debug.print("main volume - left:   {X:0>2}      ", .{mvoll});
+    std.debug.print("key on:                 {X:0>2}\n",   .{kon});
+    std.debug.print("main volume - right:  {X:0>2}      ", .{mvolr});
+    std.debug.print("key off:                {X:0>2}\n",   .{koff});
+    std.debug.print("echo volume - left:   {X:0>2}      ", .{evoll});
+    std.debug.print("source end (endx):      {X:0>2}\n",   .{0x00});
+    std.debug.print("echo volume - right:  {X:0>2}      ", .{evolr});
+    std.debug.print("echo feedback:          {X:0>2}\n",   .{efb});
+    std.debug.print("\n", .{});
+
+    std.debug.print("pitch modulation:     {X:0>2}      ", .{pmon});
+    std.debug.print("echo buffer start:      {X:0>2}00\n", .{s.echo.esa_page});
+    std.debug.print("noise enable:         {X:0>2}      ", .{non});
+    std.debug.print("source directory start: {X:0>2}00\n", .{s.brr_bank});
+    std.debug.print("echo enable:          {X:0>2}      ", .{eon});
+    std.debug.print("echo delay:             {X:0>2}\n",   .{s.echo.delay});
+    std.debug.print("\n", .{});
+
+    std.debug.print("noise clock:     {X:0>2}\n", .{s.noise.output_rate});
+    std.debug.print("read-only echo:  {}\n",      .{s.echo.readonly == 1});
+    std.debug.print("mute:            {}\n",      .{s.mute          == 1});
+    std.debug.print("reset:           {}\n",      .{s.reset         == 1});
+    std.debug.print("\n", .{});
+    std.debug.print(
+        "fir:  {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",
+        .{
+            fir[0], fir[1], fir[2], fir[3],
+            fir[4], fir[5], fir[6], fir[7],
+        }
+    );
+    std.debug.print("\n", .{});
+}
+
+fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
+    const s = &emu.s_dsp.state;
+
+    // Print voice 0-3 states
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        const val: u8 = @bitCast(v.vol_left);
+        std.debug.print("V{d}  left volume:  {X:0>2}       ", .{idx, val});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        const val: u8 = @bitCast(v.vol_right);
+        std.debug.print("    right volume: {X:0>2}       ", .{val});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        std.debug.print("    pitch:        {X:0>4}     ", .{v.pitch});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        std.debug.print("    srcn:         {X:0>2}       ", .{v.source});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        std.debug.print("    adsr 1:       {X:0>2}       ", .{v.adsr_0});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        std.debug.print("    adsr 2:       {X:0>2}       ", .{v.adsr_1});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        std.debug.print("    gain:         {X:0>2}       ", .{v.gain});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s.voice[idx];
+        std.debug.print("    envx:         {X:0>2}       ", .{v.envx});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        _ = &s.voice[idx];
+        std.debug.print("    outx:         {X:0>2}       ", .{0x00});
+    }
+    std.debug.print("\n", .{});
+}
+
 fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: OptionStruct) void {
     var pc_match: bool = false;
 
@@ -1430,10 +1615,10 @@ fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: Opt
         use_boot_rom     = state.use_boot_rom;
     }
 
-    if (pc_match) {
+    if (pc_match and !options.is_dsp) {
         print_byte("\x1B[44m", data, "\x1B[49m", as_char);
     }
-    else if (address == emu.*.s_smp.spc.pc()) {
+    else if (address == emu.s_smp.spc.pc() and !options.is_dsp) {
         print_byte("\x1B[45m", data, "\x1B[49m", as_char);
     }
     else {
@@ -1443,7 +1628,7 @@ fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: Opt
 
         if (options.logs) |logs| {
             for (logs) |log| {
-                if (log.address == address) {
+                if (!options.is_dsp and log.address == address or options.is_dsp and log.address == 0x00F3 and emu.s_smp.state.dsp_address == address) {
                     switch (log.type) {
                         SSMP.AccessType.dummy_read, SSMP.AccessType.exec, SSMP.AccessType.fetch => {
                             is_fetch = true;
@@ -1461,7 +1646,10 @@ fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: Opt
         }
 
         if (is_write) {
-            if (address >= 0x00F0 and address <= 0x00FF) {
+            if (options.is_dsp) {
+                print_byte("\x1B[46m", data, "\x1B[49m", as_char);
+            }
+            else if (address >= 0x00F0 and address <= 0x00FF) {
                 print_byte("\x1B[44m", data, "\x1B[49m", as_char);
             }
             else if (ram_disable == 1 or ram_write_enable == 0) {
@@ -1472,7 +1660,10 @@ fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: Opt
             }
         }
         else if (is_read and !is_fetch) {
-            if (address >= 0x00F0 and address <= 0x00FC) {
+            if (options.is_dsp) {
+                print_byte("\x1B[41m", data, "\x1B[49m", as_char);
+            }
+            else if (address >= 0x00F0 and address <= 0x00FC) {
                 print_byte("\x1B[43m\x1B[37m", data, "\x1B[0m", as_char);
             }
             else if (address >= 0x00FD and address <= 0x00FF) {

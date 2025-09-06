@@ -58,6 +58,7 @@ pub fn main() !void {
     std.debug.print("Mode commands: \n", .{});
     std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
     std.debug.print("   v = Memory viewer \n", .{});
+    std.debug.print("   r = DSP register map viewer \n", .{});
     std.debug.print("Action commands: \n", .{});
     std.debug.print("   s = Step instruction [default] \n", .{});
     std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
@@ -180,6 +181,14 @@ pub fn main() !void {
                 std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
             },
+            'r' => {
+                cur_mode = 'r';
+                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_dsp_map(&emu, .{.is_dsp = true});
+
+                std.debug.print("\n", .{});
+                db.print_dsp_state(&emu, .{.is_dsp = true});
+            },
             'w' => {
                 cur_action = 'w';
 
@@ -274,6 +283,13 @@ pub fn main() !void {
                 else if (cur_mode == 'v') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                }
+                else if (cur_mode == 'r') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+
+                    std.debug.print("\n", .{});
+                    db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
                 }
             },
             else => {

@@ -181,7 +181,7 @@ pub const SDSP = struct {
                 0x0C => { // MVOLL
                     s.main_vol_left = @bitCast(data);
                 },
-                0x1C => { // MVOLL
+                0x1C => { // MVOLR
                     s.main_vol_right = @bitCast(data);
                 },
                 0x2C => { // EVOLL
@@ -210,7 +210,7 @@ pub const SDSP = struct {
                 },
                 0x7C => { // ENDX
                     // The lone exception to the "DSP map value always matches internal state after initialization" rule:
-                    // Because this is a register that is meant to be read, writing to it simply resets to zero
+                    // Because this is a register that is meant to be read-only, writing to it simply resets to zero
                     self.dsp_map[address] = 0x00;
                 },
                 0x0D => { // EFB
@@ -287,9 +287,10 @@ pub const SDSP = struct {
     }
 
     pub fn debug_write(self: *SDSP, address: u8, data: u8) void {
-        if (address & 0x80 == 0) {
-            self.dsp_map[address] = data;
-        }
+        //if (address & 0x80 == 0) {
+        //    self.dsp_map[address] = data;
+        //}
+        self.write(address, data);
     }
 
     inline fn proc_t0(self: *SDSP) void {
