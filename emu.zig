@@ -26,7 +26,7 @@ pub const Emu = struct {
 
     debug_persist_shadow_mode:  bool = false,
     debug_persist_spc_state:    bool = false,
-    debug_return_on_force_exit: bool = false,
+    debug_return_on_force_exit: bool = true,
 
     pub fn static_init() void {
         prng = std.Random.DefaultPrng.init(blk: {

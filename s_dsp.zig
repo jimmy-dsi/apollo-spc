@@ -162,12 +162,127 @@ pub const SDSP = struct {
     }
 
     pub fn read(self: *const SDSP, address: u8) u8 {
+        // Reads only grab the value from the DSP register array, even if the underlying internal state value doesn't match this
+        // In practice, such mismatches would only ever happen right after reset, before the SPC program runs any DSP initialization code
+        // After that, they'll pretty much always be in sync
         return self.dsp_map[address & 0x7F];
     }
 
     pub fn write(self: *SDSP, address: u8, data: u8) void {
         if (address & 0x80 == 0) {
+            // Always write to the DSP register array
             self.dsp_map[address] = data;
+
+            const s = &self.state;
+            const idx: u3 = @intCast(address >> 4 & 7);
+
+            // Then copy to internal DSP state values
+            switch (address) {
+                0x0C => { // MVOLL
+                    s.main_vol_left = @bitCast(data);
+                },
+                0x1C => { // MVOLL
+                    s.main_vol_right = @bitCast(data);
+                },
+                0x2C => { // EVOLL
+                    s.echo.vol_left = @bitCast(data);
+                },
+                0x3C => { // EVOLR
+                    s.echo.vol_right = @bitCast(data);
+                },
+                0x4C => { // KON
+                    for (0..8) |bit| {
+                        const b: u3 = @intCast(bit);
+                        s.voice[b].keyon = @intCast(data >> b & 1);
+                    }
+                },
+                0x5C => { // KOFF
+                    for (0..8) |bit| {
+                        const b: u3 = @intCast(bit);
+                        s.voice[b].keyoff = @intCast(data >> b & 1);
+                    }
+                },
+                0x6C => { // FLG
+                    s.noise.output_rate = @intCast(data & 0x1F);
+                    s.echo.readonly     = @intCast(data >> 5 & 1);
+                    s.mute              = @intCast(data >> 6 & 1);
+                    s.reset             = @intCast(data >> 7 & 1);
+                },
+                0x7C => { // ENDX
+                    // The lone exception to the "DSP map value always matches internal state after initialization" rule:
+                    // Because this is a register that is meant to be read, writing to it simply resets to zero
+                    self.dsp_map[address] = 0x00;
+                },
+                0x0D => { // EFB
+                    s.echo.feedback = @bitCast(data);
+                },
+                0x2D => { // PMON
+                    for (0..8) |bit| {
+                        const b: u3 = @intCast(bit);
+                        s.voice[b].pitch_mod_on = @intCast(data >> b & 1);
+                    }
+                    s.voice[0].pitch_mod_on = 0; // Voice 0 does not support modulation
+                },
+                0x3D => { // NON
+                    for (0..8) |bit| {
+                        const b: u3 = @intCast(bit);
+                        s.voice[b].noise_on = @intCast(data >> b & 1);
+                    }
+                },
+                0x4D => { // EON
+                    for (0..8) |bit| {
+                        const b: u3 = @intCast(bit);
+                        s.voice[b].echo_on = @intCast(data >> b & 1);
+                    }
+                },
+                0x5D => { // DIR
+                    s.brr_bank = data;
+                },
+                0x6D => { // ESA
+                    s.echo.esa_page = data;
+                },
+                0x7D => { // EDL
+                    s.echo.delay = @intCast(data & 0xF);
+                },
+                0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70 => { // VxVOLL
+                    s.voice[idx].vol_left = @bitCast(data);
+                },
+                0x01, 0x11, 0x21, 0x31, 0x41, 0x51, 0x61, 0x71 => { // VxVOLR
+                    s.voice[idx].vol_right = @bitCast(data);
+                },
+                0x02, 0x12, 0x22, 0x32, 0x42, 0x52, 0x62, 0x72 => { // VxPITCHL
+                    const pitch_hi = s.voice[idx].pitch & 0x3F00;
+                    s.voice[idx].pitch = pitch_hi | @as(u14, data);
+                },
+                0x03, 0x13, 0x23, 0x33, 0x43, 0x53, 0x63, 0x73 => { // VxPITCHH
+                    const pitch_lo = s.voice[idx].pitch & 0x00FF;
+                    s.voice[idx].pitch = @as(u14, data & 0x3F) << 8 | pitch_lo;
+                },
+                0x04, 0x14, 0x24, 0x34, 0x44, 0x54, 0x64, 0x74 => { // VxSRCN
+                    s.voice[idx].source = data;
+                },
+                0x05, 0x15, 0x25, 0x35, 0x45, 0x55, 0x65, 0x75 => { // VxADSR0
+                    s.voice[idx].adsr_0 = data;
+                },
+                0x06, 0x16, 0x26, 0x36, 0x46, 0x56, 0x66, 0x76 => { // VxADSR1
+                    s.voice[idx].adsr_1 = data;
+                },
+                0x07, 0x17, 0x27, 0x37, 0x47, 0x57, 0x67, 0x77 => { // VxGAIN
+                    s.voice[idx].gain = data;
+                },
+                0x08, 0x18, 0x28, 0x38, 0x48, 0x58, 0x68, 0x78 => { // VxENVX
+                    // TODO
+                },
+                0x09, 0x19, 0x29, 0x39, 0x49, 0x59, 0x69, 0x79 => { // VxOUTX
+                    // TODO
+                },
+                0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F => { // FIRx
+                    s.echo.fir[idx] = @bitCast(data);
+                },
+                else => {
+                    // Nothing
+                }
+            }
         }
     }
 

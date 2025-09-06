@@ -108,7 +108,7 @@ pub fn main() !void {
         0x8D, 0x03,       //    mov y, #$10
         0x3F, 0x8A, 0x15, //    call $158A
         0xFE, 0xFE,       // -: dbnz y, -
-        0xFF,             //    reti
+        0x7F,             //    reti
         0xC5,             //    mov ----, a
     };
     
