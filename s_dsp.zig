@@ -68,7 +68,7 @@ pub const SDSP = struct {
         }
 
         for (&self.dsp_map) |*value| {
-            value.* = 0x00;
+            value.* = Emu.rand.int(u8);
         }
 
         self.reset();
@@ -76,8 +76,11 @@ pub const SDSP = struct {
 
     pub fn reset(self: *SDSP) void {
         self.co.reset();
-        // Reset FLG to $E0 (soft reset, channel mute, and echo write disable. Noise clock set to frequency %0000)
-        self.dsp_map[0x6C] = 0b1110000;
+        // Reset FLG internal state (soft reset, channel mute, and echo write disable. Noise clock set to frequency %0000)
+        self.state.reset = 1;
+        self.state.mute  = 1;
+        self.state.echo.readonly = 1;
+        self.state.noise.output_rate = 0x00;
     }
 
     pub fn step(self: *SDSP) void {

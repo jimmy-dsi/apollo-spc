@@ -1,3 +1,5 @@
+const DSPStateInternal = @import("dsp_state_int.zig").DSPStateInternal;
+
 pub const DSPState = struct {
     pub const Echo = struct {
         feedback:  i8 = 0x00,
@@ -50,4 +52,6 @@ pub const DSPState = struct {
     brr_bank: u8 = 0x00,
 
     voice: [8]Voice = [_]Voice {.{}} ** 8,
+
+    _internal: DSPStateInternal
 };
