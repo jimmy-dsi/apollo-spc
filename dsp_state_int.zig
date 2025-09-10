@@ -1,6 +1,9 @@
+const gauss    = @import("gauss.zig");
+const envelope = @import("envelope.zig");
+
 pub const DSPStateInternal = struct {
     pub const EnvMode = enum {
-        release, attack, decay, sustain
+        key_off, attack, decay, release
     };
 
     pub const BRR = struct {
@@ -21,11 +24,26 @@ pub const DSPStateInternal = struct {
         _brr_address:     u16      = 0x0000,           // Address of current BRR block
         _brr_offset:      u4       = 1,                // Current decoding offset in BRR block (1-8)
         _key_on_delay:    u3       = 0,                // KON delay/current setup phase
-        _env_mode:        EnvMode  = .release,
+        _env_mode:        EnvMode  = .key_off,
         _env_level:       u11      = 0,                // Current envelope level (0-2047)
+
+        // Internal latches
+        __env_level:    i16 = 0, // Used by GAIN mode 7, very obscure quirk
+        __key_latch:    u1  = 0,
+        __key_on:       u1  = 0,
+        __key_off:      u1  = 0,
+        __pitch_mod_on: u1  = 0,
+        __noise_on:     u1  = 0,
+        __echo_on:      u1  = 0,
+        __end:          u1  = 0,
+        __looped:       u1  = 0,
     };
 
-    _brr:   BRR      = .{},
+    _brr:        BRR = .{},
+    _noise_lfsr: u15 = 0x4000,
+    _sample_clk: u1  = 1,
+    _counter:    u15 = 0x0000,
+
     _voice: [8]Voice = [_]Voice {.{}} ** 8,
 
     // Latch state
@@ -40,7 +58,7 @@ pub const DSPStateInternal = struct {
         self._brr._cur_source = source;
     }
 
-    pub fn voice_step_b(self: *DSPStateInternal, v_idx: u3, aram_0: [*]u8, aram_1: [*]u8, adsr_0: u8, pitch_lo: u8) void {
+    pub fn voice_step_b(self: *DSPStateInternal, v_idx: u3, aram_0: [*]u8, aram_1: [*]u8, pitch_lo: u8, adsr_0: u8) void {
         // Read sample pointer (ignored if not needed)
         var address: u16 = self._brr._cur_address;
         if (self._voice[v_idx]._key_on_delay == 0) {
@@ -48,12 +66,11 @@ pub const DSPStateInternal = struct {
         }
 
         // Do this to prevent buffer overflow
-        var hi_address: i32 = @intCast(address +% 1);
-        hi_address -= 1;
+        const hi_address: usize = @intCast(address +% 1);
         
         self._brr._next_address =
               @as(u16, (aram_0 + address)[0])
-            | @as(u16, (aram_1 + hi_address)[0]) << 8;
+            | @as(u16, (if (hi_address > 0) aram_1 + hi_address - 1 else aram_1 - 1)[0]) << 8;
 
         self._adsr_0 = adsr_0;
 
@@ -61,14 +78,19 @@ pub const DSPStateInternal = struct {
         self._pitch = @intCast(pitch_lo);
     }
 
-    pub fn voice_step_c(self: *DSPStateInternal, v_idx: u3, aram_data_0: u8, aram_data_1: u8, pitch_hi: u8, adsr_1: u8, gain: u8, envx: *u8) void {
+    pub fn voice_step_c(self: *DSPStateInternal,
+                        v_idx: u3,
+                        aram_data_0: u8, aram_data_1: u8,
+                        envx: *u8, pitch_hi: u8, adsr_1: u8, gain: u8,
+                        flg_reset: u1, gauss_tbl: [*]const u16) void
+    {
         self.voice_step_c_pt1(pitch_hi);
         self.voice_step_c_pt2(aram_data_0, aram_data_1);
-        self.voice_step_c_pt3(v_idx, adsr_1, gain, envx);
+        self.voice_step_c_pt3(v_idx, adsr_1, gain, envx, flg_reset, gauss_tbl);
     }
 
     pub fn voice_step_c_pt1(self: *DSPStateInternal, pitch_hi: u8) void {
-        self._pitch |= @as(u16, pitch_hi) << 8;
+        self._pitch |= @as(u15, pitch_hi) << 8;
     }
 
     pub fn voice_step_c_pt2(self: *DSPStateInternal, aram_data_0: u8, aram_data_1: u8) void {
@@ -76,12 +98,119 @@ pub const DSPStateInternal = struct {
         self._brr._cur_block_header = aram_data_1;
     }
 
-    pub fn voice_step_c_pt3(self: *DSPStateInternal, v_idx: u3, adsr_1: u8, gain: u8, envx: *u8) void {
+    pub fn voice_step_c_pt3(self: *DSPStateInternal, v_idx: u3, adsr_1: u8, gain: u8, envx: *u8, flg_reset: u1, gauss_tbl: [*]const u16) void {
         const v = &self._voice[v_idx];
 
-        _ = v;
-        _ = adsr_1;
-        _ = gain;
-        envx.* += 0;
+        // Pitch modulation using previous voice's output (Looks like there's a single output state variable with a value that's simply carried over from previous channel processed)
+        // End result is that previous channel output => input for next channel pmod
+        if (v.__pitch_mod_on == 1) {
+            // Pitch is adjusted by modulation amount
+            // Seems that instead of being a simple addition with the output, it also factors in the current pitch as a multiplier as well
+            // The math appears to work out so that the perceived change in frequency from the previous output is the same regardless of the current pitch
+            // (So for example, the maximum positive output seems to always offset the pitch 1 octave higher, regardless of register)
+            const p: i16 = @intCast(self._pitch);
+            const o: i16 = @intCast(self._output >> 5);
+            self._pitch += @intCast(o * p >> 10);
+        }
+
+        if (v._key_on_delay > 0) {
+            // Get ready to start BRR decoding on next sample
+            if (v._key_on_delay == 5) {
+                v._brr_address   = self._brr._next_address;
+                v._brr_offset    = 1;
+                v._buffer_offset = 0;
+
+                self._brr._cur_block_header = 0; // I guess the first BRR block of a sample when keyed on is forced to header value 00 (Is that why most encoders zero out the first block?)
+            }
+
+            // Envelope is never run during KON
+            v._env_level  = 0;
+            v.__env_level = 0;
+
+            // Disable BRR decoding until the last 3 samples
+            if (v._key_on_delay == 4 or v._key_on_delay == 2) {
+                // Begin gaussian offset 4 samples after BRR decoding position in ring buffer
+                v._gaussian_offset = 0x4000;
+            }
+            else {
+                v._gaussian_offset = 0;
+            }
+
+            // Internal pitch latch is reset to zero during KON and does not advance gaussian offset
+            self._pitch = 0;
+
+            v._key_on_delay -= 1;
+        }
+
+        const output =
+            if (v.__noise_on == 0)
+                gauss.interpolate(self, v_idx, gauss_tbl) // Do gaussian interpolation
+            else
+                @as(i16, self._noise_lfsr) << 1; // Output is set to noise LFSR output instead, if noise is enabled for this voice
+
+        // Apply envelope
+        self._output = output * @as(i16, v._env_level) >> 11;
+        envx.* = @intCast(v._env_level >> 4); // Set ENVX to top 7 bits of envelope level
+
+        // Immediately silence the voice if reset FLG bit has been set, or if we've reached the non-looped end block of a BRR sample
+        if (flg_reset == 1 or self._brr._cur_block_header & 0b11 == 1) {
+            v._env_mode  = .key_off;
+            v._env_level = 0;
+        }
+
+        // Process KON and KOFF once every 2nd sample processed
+        if (self._sample_clk == 1) {
+            // KOFF
+            if (v.__key_off == 1) {
+                v._env_mode = .key_off;
+            }
+
+            // KON
+            if (v.__key_on == 1) {
+                v._key_on_delay = 5; // Once KON is processed, delay 5 samples before processing BRR decoding, envelope, pitch, etc.
+                v._env_mode = .attack;
+            }
+        }
+
+        if (v._key_on_delay == 0) {
+            // Run envelope for next sample
+            envelope.run(self, v_idx, adsr_1, gain);
+        }
+    }
+
+    pub fn voice_step_d(self: *DSPStateInternal, v_idx: u3, aram_data_0: u8, vol_left: i8) void {
+        _ = self;
+        _ = v_idx;
+        _ = vol_left;
+        _ = aram_data_0;
+    }
+
+    pub fn voice_step_e(self: *DSPStateInternal, v_idx: u3, vol_right: i8) void {
+        _ = self;
+        _ = v_idx;
+        _ = vol_right;
+    }
+
+    pub fn voice_step_f(self: *DSPStateInternal) void {
+        _ = self;
+    }
+
+    pub fn voice_step_g(self: *DSPStateInternal, v_idx: u3, endx_reg: *u8, envx: u8) void {
+        _ = self;
+        _ = v_idx;
+        _ = endx_reg;
+        _ = envx;
+    }
+
+    pub fn voice_step_h(self: *DSPStateInternal, v_idx: u3, outx_reg: *u8) void {
+        _ = self;
+        _ = v_idx;
+        _ = outx_reg;
+    }
+
+    pub fn voice_step_i(self: *DSPStateInternal, v_idx: u3, envx_reg: *u8) void {
+        _ = self;
+        _ = v_idx;
+        _ = envx_reg;
     }
 };

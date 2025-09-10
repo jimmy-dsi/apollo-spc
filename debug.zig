@@ -1511,7 +1511,7 @@ pub fn print_dsp_state(emu: *Emu, options: OptionStruct) void {
     std.debug.print("echo delay:             {X:0>2}\n",   .{s.echo.delay});
     std.debug.print("\n", .{});
 
-    std.debug.print("noise clock:     {X:0>2}\n", .{s.noise.output_rate});
+    std.debug.print("noise clock:     {X:0>2}\n", .{s.noise_rate});
     std.debug.print("read-only echo:  {}\n",      .{s.echo.readonly == 1});
     std.debug.print("mute:            {}\n",      .{s.mute          == 1});
     std.debug.print("reset:           {}\n",      .{s.reset         == 1});

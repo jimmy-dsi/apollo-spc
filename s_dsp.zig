@@ -1,10 +1,11 @@
 const std = @import("std");
 
-const Emu       = @import("emu.zig").Emu;
-const SSMP      = @import("s_smp.zig").SSMP;
-const DSPState  = @import("dsp_state.zig").DSPState;
-const CoManager = @import("co_mgr.zig").CoManager;
-const CoState   = @import("co_state.zig").CoState;
+const Emu              = @import("emu.zig").Emu;
+const SSMP             = @import("s_smp.zig").SSMP;
+const DSPState         = @import("dsp_state.zig").DSPState;
+const DSPStateInternal = @import("dsp_state_int.zig").DSPStateInternal;
+const CoManager        = @import("co_mgr.zig").CoManager;
+const CoState          = @import("co_state.zig").CoState;
 
 const Co = CoState.Co;
 
@@ -76,11 +77,11 @@ pub const SDSP = struct {
 
     pub fn reset(self: *SDSP) void {
         self.co.reset();
-        // Reset FLG internal state (soft reset, channel mute, and echo write disable. Noise clock set to frequency %0000)
+        // Reset FLG internal state (soft reset, channel mute, and echo write disable. Noise clock set to frequency %00000)
         self.state.reset = 1;
         self.state.mute  = 1;
         self.state.echo.readonly = 1;
-        self.state.noise.output_rate = 0x00;
+        self.state.noise_rate = 0x00;
     }
 
     pub fn step(self: *SDSP) void {
@@ -126,13 +127,78 @@ pub const SDSP = struct {
     }
 
     pub fn proc(self: *SDSP, substate: u32) !void {
+        const aram = &self.audio_ram;
+        const s    = &self.state;
+        const v    = &s.voice;
+        const n    = self.int();
+        const vi   = &n._voice;
+        const r    = &self.dsp_map;
+
+        const aram_ref_0: [*]u8 = aram;
+        const aram_ref_1: [*]u8 = aram_ref_0 + 1;
+
         // Main 32-step S-DSP loop. Seems there are some discrepancies with the FullSNES timing diagram and how Ares implements this. Replicating Ares behavior.
         switch (substate) {
-            0  => { self.proc_t0();  try self.co.wait(2); },
-            1  => { self.proc_t1();  try self.co.wait(2); },
-            2  => { self.proc_t2();  try self.co.wait(2); },
-            3  => { self.proc_t3();  try self.co.wait(2); },
-            4  => { self.proc_t4();  try self.co.wait(2); },
+            0 => {
+                self.proc_t0(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR
+                    // Register array
+                    v[0].vol_right, @intCast(v[1].pitch & 0xFF), v[1].adsr_0
+                    // Extras
+                );
+                try self.co.wait(2);
+            },
+            1 => {
+                self.proc_t1(
+                    // RAM access
+                    aram[vi[1]._brr_address + vi[1]._brr_offset],
+                    aram[vi[1]._brr_address],
+                    // Register array
+                    &v[1].envx, @intCast(v[1].pitch >> 8), v[1].adsr_1, // Note: Accesses ONE OF: gain/adsr_1. Never both within the same cycle
+                                                           v[1].gain,   //       So, still satisfies the max 3 DSP registers per cycle rule
+                    // Extras
+                    s.reset
+                );
+                try self.co.wait(2);
+            },
+            2 => {
+                self.proc_t2(
+                    // RAM access
+                    aram[vi[1]._brr_address + vi[1]._brr_offset + 1],
+                    // Register array
+                    v[0].envx, v[1].vol_left, v[3].source,
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            3 => {
+                self.proc_t3(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR
+                    // Register array
+                    v[1].vol_right, @intCast(v[2].pitch & 0xFF), v[2].adsr_0,
+                    // Extras
+                    &r[0x09] // V0OUTX - This is a little weird though. Fullsnes does not consider OUTX or ENVX as part of the "extra" array
+                             //          However, it can't be part of the DSP register array either because then there would be 4 DSP accesses in 1 cycle here
+                             //          Maybe it doesn't count when it's a write to the program-facing DSP map directly? (as opposed to the internal mirrored values)
+                );
+                try self.co.wait(2);
+            },
+            4 => {
+                self.proc_t4(
+                    // RAM access
+                    aram[vi[2]._brr_address + vi[2]._brr_offset],
+                    aram[vi[2]._brr_address],
+                    // Register array
+                    &v[2].envx, @intCast(v[2].pitch >> 8), v[2].adsr_1,
+                                                           v[2].gain, 
+                    // Extras
+                    &r[0x08], s.reset // V0ENVX, FLG
+                );
+                try self.co.wait(2);
+            },
             5  => { self.proc_t5();  try self.co.wait(2); },
             6  => { self.proc_t6();  try self.co.wait(2); },
             7  => { self.proc_t7();  try self.co.wait(2); },
@@ -206,14 +272,17 @@ pub const SDSP = struct {
                     }
                 },
                 0x6C => { // FLG
-                    s.noise.output_rate = @intCast(data & 0x1F);
-                    s.echo.readonly     = @intCast(data >> 5 & 1);
-                    s.mute              = @intCast(data >> 6 & 1);
-                    s.reset             = @intCast(data >> 7 & 1);
+                    s.noise_rate    = @intCast(data & 0x1F);
+                    s.echo.readonly = @intCast(data >> 5 & 1);
+                    s.mute          = @intCast(data >> 6 & 1);
+                    s.reset         = @intCast(data >> 7 & 1);
                 },
                 0x7C => { // ENDX
                     // The lone exception to the "DSP map value always matches internal state after initialization" rule:
                     // Because this is a register that is meant to be read-only, writing to it simply resets to zero
+                    for (0..8) |v_idx| {
+                        self.state._internal._voice[v_idx].__end = 0;
+                    }
                     self.dsp_map[address] = 0x00;
                 },
                 0x0D => { // EFB
@@ -274,10 +343,10 @@ pub const SDSP = struct {
                     s.voice[idx].gain = data;
                 },
                 0x08, 0x18, 0x28, 0x38, 0x48, 0x58, 0x68, 0x78 => { // VxENVX
-                    // TODO
+                    self.state._internal._envx = data;
                 },
                 0x09, 0x19, 0x29, 0x39, 0x49, 0x59, 0x69, 0x79 => { // VxOUTX
-                    // TODO
+                    self.state._internal._outx = data;
                 },
                 0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F => { // FIRx
                     s.echo.fir[idx] = @bitCast(data);
@@ -296,24 +365,65 @@ pub const SDSP = struct {
         self.write(address, data);
     }
 
-    inline fn proc_t0(self: *SDSP) void {
-        _ = self;
+    inline fn int(self: *SDSP) *DSPStateInternal {
+        return &self.state._internal;
     }
 
-    inline fn proc_t1(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t0(s: *SDSP,
+                      aram_0: [*]u8, aram_1: [*]u8,
+                      v0_volr: i8, v1_pitchl: u8, v1_adsr_0: u8) void
+    {
+        s.int().voice_step_e(0, v0_volr);
+        s.int().voice_step_b(1, aram_0, aram_1, v1_pitchl, v1_adsr_0);
     }
 
-    inline fn proc_t2(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t1(s: *SDSP,
+                      aram_data_0: u8, aram_data_1: u8,
+                      v1_envx: *u8, v1_pitchh: u6, v1_adsr_1: u8, v1_gain: u8,
+                      flg_r: u1) void
+    {
+        s.int().voice_step_f();
+        s.int().voice_step_c(
+            1,
+            aram_data_0, aram_data_1,
+            v1_envx, v1_pitchh, v1_adsr_1, v1_gain,
+            flg_r, &gauss_table
+        );
     }
 
-    inline fn proc_t3(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t2(s: *SDSP,
+                      aram_data_0: u8,
+                      v0_envx: u8, v1_voll: i8, v3_srcn: u8,
+                      endx: *u8) void
+    {
+        s.int().voice_step_g(0, endx, v0_envx);
+        s.int().voice_step_d(1, aram_data_0, v1_voll);
+        s.int().voice_step_a(v3_srcn);
     }
 
-    inline fn proc_t4(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t3(s: *SDSP,
+                      aram_0: [*]u8, aram_1: [*]u8,
+                      v1_volr: i8, v2_pitchl: u8, v2_adsr_0: u8,
+                      outx: *u8) void
+    {
+        s.int().voice_step_h(0, outx);
+        s.int().voice_step_e(1, v1_volr);
+        s.int().voice_step_b(2, aram_0, aram_1, v2_pitchl, v2_adsr_0);
+    }
+
+    inline fn proc_t4(s: *SDSP,
+                      aram_data_0: u8, aram_data_1: u8,
+                      v2_envx: *u8, v2_pitchh: u6, v2_adsr_1: u8, v2_gain: u8,
+                      envx: *u8, flg_r: u1) void
+    {
+        s.int().voice_step_i(0, envx);
+        s.int().voice_step_f();
+        s.int().voice_step_c(
+            2,
+            aram_data_0, aram_data_1,
+            v2_envx, v2_pitchh, v2_adsr_1, v2_gain,
+            flg_r, &gauss_table
+        );
     }
 
     inline fn proc_t5(self: *SDSP) void {

@@ -14,11 +14,6 @@ pub const DSPState = struct {
         readonly: u1 = 1
     };
 
-    pub const Noise = struct {
-        output_rate: u5  = 0x00,
-        lfsr:        u15 = 0x4000
-    };
-
     pub const Voice = struct {
         vol_left:  i8  = 0x00,
         vol_right: i8  = 0x00,
@@ -47,7 +42,8 @@ pub const DSPState = struct {
     main_vol_right: i8 = 0x00,
 
     echo:  Echo  = .{},
-    noise: Noise = .{},
+
+    noise_rate: u5 = 0x00,
 
     brr_bank: u8 = 0x00,
 
