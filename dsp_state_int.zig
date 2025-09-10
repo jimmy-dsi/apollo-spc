@@ -1,5 +1,6 @@
 const gauss    = @import("gauss.zig");
 const envelope = @import("envelope.zig");
+const brr      = @import("brr.zig");
 
 pub const DSPStateInternal = struct {
     pub const EnvMode = enum {
@@ -52,6 +53,14 @@ pub const DSPStateInternal = struct {
     _outx:   u8  = 0x00,
     _pitch:  u15 = 0x0000,
     _output: i16 = 0x0000,
+
+    inline fn voice_output(self: *DSPStateInternal, v_idx: u3, comptime channel: u1, vol: i8) void {
+        // TODO: Implement
+        _ = self;
+        _ = v_idx;
+        _ = channel;
+        _ = vol;
+    }
 
     pub fn voice_step_a(self: *DSPStateInternal, source: u8) void {
         self._brr._cur_address = (@as(u16, self._brr._bank) << 8) +% (@as(u16, self._brr._cur_source) << 2);
@@ -179,10 +188,38 @@ pub const DSPStateInternal = struct {
     }
 
     pub fn voice_step_d(self: *DSPStateInternal, v_idx: u3, aram_data_0: u8, vol_left: i8) void {
-        _ = self;
-        _ = v_idx;
-        _ = vol_left;
-        _ = aram_data_0;
+        const v = &self._voice[v_idx];
+
+        // Decode BRR
+        v.__looped = 0;
+        if (v._gaussian_offset >= 0x4000) {
+            // Decode 4 BRR samples
+            brr.decode(self, v_idx, aram_data_0);
+            v._brr_offset +%= 2;
+            
+            if (v._brr_offset >= 9) {
+                // Start decoding next BRR block
+                v._brr_address +%= 9;
+                if (self._brr._cur_block_header & 0x01 == 1) { // Check if end or loop is set
+                    // Seems that BRR always loops, even if loop header bit is not set
+                    // It just sets envelope level to 0 instantly
+                    v._brr_address = self._brr._next_address;
+                    v.__looped = 1;
+                }
+                v._brr_offset = 1;
+            }
+        }
+
+        // Advance sample offset by last written pitch (should match pitch of current voice when written)
+        v._gaussian_offset = (v._gaussian_offset & 0x3FFF) + @as(u16, self._pitch);
+
+        // Keep from getting too far ahead when using pitch modulation... I don't think it's actually possible for that to happen, but just to be safe
+        if (v._gaussian_offset > 0x7FFF) {
+            v._gaussian_offset = 0x7FFF;
+        }
+
+        // Output left volume
+        self.voice_output(v_idx, 0, vol_left);
     }
 
     pub fn voice_step_e(self: *DSPStateInternal, v_idx: u3, vol_right: i8) void {
