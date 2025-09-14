@@ -41,7 +41,7 @@ pub const DSPState = struct {
     main_vol_left:  i8 = 0x00,
     main_vol_right: i8 = 0x00,
 
-    echo:  Echo  = .{},
+    echo: Echo  = .{},
 
     noise_rate: u5 = 0x00,
 

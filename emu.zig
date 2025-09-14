@@ -13,11 +13,18 @@ pub const Emu = struct {
         force_exit:    bool = false
     };
 
+    const DacBufSize = 96_000;
+
     pub var rand: std.Random = undefined;
     var prng: std.Random.DefaultPrng = undefined;
 
     s_dsp: SDSP,
     s_smp: SSMP,
+
+    dac_buffer_left:  [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
+    dac_buffer_right: [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
+    dac_buffer_offset: u32 = 0,
+    dac_offset_prev:   u32 = 0,
 
     master_debug_mode: DebugMode = DebugMode.none,
     cur_debug_mode:    DebugMode = DebugMode.none,
@@ -49,6 +56,58 @@ pub const Emu = struct {
         self.s_dsp          = s_dsp;
         self.s_smp          = s_smp;
         self.cur_debug_mode = DebugMode.none;
+    }
+
+    pub inline fn queue_dac_sample(self: *Emu, left: i17, right: i17) void {
+        // Clip to 16-bit signed if overflow
+        const lu17: u17 = @bitCast(left);
+        const ru17: u17 = @bitCast(right);
+        //
+        const lu16: u16 = @intCast(lu17 & 0xFFFF);
+        const ru16: u16 = @intCast(ru17 & 0xFFFF);
+        //
+        const ls16: i16 = @bitCast(lu16);
+        const rs16: i16 = @bitCast(ru16);
+
+        self.dac_buffer_left [self.dac_buffer_offset] = ls16;
+        self.dac_buffer_right[self.dac_buffer_offset] = rs16;
+
+        self.dac_buffer_offset = (self.dac_buffer_offset + 1) % DacBufSize;
+    }
+
+    pub fn consume_dac_samples(self: *Emu) struct {[]i16, []i16, ?[]i16, ?[]i16} {
+        const start_1 = self.dac_offset_prev;
+        var   end_1   = self.dac_offset_prev;
+
+        self.dac_offset_prev = self.dac_buffer_offset;
+        
+        var has_second = false;
+
+        if (end_1 > self.dac_buffer_offset) {
+            end_1 = DacBufSize;
+            has_second = true;
+        }
+        else {
+            end_1 = self.dac_buffer_offset;
+        }
+
+        if (!has_second) {
+            return .{
+                self.dac_buffer_left [start_1..end_1],
+                self.dac_buffer_right[start_1..end_1],
+                null, null
+            };
+        }
+
+        const start_2: u32 = 0;
+        const end_2:   u32 = self.dac_buffer_offset;
+
+        return .{
+            self.dac_buffer_left [start_1..end_1],
+            self.dac_buffer_right[start_1..end_1],
+            self.dac_buffer_left [start_2..end_2],
+            self.dac_buffer_right[start_2..end_2],
+        };
     }
 
     pub fn enable_shadow_mode(self: *Emu, options: DebugModeOptions) void {

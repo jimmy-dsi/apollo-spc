@@ -40,26 +40,75 @@ pub const DSPStateInternal = struct {
         __looped:       u1  = 0,
     };
 
-    _brr:        BRR = .{},
-    _noise_lfsr: u15 = 0x4000,
-    _sample_clk: u1  = 1,
-    _counter:    u15 = 0x0000,
+    pub const Echo = struct {
+        // Used for FIR calculations
+        _history_left:  [8]i16 = [_]i16 {0} ** 8,
+        _history_right: [8]i16 = [_]i16 {0} ** 8,
+
+        _input_left:  i17 = 0,
+        _input_right: i17 = 0,
+
+        _esa_page:       u8  = 0x00,
+        _readonly:       u1  = 0,
+        _address:        u16 = 0,
+        _offset:         u16 = 0, // Current offset from ESA into echo buffer
+        _length:         u16 = 0, // Length in bytes of echo buffer
+        _history_offset: u3  = 0
+    };
+
+    // Output
+    _main_out_left:  i17 = 0,
+    _main_out_right: i17 = 0,
+    _echo_out_left:  i17 = 0,
+    _echo_out_right: i17 = 0,
+
+    // Misc. Internal state
+    _brr:        BRR  = .{},
+    _echo:       Echo = .{},
+    _noise_lfsr: u15  = 0x4000,
+    _sample_clk: u1   = 1,
+    _counter:    u15  = 0x0000,
 
     _voice: [8]Voice = [_]Voice {.{}} ** 8,
 
     // Latch state
     _adsr_0: u8  = 0x00,
     _envx:   u8  = 0x00,
-    _outx:   u8  = 0x00,
+    _outx:   i8  = 0x00,
     _pitch:  u15 = 0x0000,
     _output: i16 = 0x0000,
 
     inline fn voice_output(self: *DSPStateInternal, v_idx: u3, comptime channel: u1, vol: i8) void {
-        // TODO: Implement
-        _ = self;
-        _ = v_idx;
-        _ = channel;
-        _ = vol;
+        const v = &self._voice[v_idx];
+        
+        const main_out: *i17 = 
+            if (channel == 0) &self._main_out_left
+            else              &self._main_out_right;
+
+        const echo_out: *i17 =
+            if (channel == 0) &self._echo_out_left
+            else              &self._echo_out_right;
+
+        // Apply left/right volume
+        const amp: i17 = @intCast(@as(i24, self._output) * @as(i24, vol) >> 7);
+
+        // Add to output total
+        main_out.* += amp;
+        // Clamp to i16
+        main_out.* =
+            if      (main_out.* >  0x7FFF)    0x7FFF
+            else if (main_out.* < -0x8000)   -0x8000
+            else                            main_out.*;
+        
+        // Add to echo total if echo is enabled for current voice
+        if (v.__echo_on == 1) {
+            echo_out.* +%= amp;
+            // Clamp to i16
+            echo_out.* =
+                if      (echo_out.* >  0x7FFF)    0x7FFF
+                else if (echo_out.* < -0x8000)   -0x8000
+                else                            echo_out.*;
+        }
     }
 
     pub fn voice_step_a(self: *DSPStateInternal, source: u8) void {
@@ -158,10 +207,12 @@ pub const DSPStateInternal = struct {
                 @as(i16, self._noise_lfsr) << 1; // Output is set to noise LFSR output instead, if noise is enabled for this voice
 
         // Apply envelope
-        self._output = output * @as(i16, v._env_level) >> 11;
+        self._output = @intCast(@as(i32, output) * @as(i32, v._env_level) >> 11);
         envx.* = @intCast(v._env_level >> 4); // Set ENVX to top 7 bits of envelope level
 
         // Immediately silence the voice if reset FLG bit has been set, or if we've reached the non-looped end block of a BRR sample
+        // It appears that even though __end is set unconditionally whether it's looping or non-looping, this is still determined
+        // by examining the current header bits directly.
         if (flg_reset == 1 or self._brr._cur_block_header & 0b11 == 1) {
             v._env_mode  = .key_off;
             v._env_level = 0;
@@ -196,7 +247,7 @@ pub const DSPStateInternal = struct {
             // Decode 4 BRR samples
             brr.decode(self, v_idx, aram_data_0);
             v._brr_offset +%= 2;
-            
+
             if (v._brr_offset >= 9) {
                 // Start decoding next BRR block
                 v._brr_address +%= 9;
@@ -223,31 +274,44 @@ pub const DSPStateInternal = struct {
     }
 
     pub fn voice_step_e(self: *DSPStateInternal, v_idx: u3, vol_right: i8) void {
-        _ = self;
-        _ = v_idx;
-        _ = vol_right;
+        const v = &self._voice[v_idx];
+
+        // Output right volume
+        self.voice_output(v_idx, 1, vol_right);
+
+        // ENDX, OUTX, ENVX won't update if you wrote to them 1-2 clocks earlier
+        v.__end |= v.__looped;
+
+        // Clear ENDX bit once KON begins
+        if (v._key_on_delay == 5) {
+            v.__end = 0;
+        }
     }
 
     pub fn voice_step_f(self: *DSPStateInternal) void {
-        _ = self;
+        // Queue OUTX for current voice
+        self._outx = @intCast(self._output >> 8);
     }
 
-    pub fn voice_step_g(self: *DSPStateInternal, v_idx: u3, endx_reg: *u8, envx: u8) void {
-        _ = self;
-        _ = v_idx;
-        _ = endx_reg;
-        _ = envx;
+    pub fn voice_step_g(self: *DSPStateInternal, endx_reg: *u8, envx: u8) void {
+        // Flush voice ENDX values to program-facing ENDX register
+        endx_reg.* = 0x00;
+        for (0..8) |n| {
+            const b: u3 = @intCast(n);
+            endx_reg.* |= @as(u8, self._voice[n].__end) << b;
+        }
+
+        // Queue ENVX for specified voice
+        self._envx = envx;
     }
 
-    pub fn voice_step_h(self: *DSPStateInternal, v_idx: u3, outx_reg: *u8) void {
-        _ = self;
-        _ = v_idx;
-        _ = outx_reg;
+    pub fn voice_step_h(self: *DSPStateInternal, outx_reg: *u8) void {
+        // Flush current voice OUTX to program-facing OUTX register
+        outx_reg.* = @bitCast(self._outx);
     }
 
-    pub fn voice_step_i(self: *DSPStateInternal, v_idx: u3, envx_reg: *u8) void {
-        _ = self;
-        _ = v_idx;
-        _ = envx_reg;
+    pub fn voice_step_i(self: *DSPStateInternal, envx_reg: *u8) void {
+        // Flush current voice ENVX to program-facing ENVX register
+        envx_reg.* = self._envx;
     }
 };

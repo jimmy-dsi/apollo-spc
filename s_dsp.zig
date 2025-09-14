@@ -7,6 +7,9 @@ const DSPStateInternal = @import("dsp_state_int.zig").DSPStateInternal;
 const CoManager        = @import("co_mgr.zig").CoManager;
 const CoState          = @import("co_state.zig").CoState;
 
+const echo = @import("echo.zig");
+const misc = @import("misc.zig");
+
 const Co = CoState.Co;
 
 pub const SDSP = struct {
@@ -142,7 +145,7 @@ pub const SDSP = struct {
             0 => {
                 self.proc_t0(
                     // RAM access
-                    aram_ref_0, aram_ref_1, // Used for BRR
+                    aram_ref_0, aram_ref_1, // Used for BRR - V1
                     // Register array
                     v[0].vol_right, @intCast(v[1].pitch & 0xFF), v[1].adsr_0
                     // Extras
@@ -176,7 +179,7 @@ pub const SDSP = struct {
             3 => {
                 self.proc_t3(
                     // RAM access
-                    aram_ref_0, aram_ref_1, // Used for BRR
+                    aram_ref_0, aram_ref_1, // Used for BRR - V2
                     // Register array
                     v[1].vol_right, @intCast(v[2].pitch & 0xFF), v[2].adsr_0,
                     // Extras
@@ -199,33 +202,330 @@ pub const SDSP = struct {
                 );
                 try self.co.wait(2);
             },
-            5  => { self.proc_t5();  try self.co.wait(2); },
-            6  => { self.proc_t6();  try self.co.wait(2); },
-            7  => { self.proc_t7();  try self.co.wait(2); },
-            8  => { self.proc_t8();  try self.co.wait(2); },
-            9  => { self.proc_t9();  try self.co.wait(2); },
-            10 => { self.proc_t10(); try self.co.wait(2); },
-            11 => { self.proc_t11(); try self.co.wait(2); },
-            12 => { self.proc_t12(); try self.co.wait(2); },
-            13 => { self.proc_t13(); try self.co.wait(2); },
-            14 => { self.proc_t14(); try self.co.wait(2); },
-            15 => { self.proc_t15(); try self.co.wait(2); },
-            16 => { self.proc_t16(); try self.co.wait(2); },
-            17 => { self.proc_t17(); try self.co.wait(2); },
-            18 => { self.proc_t18(); try self.co.wait(2); },
-            19 => { self.proc_t19(); try self.co.wait(2); },
-            20 => { self.proc_t20(); try self.co.wait(2); },
-            21 => { self.proc_t21(); try self.co.wait(2); },
-            22 => { self.proc_t22(); try self.co.wait(2); },
-            23 => { self.proc_t23(); try self.co.wait(2); },
-            24 => { self.proc_t24(); try self.co.wait(2); },
-            25 => { self.proc_t25(); try self.co.wait(2); },
-            26 => { self.proc_t26(); try self.co.wait(2); },
-            27 => { self.proc_t27(); try self.co.wait(2); },
-            28 => { self.proc_t28(); try self.co.wait(2); },
-            29 => { self.proc_t29(); try self.co.wait(2); },
-            30 => { self.proc_t30(); try self.co.wait(2); },
-            31 => { self.proc_t31();   self.co.finish(2); },
+            5 => {
+                self.proc_t5(
+                    // RAM access
+                    aram[vi[2]._brr_address + vi[2]._brr_offset + 1],
+                    // Register array
+                    v[1].envx, v[2].vol_left, v[4].source,
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            6 => {
+                self.proc_t6(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR - V3
+                    // Register array
+                    v[2].vol_right, @intCast(v[3].pitch & 0xFF), v[3].adsr_0,
+                    // Extras
+                    &r[0x19], // V1OUTX
+                );
+                try self.co.wait(2);
+            },
+            7 => {
+                self.proc_t7(
+                    // RAM access
+                    aram[vi[3]._brr_address + vi[3]._brr_offset],
+                    aram[vi[3]._brr_address],
+                    // Register array
+                    &v[3].envx, @intCast(v[3].pitch >> 8), v[3].adsr_1,
+                                                           v[3].gain, 
+                    // Extras
+                    &r[0x18], s.reset // V1ENVX, FLG
+                );
+                try self.co.wait(2);
+            },
+            8 => {
+                self.proc_t8(
+                    // RAM access
+                    aram[vi[3]._brr_address + vi[3]._brr_offset + 1],
+                    // Register array
+                    v[2].envx, v[3].vol_left, v[5].source,
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            9 => {
+                self.proc_t9(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR - V4
+                    // Register array
+                    v[3].vol_right, @intCast(v[4].pitch & 0xFF), v[4].adsr_0,
+                    // Extras
+                    &r[0x29], // V2OUTX
+                );
+                try self.co.wait(2);
+            },
+            10 => {
+                self.proc_t10(
+                    // RAM access
+                    aram[vi[4]._brr_address + vi[4]._brr_offset],
+                    aram[vi[4]._brr_address],
+                    // Register array
+                    &v[4].envx, @intCast(v[4].pitch >> 8), v[4].adsr_1,
+                                                           v[4].gain, 
+                    // Extras
+                    &r[0x28], s.reset // V2ENVX, FLG
+                );
+                try self.co.wait(2);
+            },
+            11 => {
+                self.proc_t11(
+                    // RAM access
+                    aram[vi[4]._brr_address + vi[4]._brr_offset + 1],
+                    // Register array
+                    v[3].envx, v[4].vol_left, v[6].source,
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            12 => {
+                self.proc_t12(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR - V5
+                    // Register array
+                    v[4].vol_right, @intCast(v[5].pitch & 0xFF), v[5].adsr_0,
+                    // Extras
+                    &r[0x39], // V3OUTX
+                );
+                try self.co.wait(2);
+            },
+            13 => {
+                self.proc_t13(
+                    // RAM access
+                    aram[vi[5]._brr_address + vi[5]._brr_offset],
+                    aram[vi[5]._brr_address],
+                    // Register array
+                    &v[5].envx, @intCast(v[5].pitch >> 8), v[5].adsr_1,
+                                                           v[5].gain, 
+                    // Extras
+                    &r[0x38], s.reset // V3ENVX, FLG
+                );
+                try self.co.wait(2);
+            },
+            14 => {
+                self.proc_t14(
+                    // RAM access
+                    aram[vi[5]._brr_address + vi[5]._brr_offset + 1],
+                    // Register array
+                    v[4].envx, v[5].vol_left, v[7].source,
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            15 => {
+                self.proc_t15(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR - V6
+                    // Register array
+                    v[5].vol_right, @intCast(v[6].pitch & 0xFF), v[6].adsr_0,
+                    // Extras
+                    &r[0x49], // V4OUTX
+                );
+                try self.co.wait(2);
+            },
+            16 => {
+                self.proc_t16(
+                    // RAM access
+                    aram[vi[6]._brr_address + vi[6]._brr_offset],
+                    aram[vi[6]._brr_address],
+                    // Register array
+                    &v[6].envx, @intCast(v[6].pitch >> 8), v[6].adsr_1,
+                                                           v[6].gain, 
+                    // Extras
+                    &r[0x48], s.reset // V4ENVX, FLG
+                );
+                try self.co.wait(2);
+            },
+            17 => {
+                self.proc_t17(
+                    // RAM access
+                    aram[vi[6]._brr_address + vi[6]._brr_offset + 1],
+                    // Register array
+                    v[5].envx, v[6].vol_left, v[0].source,
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            18 => {
+                self.proc_t18(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR - V7
+                    // Register array
+                    v[6].vol_right, @intCast(v[7].pitch & 0xFF), v[7].adsr_0,
+                    // Extras
+                    &r[0x59], // V5OUTX
+                );
+                try self.co.wait(2);
+            },
+            19 => {
+                self.proc_t19(
+                    // RAM access
+                    aram[vi[7]._brr_address + vi[7]._brr_offset],
+                    aram[vi[7]._brr_address],
+                    // Register array
+                    &v[7].envx, @intCast(v[7].pitch >> 8), v[7].adsr_1,
+                                                           v[7].gain, 
+                    // Extras
+                    &r[0x58], s.reset // V5ENVX, FLG
+                );
+                try self.co.wait(2);
+            },
+            20 => {
+                self.proc_t20(
+                    // RAM access
+                    aram[vi[7]._brr_address + vi[7]._brr_offset + 1],
+                    // Register array
+                    v[6].envx, v[7].vol_left, v[1].source,
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            21 => {
+                self.proc_t21(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for BRR - V0
+                    // Register array
+                    v[7].vol_right, @intCast(v[0].pitch & 0xFF), v[0].adsr_0,
+                    // Extras
+                    &r[0x69], // V6OUTX
+                );
+                try self.co.wait(2);
+            },
+            22 => {
+                self.proc_t22(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for echo
+                    // Register array
+                    @intCast(v[0].pitch >> 8), s.echo.fir[0],
+                    // Extras
+                    &r[0x68] // V6ENVX
+                );
+                try self.co.wait(2);
+            },
+            23 => {
+                self.proc_t23(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for echo
+                    // Register array
+                    v[7].envx, s.echo.fir[1], s.echo.fir[2],
+                    // Extras
+                    &r[0x7C], // ENDX
+                );
+                try self.co.wait(2);
+            },
+            24 => {
+                self.proc_t24(
+                    // RAM access
+                    // Register array
+                    s.echo.fir[3], s.echo.fir[4], s.echo.fir[5],
+                    // Extras
+                    &r[0x79], // V7OUTX
+                );
+                try self.co.wait(2);
+            },
+            25 => {
+                self.proc_t25(
+                    // RAM access
+                    aram[vi[0]._brr_address + vi[0]._brr_offset],
+                    aram[vi[0]._brr_address],
+                    // Register array
+                    s.echo.fir[6], s.echo.fir[7],
+                    // Extras
+                    &r[0x78] // V7ENVX
+                );
+                try self.co.wait(2);
+            },
+            26 => {
+                self.proc_t26(
+                    // RAM access
+                    // Register array
+                    s.main_vol_left, s.echo.vol_left, s.echo.feedback,
+                    // Extras
+                );
+                try self.co.wait(2);
+            },
+            27 => {
+                var pmon: u8 = 0x00;
+                inline for (0..8) |bit| {
+                    const b: u3 = @intCast(bit);
+                    pmon |= @as(u8, v[b].pitch_mod_on) << b;
+                }
+
+                self.proc_t27(
+                    // RAM access
+                    // Register array
+                    s.main_vol_right, s.echo.vol_right, pmon,
+                    // Extras
+                    s.mute
+                );
+                try self.co.wait(2);
+            },
+            28 => {
+                var non: u8 = 0x00;
+                var eon: u8 = 0x00;
+
+                inline for (0..8) |bit| {
+                    const b: u3 = @intCast(bit);
+                    non |= @as(u8, v[b].noise_on) << b;
+                    eon |= @as(u8, v[b].echo_on) << b;
+                }
+
+                self.proc_t28(
+                    // RAM access
+                    // Register array
+                    non, eon, s.brr_bank,
+                    // Extras
+                    s.echo.readonly
+                );
+                try self.co.wait(2);
+            },
+            29 => {
+                self.proc_t29(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for echo
+                    // Register array
+                    s.echo.delay, s.echo.esa_page,
+                    // Extras
+                    s.echo.readonly
+                );
+                try self.co.wait(2);
+            },
+            30 => {
+                var koff: u8 = 0x00;
+                inline for (0..8) |bit| {
+                    const b: u3 = @intCast(bit);
+                    koff |= @as(u8, v[b].keyoff) << b;
+                }
+
+                self.proc_t30(
+                    // RAM access
+                    aram_ref_0, aram_ref_1, // Used for echo
+                    // Register array
+                    &v[0].envx, v[0].adsr_1, koff, s.noise_rate,
+                                v[0].gain,
+                    // Extras
+                    s.reset
+                );
+                try self.co.wait(2);
+            },
+            31 => {
+                self.proc_t31(
+                    // RAM access
+                    aram[vi[0]._brr_address + vi[0]._brr_offset + 1],
+                    // Register array
+                    v[0].vol_left, v[2].source,
+                    // Extras
+                );
+                self.co.finish(2);
+            },
             else => unreachable
         }
     }
@@ -263,6 +563,7 @@ pub const SDSP = struct {
                     for (0..8) |bit| {
                         const b: u3 = @intCast(bit);
                         s.voice[b].keyon = @intCast(data >> b & 1);
+                        self.state._internal._voice[b].__key_latch = @intCast(data >> b & 1);
                     }
                 },
                 0x5C => { // KOFF
@@ -346,7 +647,7 @@ pub const SDSP = struct {
                     self.state._internal._envx = data;
                 },
                 0x09, 0x19, 0x29, 0x39, 0x49, 0x59, 0x69, 0x79 => { // VxOUTX
-                    self.state._internal._outx = data;
+                    self.state._internal._outx = @bitCast(data);
                 },
                 0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F => { // FIRx
                     s.echo.fir[idx] = @bitCast(data);
@@ -365,7 +666,7 @@ pub const SDSP = struct {
         self.write(address, data);
     }
 
-    inline fn int(self: *SDSP) *DSPStateInternal {
+    pub inline fn int(self: *SDSP) *DSPStateInternal {
         return &self.state._internal;
     }
 
@@ -396,7 +697,7 @@ pub const SDSP = struct {
                       v0_envx: u8, v1_voll: i8, v3_srcn: u8,
                       endx: *u8) void
     {
-        s.int().voice_step_g(0, endx, v0_envx);
+        s.int().voice_step_g(endx, v0_envx);
         s.int().voice_step_d(1, aram_data_0, v1_voll);
         s.int().voice_step_a(v3_srcn);
     }
@@ -406,7 +707,7 @@ pub const SDSP = struct {
                       v1_volr: i8, v2_pitchl: u8, v2_adsr_0: u8,
                       outx: *u8) void
     {
-        s.int().voice_step_h(0, outx);
+        s.int().voice_step_h(outx);
         s.int().voice_step_e(1, v1_volr);
         s.int().voice_step_b(2, aram_0, aram_1, v2_pitchl, v2_adsr_0);
     }
@@ -416,7 +717,7 @@ pub const SDSP = struct {
                       v2_envx: *u8, v2_pitchh: u6, v2_adsr_1: u8, v2_gain: u8,
                       envx: *u8, flg_r: u1) void
     {
-        s.int().voice_step_i(0, envx);
+        s.int().voice_step_i(envx);
         s.int().voice_step_f();
         s.int().voice_step_c(
             2,
@@ -426,111 +727,293 @@ pub const SDSP = struct {
         );
     }
 
-    inline fn proc_t5(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t5(s: *SDSP,
+                      aram_data_0: u8,
+                      v1_envx: u8, v2_voll: i8, v4_srcn: u8,
+                      endx: *u8) void
+    {
+        s.int().voice_step_g(endx, v1_envx);
+        s.int().voice_step_d(2, aram_data_0, v2_voll);
+        s.int().voice_step_a(v4_srcn);
     }
 
-    inline fn proc_t6(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t6(s: *SDSP,
+                      aram_0: [*]u8, aram_1: [*]u8,
+                      v2_volr: i8, v3_pitchl: u8, v3_adsr_0: u8,
+                      outx: *u8) void
+    {
+        s.int().voice_step_h(outx);
+        s.int().voice_step_e(2, v2_volr);
+        s.int().voice_step_b(3, aram_0, aram_1, v3_pitchl, v3_adsr_0);
     }
 
-    inline fn proc_t7(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t7(s: *SDSP,
+                      aram_data_0: u8, aram_data_1: u8,
+                      v3_envx: *u8, v3_pitchh: u6, v3_adsr_1: u8, v3_gain: u8,
+                      envx: *u8, flg_r: u1) void
+    {
+        s.int().voice_step_i(envx);
+        s.int().voice_step_f();
+        s.int().voice_step_c(
+            3,
+            aram_data_0, aram_data_1,
+            v3_envx, v3_pitchh, v3_adsr_1, v3_gain,
+            flg_r, &gauss_table
+        );
     }
 
-    inline fn proc_t8(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t8(s: *SDSP,
+                      aram_data_0: u8,
+                      v2_envx: u8, v3_voll: i8, v5_srcn: u8,
+                      endx: *u8) void
+    {
+        s.int().voice_step_g(endx, v2_envx);
+        s.int().voice_step_d(3, aram_data_0, v3_voll);
+        s.int().voice_step_a(v5_srcn);
     }
 
-    inline fn proc_t9(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t9(s: *SDSP,
+                      aram_0: [*]u8, aram_1: [*]u8,
+                      v3_volr: i8, v4_pitchl: u8, v4_adsr_0: u8,
+                      outx: *u8) void
+    {
+        s.int().voice_step_h(outx);
+        s.int().voice_step_e(3, v3_volr);
+        s.int().voice_step_b(4, aram_0, aram_1, v4_pitchl, v4_adsr_0);
     }
 
-    inline fn proc_t10(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t10(s: *SDSP,
+                       aram_data_0: u8, aram_data_1: u8,
+                       v4_envx: *u8, v4_pitchh: u6, v4_adsr_1: u8, v4_gain: u8,
+                       envx: *u8, flg_r: u1) void
+    {
+        s.int().voice_step_i(envx);
+        s.int().voice_step_f();
+        s.int().voice_step_c(
+            4,
+            aram_data_0, aram_data_1,
+            v4_envx, v4_pitchh, v4_adsr_1, v4_gain,
+            flg_r, &gauss_table
+        );
     }
 
-    inline fn proc_t11(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t11(s: *SDSP,
+                       aram_data_0: u8,
+                       v3_envx: u8, v4_voll: i8, v6_srcn: u8,
+                       endx: *u8) void
+    {
+        s.int().voice_step_g(endx, v3_envx);
+        s.int().voice_step_d(4, aram_data_0, v4_voll);
+        s.int().voice_step_a(v6_srcn);
     }
 
-    inline fn proc_t12(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t12(s: *SDSP,
+                       aram_0: [*]u8, aram_1: [*]u8,
+                       v4_volr: i8, v5_pitchl: u8, v5_adsr_0: u8,
+                       outx: *u8) void
+    {
+        s.int().voice_step_h(outx);
+        s.int().voice_step_e(4, v4_volr);
+        s.int().voice_step_b(5, aram_0, aram_1, v5_pitchl, v5_adsr_0);
     }
 
-    inline fn proc_t13(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t13(s: *SDSP,
+                       aram_data_0: u8, aram_data_1: u8,
+                       v5_envx: *u8, v5_pitchh: u6, v5_adsr_1: u8, v5_gain: u8,
+                       envx: *u8, flg_r: u1) void
+    {
+        s.int().voice_step_i(envx);
+        s.int().voice_step_f();
+        s.int().voice_step_c(
+            5,
+            aram_data_0, aram_data_1,
+            v5_envx, v5_pitchh, v5_adsr_1, v5_gain,
+            flg_r, &gauss_table
+        );
     }
 
-    inline fn proc_t14(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t14(s: *SDSP,
+                       aram_data_0: u8,
+                       v4_envx: u8, v5_voll: i8, v7_srcn: u8,
+                       endx: *u8) void
+    {
+        s.int().voice_step_g(endx, v4_envx);
+        s.int().voice_step_d(5, aram_data_0, v5_voll);
+        s.int().voice_step_a(v7_srcn);
     }
 
-    inline fn proc_t15(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t15(s: *SDSP,
+                       aram_0: [*]u8, aram_1: [*]u8,
+                       v5_volr: i8, v6_pitchl: u8, v6_adsr_0: u8,
+                       outx: *u8) void
+    {
+        s.int().voice_step_h(outx);
+        s.int().voice_step_e(5, v5_volr);
+        s.int().voice_step_b(6, aram_0, aram_1, v6_pitchl, v6_adsr_0);
     }
 
-    inline fn proc_t16(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t16(s: *SDSP,
+                       aram_data_0: u8, aram_data_1: u8,
+                       v6_envx: *u8, v6_pitchh: u6, v6_adsr_1: u8, v6_gain: u8,
+                       envx: *u8, flg_r: u1) void
+    {
+        s.int().voice_step_i(envx);
+        s.int().voice_step_f();
+        s.int().voice_step_c(
+            6,
+            aram_data_0, aram_data_1,
+            v6_envx, v6_pitchh, v6_adsr_1, v6_gain,
+            flg_r, &gauss_table
+        );
     }
 
-    inline fn proc_t17(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t17(s: *SDSP,
+                       aram_data_0: u8,
+                       v5_envx: u8, v6_voll: i8, v0_srcn: u8,
+                       endx: *u8) void
+    {
+        s.int().voice_step_a(v0_srcn);
+        s.int().voice_step_g(endx, v5_envx);
+        s.int().voice_step_d(6, aram_data_0, v6_voll);
     }
 
-    inline fn proc_t18(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t18(s: *SDSP,
+                       aram_0: [*]u8, aram_1: [*]u8,
+                       v6_volr: i8, v7_pitchl: u8, v7_adsr_0: u8,
+                       outx: *u8) void
+    {
+        s.int().voice_step_h(outx);
+        s.int().voice_step_e(6, v6_volr);
+        s.int().voice_step_b(7, aram_0, aram_1, v7_pitchl, v7_adsr_0);
     }
 
-    inline fn proc_t19(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t19(s: *SDSP,
+                       aram_data_0: u8, aram_data_1: u8,
+                       v7_envx: *u8, v7_pitchh: u6, v7_adsr_1: u8, v7_gain: u8,
+                       envx: *u8, flg_r: u1) void
+    {
+        s.int().voice_step_i(envx);
+        s.int().voice_step_f();
+        s.int().voice_step_c(
+            7,
+            aram_data_0, aram_data_1,
+            v7_envx, v7_pitchh, v7_adsr_1, v7_gain,
+            flg_r, &gauss_table
+        );
     }
 
-    inline fn proc_t20(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t20(s: *SDSP,
+                       aram_data_0: u8,
+                       v6_envx: u8, v7_voll: i8, v1_srcn: u8,
+                       endx: *u8) void
+    {
+        s.int().voice_step_a(v1_srcn);
+        s.int().voice_step_g(endx, v6_envx);
+        s.int().voice_step_d(7, aram_data_0, v7_voll);
     }
 
-    inline fn proc_t21(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t21(s: *SDSP,
+                       aram_0: [*]u8, aram_1: [*]u8,
+                       v7_volr: i8, v0_pitchl: u8, v0_adsr_0: u8,
+                       outx: *u8) void
+    {
+        s.int().voice_step_h(outx);
+        s.int().voice_step_e(7, v7_volr);
+        s.int().voice_step_b(0, aram_0, aram_1, v0_pitchl, v0_adsr_0);
     }
 
-    inline fn proc_t22(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t22(s: *SDSP,
+                       aram_echo_0: [*]u8, aram_echo_1: [*]u8,
+                       v0_pitchh: u6, fir_0: i8,
+                       envx: *u8) void
+    {
+        s.int().voice_step_c_pt1(v0_pitchh);
+        s.int().voice_step_i(envx);
+        s.int().voice_step_f();
+        echo.step_a(s.int(), aram_echo_0, aram_echo_1, fir_0);
     }
 
-    inline fn proc_t23(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t23(s: *SDSP,
+                       aram_echo_0: [*]u8, aram_echo_1: [*]u8,
+                       v7_envx: u8, fir_1: i8, fir_2: i8,
+                       endx: *u8) void
+    {
+        s.int().voice_step_g(endx, v7_envx);
+        echo.step_b(s.int(), aram_echo_0, aram_echo_1, fir_1, fir_2);
     }
 
-    inline fn proc_t24(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t24(s: *SDSP,
+                       fir_3: i8, fir_4: i8, fir_5: i8,
+                       outx: *u8) void
+    {
+        s.int().voice_step_h(outx);
+        echo.step_c(s.int(), fir_3, fir_4, fir_5);
     }
 
-    inline fn proc_t25(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t25(s: *SDSP,
+                       aram_data_0: u8, aram_data_1: u8,
+                       fir_6: i8, fir_7: i8,
+                       envx: *u8) void
+    {
+        s.int().voice_step_c_pt2(aram_data_0, aram_data_1);
+        s.int().voice_step_i(envx);
+        echo.step_d(s.int(), fir_6, fir_7);
     }
 
-    inline fn proc_t26(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t26(s: *SDSP,
+                       mvoll: i8, evoll: i8, efb: i8) void
+    {
+        echo.step_e(s.int(), mvoll, evoll, efb);
     }
 
-    inline fn proc_t27(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t27(s: *SDSP,
+                       mvolr: i8, evolr: i8, pmon: u8,
+                       mute_flg: u1) void
+    {
+        misc.step_a(s.int(), pmon);
+        echo.step_f(s.int(), mvolr, evolr, mute_flg);
+        // Output to DAC
+        s.emu.queue_dac_sample(
+            @intCast(s.int()._main_out_left),
+            @intCast(s.int()._main_out_right),
+        );
+        // Clear output for next sample
+        s.int()._main_out_left  = 0;
+        s.int()._main_out_right = 0;
     }
 
-    inline fn proc_t28(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t28(s: *SDSP,
+                       non: u8, eon: u8, dir: u8,
+                       echo_readonly_flg: u1) void
+    {
+        misc.step_b(s.int(), non, eon, dir);
+        echo.step_g(s.int(), echo_readonly_flg);
     }
 
-    inline fn proc_t29(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t29(s: *SDSP,
+                       aram_echo_0: [*]u8, aram_echo_1: [*]u8,
+                       edl: u8, esa: u8,
+                       echo_readonly_flg: u1) void
+    {
+        misc.step_c(s.int());
+        echo.step_h(s.int(), aram_echo_0, aram_echo_1, edl, esa, echo_readonly_flg);
     }
 
-    inline fn proc_t30(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t30(s: *SDSP,
+                       aram_echo_0: [*]u8, aram_echo_1: [*]u8,
+                       v0_envx: *u8, v0_adsr_1: u8, koff: u8, flg_lsb: u5, v0_gain: u8,
+                       flg_r: u1) void
+    {
+        misc.step_d(s.int(), koff, flg_lsb);
+        s.int().voice_step_c_pt3(0, v0_adsr_1, v0_gain, v0_envx, flg_r, &gauss_table);
+        echo.step_i(s.int(), aram_echo_0, aram_echo_1);
     }
 
-    inline fn proc_t31(self: *SDSP) void {
-        _ = self;
+    inline fn proc_t31(s: *SDSP,
+                       aram_data_0: u8,
+                       v0_voll: i8, v2_srcn: u8) void
+    {
+        s.int().voice_step_d(0, aram_data_0, v0_voll);
+        s.int().voice_step_a(v2_srcn);
     }
 };

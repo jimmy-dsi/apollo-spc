@@ -1701,3 +1701,123 @@ fn print_byte(before: []const u8, data: u8, after: []const u8, as_char: bool) vo
         std.debug.print(" ", .{});
     }
 }
+
+pub fn print_dsp_debug_state(emu: *Emu, options: OptionStruct) void {
+    const s = &emu.s_dsp.state;
+
+    // Print voice registers
+    print_dsp_debug_voices(emu, 0, options);
+    std.debug.print("\n", .{});
+    print_dsp_debug_voices(emu, 4, options);
+    std.debug.print("\n", .{});
+
+    _ = s;
+}
+
+fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
+    print_dsp_voices(emu, base, options);
+    std.debug.print("\n", .{});
+
+    const s = emu.s_dsp.int();
+
+    std.debug.print("\x1B[90m", .{});
+
+    // Print voice 0-3 states
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        const val: u4 = @bitCast(v._buffer_offset);
+        std.debug.print("    buff. offset: {X:0>1}        ", .{val});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        const val: u16 = @bitCast(v._gaussian_offset);
+        std.debug.print("    gauss offset: {X:0>4}     ", .{val});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        std.debug.print("    brr address:  {X:0>4}     ", .{v._brr_address});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        std.debug.print("    brr offset:   {X:0>1}        ", .{v._brr_offset});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        std.debug.print("    key on delay: {X:0>1}        ", .{v._key_on_delay});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        const res = 
+            switch (v._env_mode) {
+                .attack  => "attck",
+                .decay   => "decay",
+                .release => "reles",
+                .key_off => "keyof"
+            };
+        std.debug.print("    env. mode:    {s}    ", .{res});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        std.debug.print("    env. level:   {X:0>2}.{X:0>1}     ", .{v._env_level >> 4, @as(u12, v._env_level) << 1 & 0xF});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |_| {
+        std.debug.print("    buffer:                ", .{});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        const cast_buf: [4]u16 = [_]u16 {
+            @bitCast(v._buffer[0]), @bitCast(v._buffer[1]),
+            @bitCast(v._buffer[2]), @bitCast(v._buffer[3]),
+        };
+        std.debug.print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        const cast_buf: [4]u16 = [_]u16 {
+            @bitCast(v._buffer[4]), @bitCast(v._buffer[5]),
+            @bitCast(v._buffer[6]), @bitCast(v._buffer[7]),
+        };
+        std.debug.print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+    }
+    std.debug.print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
+        const cast_buf: [4]u16 = [_]u16 {
+            @bitCast(v._buffer[8]),  @bitCast(v._buffer[9]),
+            @bitCast(v._buffer[10]), @bitCast(v._buffer[11]),
+        };
+        std.debug.print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+    }
+    std.debug.print("\n", .{});
+
+    std.debug.print("\x1B[0m", .{});
+}

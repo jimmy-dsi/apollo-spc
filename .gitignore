@@ -9,3 +9,5 @@ apollo-spc-program
 *.exe
 *.obj
 *.pdb
+*.out
+*.raw

@@ -59,6 +59,7 @@ pub fn main() !void {
     std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
     std.debug.print("   v = Memory viewer \n", .{});
     std.debug.print("   r = DSP register map viewer \n", .{});
+    std.debug.print("   b = DSP debug viewer \n", .{});
     std.debug.print("Action commands: \n", .{});
     std.debug.print("   s = Step instruction [default] \n", .{});
     std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
@@ -84,14 +85,39 @@ pub fn main() !void {
     //emu.step();
 
     //var last_second: u64 = 0;
-    //
-    //for (0..2048000000) |_| {
-    //    emu.step();
-    //    const cur_second = emu.s_dsp.cur_cycle() / 2048000;
-    //    if (cur_second != last_second) {
-    //        last_second = cur_second;
-    //        std.debug.print("{d}\n", .{last_second});
+    
+    //for (0..204800000) |_| {
+    //    //for (0..32) |_| {
+    //        emu.step();
+    //    //}
+    //    //const L: u17 = @bitCast(emu.s_dsp.int()._main_out_left);
+    //    //const R: u17 = @bitCast(emu.s_dsp.int()._main_out_right);
+    //    //std.debug.print("{X:0>4} {X:0>4}\n", .{L, R});
+    //    const l1, const r1, const l2, const r2 = emu.consume_dac_samples();
+    //    
+    //    for (0..l1.len) |x| {
+    //        const sl: u16 = @bitCast(l1[x]);
+    //        const sr: u16 = @bitCast(r1[x]);
+    //    
+    //        std.debug.print("{X:0>2} {X:0>2} ", .{sl & 0xFF, sl >> 8});
+    //        std.debug.print("{X:0>2} {X:0>2} ", .{sr & 0xFF, sr >> 8});
     //    }
+    //    
+    //    if (l2 != null and r2 != null) {
+    //        for (0..l2.?.len) |x| {
+    //            const sl: u16 = @bitCast(l2.?[x]);
+    //            const sr: u16 = @bitCast(r2.?[x]);
+    //    
+    //            std.debug.print("{X:0>2} {X:0>2} ", .{sl & 0xFF, sl >> 8});
+    //            std.debug.print("{X:0>2} {X:0>2} ", .{sr & 0xFF, sr >> 8});
+    //        }
+    //    }
+    //
+    //    //const cur_second = emu.s_dsp.cur_cycle() / 2048000;
+    //    //if (cur_second != last_second) {
+    //    //    last_second = cur_second;
+    //    //    std.debug.print("{d}\n", .{last_second});
+    //    //}
     //}
 
     var cur_page: u8 = 0x00;
@@ -188,6 +214,11 @@ pub fn main() !void {
 
                 std.debug.print("\n", .{});
                 db.print_dsp_state(&emu, .{.is_dsp = true});
+            },
+            'b' => {
+                cur_mode = 'b';
+                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_dsp_debug_state(&emu, .{.is_dsp = true});
             },
             'w' => {
                 cur_action = 'w';
@@ -290,6 +321,10 @@ pub fn main() !void {
 
                     std.debug.print("\n", .{});
                     db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                }
+                else if (cur_mode == 'b') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
                 }
             },
             else => {

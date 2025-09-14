@@ -32,9 +32,9 @@ pub inline fn decode(s: *DSPStateInternal, v_idx: u3, aram_data_0: u8) void {
         }
 
         // Apply filter: Grab the 2 most recent decoded samples from buffer
-        const offset = v._buffer_offset;
-        const p1 = v._buffer[@mod(offset - 1, 12)] >> 1;
-        const p2 = v._buffer[@mod(offset - 2, 12)] >> 1;
+        const offset: i5 = @intCast(v._buffer_offset);
+        const p1 = @as(i32, v._buffer[@intCast(@mod(offset - 1, 12))] >> 1);
+        const p2 = @as(i32, v._buffer[@intCast(@mod(offset - 2, 12))] >> 1);
 
         switch (filter) {
             0 => {
