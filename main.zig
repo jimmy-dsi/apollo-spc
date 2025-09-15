@@ -52,6 +52,48 @@ pub fn main() !void {
 
         std.debug.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
         try metadata.print();
+    
+        while (true) {
+            for (0..2048000) |_| {
+                emu.step_cycle();
+            }
+
+            const l1, const r1, const l2, const r2 = emu.consume_dac_samples();
+            var buf: [128000]u8 = [_]u8 {0} ** 128000;
+
+            for (0..l1.len) |x| {
+                const a: u8 = @intCast(l1[x] & 0xFF);
+                const b: u8 = @intCast(l1[x] >>   8);
+                const c: u8 = @intCast(r1[x] & 0xFF);
+                const d: u8 = @intCast(r1[x] >>   8);
+
+                buf[4*x + 0] = a;
+                buf[4*x + 1] = b;
+                buf[4*x + 2] = c;
+                buf[4*x + 3] = d;
+            }
+
+            if (l2 != null and r2 != null) {
+                for (0..l2.?.len) |x| {
+                    const a: u8 = @intCast(l2.?[x] & 0xFF);
+                    const b: u8 = @intCast(l2.?[x] >>   8);
+                    const c: u8 = @intCast(r2.?[x] & 0xFF);
+                    const d: u8 = @intCast(r2.?[x] >>   8);
+
+                    const y = x + l1.len;
+
+                    buf[4*y + 0] = a;
+                    buf[4*y + 1] = b;
+                    buf[4*y + 2] = c;
+                    buf[4*y + 3] = d;
+                }
+            }
+
+            const stdout_file   = std.io.getStdOut();
+            var   stdout_writer = stdout_file.writer();
+
+            try stdout_writer.writeAll(&buf);
+        }
     }
 
     std.debug.print("----------------------------------------------------------------------------------\n", .{});
@@ -81,44 +123,6 @@ pub fn main() !void {
     emu.s_smp.enable_timer_logs = true;
     emu.s_smp.clear_access_logs();
     emu.s_smp.clear_timer_logs();
-    //emu.step();
-    //emu.step();
-
-    //var last_second: u64 = 0;
-    
-    //for (0..700000000) |_| {
-    //    //for (0..32) |_| {
-    //        emu.step();
-    //    //}
-    //    //const L: u17 = @bitCast(emu.s_dsp.int()._main_out_left);
-    //    //const R: u17 = @bitCast(emu.s_dsp.int()._main_out_right);
-    //    //std.debug.print("{X:0>4} {X:0>4}\n", .{L, R});
-    //    const l1, const r1, const l2, const r2 = emu.consume_dac_samples();
-    //    
-    //    for (0..l1.len) |x| {
-    //        const sl: u16 = @bitCast(l1[x]);
-    //        const sr: u16 = @bitCast(r1[x]);
-    //    
-    //        std.debug.print("{X:0>2} {X:0>2} ", .{sl & 0xFF, sl >> 8});
-    //        std.debug.print("{X:0>2} {X:0>2} ", .{sr & 0xFF, sr >> 8});
-    //    }
-    //    
-    //    if (l2 != null and r2 != null) {
-    //        for (0..l2.?.len) |x| {
-    //            const sl: u16 = @bitCast(l2.?[x]);
-    //            const sr: u16 = @bitCast(r2.?[x]);
-    //    
-    //            std.debug.print("{X:0>2} {X:0>2} ", .{sl & 0xFF, sl >> 8});
-    //            std.debug.print("{X:0>2} {X:0>2} ", .{sr & 0xFF, sr >> 8});
-    //        }
-    //    }
-    //
-    //    //const cur_second = emu.s_dsp.cur_cycle() / 2048000;
-    //    //if (cur_second != last_second) {
-    //    //    last_second = cur_second;
-    //    //    std.debug.print("{d}\n", .{last_second});
-    //    //}
-    //}
 
     var cur_page: u8 = 0x00;
     var cur_offset: u8 = 0x00;

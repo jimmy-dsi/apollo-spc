@@ -218,6 +218,13 @@ pub const Emu = struct {
         }
     }
 
+    pub fn step_cycle(self: *Emu) void {
+        const cur_cycle = self.s_dsp.clock_counter;
+        while (self.s_dsp.clock_counter == cur_cycle) {
+            self.step();
+        }
+    }
+
     pub fn step(self: *Emu) void {
         // Note: Normally the S-DSP and S-SMP steps are "staggered", meaning that on a period of every 2 DSP cycles (or 1 SMP cycle),
         // the first DSP cycle is used to process the S-SMP main loop (the execution of SPC700 instructions and handling of MMIO)

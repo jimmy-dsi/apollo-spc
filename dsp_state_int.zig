@@ -200,11 +200,11 @@ pub const DSPStateInternal = struct {
             v._key_on_delay -= 1;
         }
 
-        const output =
+        const output: i16 =
             if (v.__noise_on == 0)
                 gauss.interpolate(self, v_idx, gauss_tbl) // Do gaussian interpolation
             else
-                @as(i16, self._noise_lfsr) << 1; // Output is set to noise LFSR output instead, if noise is enabled for this voice
+                @bitCast(@as(u16, self._noise_lfsr) << 1); // Output is set to noise LFSR output instead, if noise is enabled for this voice
 
         // Apply envelope
         self._output = @intCast(@as(i32, output) * @as(i32, v._env_level) >> 11);
