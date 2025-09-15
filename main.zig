@@ -86,7 +86,7 @@ pub fn main() !void {
 
     //var last_second: u64 = 0;
     
-    //for (0..204800000) |_| {
+    //for (0..700000000) |_| {
     //    //for (0..32) |_| {
     //        emu.step();
     //    //}
