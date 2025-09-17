@@ -34,6 +34,7 @@ pub const SPC = struct {
     state: SPCState,
     interrupt_vector: u16 = default_int_vector, // Some guesswork here: Interrupt vector might have been intended to share the same location as the BRK vector, similar to 6502.
                                                 // Using that as the default, but made to be overrideable when debugging.
+    current_interrupt_vector: u16 = default_int_vector,
 
     // Temporary persistent working variables across coroutine states
     data_u8:  [4]u8  = [4]u8  { 0, 0, 0, 0 },
@@ -97,14 +98,16 @@ pub const SPC = struct {
         }
     }
 
-    pub fn trigger_interrupt(self: *SPC, vector: ?u16) void {
+    pub fn trigger_interrupt(self: *SPC, vector: ?u16) bool {
         // Don't allow interrupt through if interrupts are disabled or SPC is stopped
         if (self.state.i() == 0 or self.mode() == SPCState.Mode.stopped) {
-            return;
+            return false;
         }
 
-        self.interrupt_vector = vector orelse default_int_vector;
+        self.interrupt_vector = vector orelse self.current_interrupt_vector;
         self.state.pending_interrupt = true;
+
+        return true;
     }
 
     pub inline fn s_smp(self: *const SPC) *SSMP {

@@ -1,7 +1,8 @@
 const std = @import("std");
 
-const SDSP = @import("s_dsp.zig").SDSP;
-const SSMP = @import("s_smp.zig").SSMP;
+const SDSP      = @import("s_dsp.zig").SDSP;
+const SSMP      = @import("s_smp.zig").SSMP;
+const Script700 = @import("script700.zig").Script700;
 
 pub const Emu = struct {
     pub const DebugMode = enum {
@@ -21,10 +22,14 @@ pub const Emu = struct {
     s_dsp: SDSP,
     s_smp: SSMP,
 
+    script700: Script700,
+
     dac_buffer_left:  [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
     dac_buffer_right: [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
     dac_buffer_offset: u32 = 0,
     dac_offset_prev:   u32 = 0,
+
+    default_interrupt_vector: u16 = 0xFFDE,
 
     master_debug_mode: DebugMode = DebugMode.none,
     cur_debug_mode:    DebugMode = DebugMode.none,
@@ -48,14 +53,21 @@ pub const Emu = struct {
         return Emu {
             .s_dsp = undefined,
             .s_smp = undefined,
+            .script700 = undefined,
             .cur_debug_mode = DebugMode.none,
         };
     }
 
-    pub fn init(self: *Emu, s_dsp: SDSP, s_smp: SSMP) void {
+    pub fn init(self: *Emu, s_dsp: SDSP, s_smp: SSMP, script700: Script700) void {
         self.s_dsp          = s_dsp;
         self.s_smp          = s_smp;
+        self.script700      = script700;
         self.cur_debug_mode = DebugMode.none;
+    }
+
+    pub fn set_default_vector(self: *Emu, vector: u16) void {
+        self.default_interrupt_vector = vector;
+        self.s_smp.update_interrupt_vector(vector);
     }
 
     pub inline fn queue_dac_sample(self: *Emu, left: i17, right: i17) void {

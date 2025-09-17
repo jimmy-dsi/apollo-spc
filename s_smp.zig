@@ -88,6 +88,8 @@ pub const SSMP = struct {
 
     instr_boundary:     bool = false,
     next_is_force_exit: bool = false,
+    vector_changed:     bool = false,
+    next_vector:        u16  = 0xFFDE,
 
     timer_wait_cycles: u32 = 0,
 
@@ -125,6 +127,12 @@ pub const SSMP = struct {
     pub fn reset(self: *SSMP) void {
         self.spc.reset();
         self.spc.state.pc = self.boot_rom[0x3E] | @as(u16, self.boot_rom[0x3F]) << 8;
+    }
+
+    pub fn update_interrupt_vector(self: *SSMP, address: u16) void {
+        // Queue vector change (Takes effect on the start of next instruction)
+        self.next_vector    = address;
+        self.vector_changed = true;
     }
 
     pub fn enable_shadow_mode(self: *SSMP) void {
@@ -180,6 +188,12 @@ pub const SSMP = struct {
 
                 self.change_interrupt_mode();
 
+                // Update SPC interrupt vector if necessary
+                if (self.vector_changed) {
+                    self.spc.current_interrupt_vector = self.next_vector;
+                    self.vector_changed = false;
+                }
+
                 // Apply debug mode transitions if applicable
                 self.maybe_transition_debug_mode();
             }
@@ -228,7 +242,7 @@ pub const SSMP = struct {
     }
 
     pub fn trigger_interrupt(self: *SSMP, vector: ?u16) void {
-        self.spc.trigger_interrupt(vector);
+        _ = self.spc.trigger_interrupt(vector);
         if (self.instr_boundary) {
             self.change_interrupt_mode();
         }

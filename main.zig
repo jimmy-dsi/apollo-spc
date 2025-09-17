@@ -2,9 +2,10 @@ const std = @import("std");
 
 const db = @import("debug.zig");
 
-const Emu  = @import("emu.zig").Emu;
-const SDSP = @import("s_dsp.zig").SDSP;
-const SSMP = @import("s_smp.zig").SSMP;
+const Emu       = @import("emu.zig").Emu;
+const SDSP      = @import("s_dsp.zig").SDSP;
+const SSMP      = @import("s_smp.zig").SSMP;
+const Script700 = @import("script700.zig").Script700;
 
 const spc_loader = @import("spc_loader.zig");
 
@@ -33,8 +34,12 @@ pub fn main() !void {
     var emu = Emu.new();
     emu.init(
         SDSP.new(&emu),
-        SSMP.new(&emu, .{})
+        SSMP.new(&emu, .{}),
+        Script700.new(&emu),
     );
+    defer emu.script700.deinit();
+
+    emu.script700.run(.{});
 
     // Load SPC file from path if present
     if (spc_file_path) |path| {
