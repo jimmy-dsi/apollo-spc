@@ -239,6 +239,7 @@ pub const SSMP = struct {
 
     pub fn receive_port_value(self: *SSMP, port_index: u2, value: u8) void {
         self.state.input_ports[port_index] = value;
+        self.emu.script700.state.port_in[port_index] = value; // Reflect on Script700 side
     }
 
     pub fn trigger_interrupt(self: *SSMP, vector: ?u16) void {
@@ -1205,11 +1206,17 @@ pub const SSMP = struct {
                 if (data >> 4 & 1 == 1) {
                     self.state.input_ports[0] = 0x00;
                     self.state.input_ports[1] = 0x00;
+                    // Zero out on Script700 side as well
+                    self.emu.script700.state.port_in[0] = 0x00;
+                    self.emu.script700.state.port_in[1] = 0x00;
                 }
 
                 if (data >> 5 & 1 == 1) {
                     self.state.input_ports[2] = 0x00;
                     self.state.input_ports[3] = 0x00;
+                    // Zero out on Script700 side as well
+                    self.emu.script700.state.port_in[2] = 0x00;
+                    self.emu.script700.state.port_in[3] = 0x00;
                 }
 
                 inline for (0..3) |index| {
@@ -1285,15 +1292,19 @@ pub const SSMP = struct {
             },
             0x00F4 => { // CPUIO0 (Overwrite the input data (from S-CPU) as opposed to output)
                 self.state.input_ports[0] = data;
+                self.emu.script700.state.port_in[0] = data; // Reflect on Script700 side
             },
             0x00F5 => { // CPUIO1 (Overwrite the input data (from S-CPU) as opposed to output)
                 self.state.input_ports[1] = data;
+                self.emu.script700.state.port_in[1] = data; // Reflect on Script700 side
             },
             0x00F6 => { // CPUIO2 (Overwrite the input data (from S-CPU) as opposed to output)
                 self.state.input_ports[2] = data;
+                self.emu.script700.state.port_in[2] = data; // Reflect on Script700 side
             },
             0x00F7 => { // CPUIO3 (Overwrite the input data (from S-CPU) as opposed to output)
                 self.state.input_ports[3] = data;
+                self.emu.script700.state.port_in[3] = data; // Reflect on Script700 side
             },
             0x00F8...0x00FC => { // Normal behavior
                 self.write_io(address, data);

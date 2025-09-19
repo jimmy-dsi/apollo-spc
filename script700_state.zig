@@ -22,7 +22,7 @@ pub const Script700State = struct {
     wait_until:  ?u64        = null,
     wait_device:  WaitDevice = .none,
     wait_port:    u2         = 0,
-    wait_value:  ?u8         = null,
+    wait_value: ?*u8         = null,
 
     pub fn reset(self: *Script700State) void {
         for (0..4) |i| {
@@ -68,7 +68,7 @@ pub const Script700State = struct {
         return self.aram_breakpoints[bit_addr] & @as(u8, 1) << bit != 0;
     }
 
-    pub inline fn set_wait_condition(self: *Script700State, device: WaitDevice, port: u2, value: ?u8) void {
+    pub inline fn set_wait_condition(self: *Script700State, device: WaitDevice, port: u2, value: ?*u8) void {
         if (device == .none) {
             return;
         }
