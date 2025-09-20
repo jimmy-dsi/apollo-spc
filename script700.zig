@@ -32,7 +32,11 @@ pub const Script700 = struct {
 
     emu: *Emu,
 
+    _finished: bool = false,
+
     enabled: bool = false,
+    compat_mode: bool = true, // Indicates whether timing operations should be consistent with spcplay Script700 behavior. `false` instead indicates cycle-level accuracy.
+    initialized: bool = false,
 
     label_addresses:   [1024]u32 = [_]u32 {0xFFFFFFFF} ** 1024,
     label_remappings: ?[]u32 = null,
@@ -58,6 +62,7 @@ pub const Script700 = struct {
         }
 
         self.label_remappings = null;
+        self.initialized = false;
         self.data_area = &default_data;
     }
 
@@ -65,6 +70,7 @@ pub const Script700 = struct {
         self.deinit();
         self.script_bytecode = &default_bytecode;
         self.label_remappings = null;
+        self.initialized = false;
         self.state.reset();
     }
 
@@ -79,6 +85,7 @@ pub const Script700 = struct {
     pub fn load_bytecode(self: *Script700, script_bytecode: []u32) void {
         self.enabled = true;
         self.script_bytecode = script_bytecode;
+        self.initialized = false;
         self.state.reset();
     }
 
@@ -98,10 +105,28 @@ pub const Script700 = struct {
         self.label_remappings = label_remappings;
     }
 
+    pub inline fn finished(self: *Script700) bool {
+        const result = self._finished;
+        self._finished = false;
+        return result;
+    }
+
     pub fn run(self: *Script700, options: RunOptions) void {
+        if (!self.initialized) {
+            if (self.compat_mode) {
+                // SPCPlay's Script700 engine does not start running until 32 DSP cycles have elapsed after SPC reset
+                self.state.wait_until = self.state.cur_cycle +| 32;
+            }
+            self.initialized = true;
+        }
+
         self.state.step = 0;
+        self._finished = false;
+
         for (0..options.max_steps) |_| {
             if (!self.enabled or self.state.wait_until != null) {
+                self.state.last_cycle = self.emu.s_dsp.cur_cycle();
+                self._finished = true;
                 return;
             }
             self.step_instruction() catch {
@@ -174,6 +199,38 @@ pub const Script700 = struct {
         }
 
         self.state.step +%= 1;
+    }
+
+    pub inline fn resume_script(self: *Script700, cur_cycle: u64, cur_begin_cycle: u64, dynamic_wait: bool) void {
+        const prev_cycle       = self.state.cur_cycle;
+        const prev_begin_cycle = self.state.begin_cycle;
+
+        self.state.cur_cycle   = cur_cycle;
+        self.state.begin_cycle = cur_begin_cycle;
+
+        if (dynamic_wait) {
+            if (self.compat_mode) {
+                const wr: i64 = @intCast(cur_cycle % 32);
+                self.state.clock_offset = -32;
+                self.state.wait_accum = -wr;
+
+                if (self.state.wait_accum == 0) {
+                    self.state.wait_accum = -32;
+                }
+
+                const prev_sync_point: u64 = @divFloor(prev_begin_cycle, 32) * 32;
+                self.state.cmp[0] = @intCast((cur_cycle - prev_sync_point) & 0xFFFF_FFFF);
+            }
+            else {
+                self.state.wait_accum = 0;
+                self.state.cmp[0] = @intCast((cur_cycle - prev_cycle) & 0xFFFF_FFFF);
+            }
+        }
+        else {
+            self.state.wait_accum = 0;
+        }
+
+        self.state.wait_until = null;
     }
 
     inline fn proc_instr_general(self: *Script700, instr: u32) !void {
@@ -265,15 +322,42 @@ pub const Script700 = struct {
         const cmd: u2 = @intCast((instr & 0x1800_0000) >> 27);
         switch (cmd) {
             0 => { // wait (w)
-                self.state.wait_until  = self.emu.s_dsp.cur_cycle() +| @as(u64, result);
-                self.state.wait_device = .none;
+                if (result == 0) {
+                    return;
+                }
+
+                if (self.compat_mode) {
+                    self.state.wait_accum +|= result;
+
+                    if (self.state.wait_accum >= 32) {
+                        const w: f64 = @floatFromInt(self.state.wait_accum);
+                        const step_amt: i64 = @intFromFloat(@ceil(w / 32) * 32);
+
+                        self.state.clock_offset +|= step_amt;
+
+                        if (self.state.clock_offset > 0) {
+                            const co: u64 = @intCast(self.state.clock_offset);
+
+                            self.state.wait_until = self.state.cur_cycle +| co;
+                            self.state.wait_accum -= step_amt;
+
+                            self.state.clock_offset = 0;
+                        }
+                    }
+                }
+                else {
+                    self.state.wait_until  = self.state.cur_cycle +| @as(u64, result);
+                    self.state.wait_device = .none;
+                }
             },
             1 => { // waiti (wi)
                 const port_num: u2 = @intCast(result & 3);
+                self.state.wait_accum = 0;
                 self.state.set_wait_condition(.input, port_num, null);
             },
             2 => { // waito (wo)
                 const port_num: u2 = @intCast(result & 3);
+                self.state.wait_accum = 0;
                 self.state.set_wait_condition(.output, port_num, null);
             },
             3 => unreachable
@@ -402,7 +486,10 @@ pub const Script700 = struct {
 
         const address: u32 = 
             if (info.src_dyn_ptr)
-                self.state.cmp[0]
+                if (optype == .rcmp)
+                    self.state.cmp[1]
+                else
+                    self.state.cmp[0]
             else
                 info.src_address orelse 0;
 
@@ -445,7 +532,10 @@ pub const Script700 = struct {
 
         const dest_address: u32 = 
             if (info.dest_dyn_ptr)
-                self.state.cmp[1]
+                if (optype == .rcmp)
+                    self.state.cmp[0]
+                else
+                    self.state.cmp[1]
             else
                 info.dest_address orelse 0;
 

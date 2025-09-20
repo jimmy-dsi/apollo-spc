@@ -18,6 +18,14 @@ pub const Script700State = struct {
     step: u32 = 0,
 
     aram_breakpoints: [8192]u8 = [_]u8 {0x00} ** 8192,
+    
+    wait_accum:   i64 = 0,
+    cur_cycle:    u64 = 0, // The true current cycle - Can be in the middle of an SPC700 instruction
+                           // In compat mode, Script700 has the SPC700 step ahead to the end of the current instruction
+                           // But this value would reflect what the current cycle was before stepping ahead
+    begin_cycle:  u64 = 0, // The cycle at which the currently executing SPC700 instruction began
+    last_cycle:   u64 = 0, // The true state of the DSP clock counter when the Script700 was last run
+    clock_offset: i64 = 0,
 
     wait_until:  ?u64        = null,
     wait_device:  WaitDevice = .none,
@@ -51,6 +59,8 @@ pub const Script700State = struct {
             self.aram_breakpoints[i] = 0x00;
         }
 
+        self.wait_accum = 0;
+        self.clock_offset = 0;
         self.wait_until = null;
     }
 

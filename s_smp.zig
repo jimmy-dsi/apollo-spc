@@ -82,6 +82,9 @@ pub const SSMP = struct {
     access_logs: [256]AccessLog = undefined,
     last_log_index: u32 = 0,
 
+    secondary_access_logs: [32]AccessLog = undefined,
+    secondary_log_index: u32 = 0,
+
     enable_timer_logs: bool = false,
     timer_logs: [256]TimerLog = undefined,
     last_timer_log_index: u32 = 0,
@@ -258,7 +261,70 @@ pub const SSMP = struct {
         }
     }
 
+    pub fn get_access_logs_range(self: *SSMP, start_cycle: u64) []AccessLog {
+        if (self.secondary_log_index > 0) {
+            // If secondary logs are present, read from those instead
+            var start_index: i32 = @intCast(self.secondary_log_index);
+            while (start_index >= 0) {
+                const si: usize = @intCast(start_index);
+                if (self.secondary_access_logs[si].dsp_cycle < start_cycle) {
+                    break;
+                }
+                start_index -= 1;
+            }
+
+            if (start_index < 0) {
+                start_index = 0;
+            }
+
+            const si_: usize = @intCast(start_index);
+            return self.secondary_access_logs[si_..];
+        }
+        else {
+            // Otherwise, grab from main log array
+            var start_index: i32 = @intCast(self.last_log_index);
+            while (start_index >= 0) {
+                const si: usize = @intCast(start_index);
+                if (self.access_logs[si].dsp_cycle < start_cycle) {
+                    break;
+                }
+                start_index -= 1;
+            }
+
+            if (start_index < 0) {
+                start_index = 0;
+            }
+
+            const si_: usize = @intCast(start_index);
+            return self.access_logs[si_..];
+        }
+    }
+
     pub fn clear_access_logs(self: *SSMP) void {
+        // Copy to secondary buffer, for Script700 to use if main one has been cleared
+        if (self.last_log_index > 32) {
+            var index:   u32 = self.last_log_index - 1;
+            var s_index: i32 = 31;
+
+            while (s_index >= 0) {
+                const si: usize = @intCast(s_index);
+                const i:  usize = @intCast(index);
+
+                self.secondary_access_logs[si] = self.access_logs[i];
+                index   -= 1;
+                s_index -= 1;
+            }
+
+            self.secondary_log_index = 32;
+        }
+        else {
+            for (0..self.last_log_index) |i| {
+                self.secondary_access_logs[i] = self.access_logs[i];
+            }
+            self.secondary_log_index = self.last_log_index;
+        }
+
+        // Clear the main log buffer
         self.access_logs[0] = .{ .dsp_cycle = 0, .address = 0 };
         self.last_log_index = 0;
     }
