@@ -1821,3 +1821,33 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
 
     std.debug.print("\x1B[0m", .{});
 }
+
+pub fn print_script700_state(emu: *Emu) void {
+    const s7  = &emu.script700;
+    const s7s = &s7.state;
+
+    const smp  = &emu.s_smp;
+    const smps = &smp.state;
+
+    std.debug.print("Running?    : {}\n", .{s7.enabled});
+    std.debug.print("Port In (Q) : {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",   .{s7s.port_in[0], s7s.port_in[1], s7s.port_in[2], s7s.port_in[3]});
+    std.debug.print("Port In     : {X:0>2} {X:0>2} {X:0>2} {X:0>2}    ", .{smps.input_ports [0], smps.input_ports [1], smps.input_ports [2], smps.input_ports [3]});
+    std.debug.print("Out : {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",           .{smps.output_ports[0], smps.output_ports[1], smps.output_ports[2], smps.output_ports[3]});
+
+    std.debug.print("Work 0-3    : {X:0>8} {X:0>8} {X:0>8} {X:0>8}\n", .{s7s.work[0], s7s.work[1], s7s.work[2], s7s.work[3]});
+    std.debug.print("     4-7    : {X:0>8} {X:0>8} {X:0>8} {X:0>8}\n", .{s7s.work[4], s7s.work[5], s7s.work[6], s7s.work[7]});
+
+    std.debug.print("Cmp Param   : {X:0>8} {X:0>8}\n", .{s7s.cmp[0], s7s.cmp[1]});
+    std.debug.print("Wait Until  : ", .{});
+    if (s7s.wait_until == null) {
+        std.debug.print("---------------- (none)\n", .{});
+    }
+    else {
+        std.debug.print("{X:0>16} ({d})\n", .{s7s.wait_until.?, s7s.wait_until.?});
+    }
+
+    std.debug.print("Script Size : {X:0>6}\n",        .{s7.script_bytecode.len});
+    std.debug.print("Data Size   : {X:0>6} ",         .{s7.data_area.len});
+    std.debug.print("(PC={X:0>6} SP={X:0>2})\n",      .{s7s.pc, s7s.sp});
+    std.debug.print("Cur. Cycle  : {X:0>16} ({d})\n", .{s7s.cur_cycle, s7s.cur_cycle});
+}

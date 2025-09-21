@@ -125,7 +125,6 @@ pub const Script700 = struct {
 
         for (0..options.max_steps) |_| {
             if (!self.enabled or self.state.wait_until != null) {
-                self.state.last_cycle = self.emu.s_dsp.cur_cycle();
                 self._finished = true;
                 return;
             }
@@ -133,6 +132,11 @@ pub const Script700 = struct {
                 self.enabled = false; // Disable script if we run into an unrecoverable error (such as an issue when allocating memory)
                 // TODO: Add error reporting mechanism for when this happens
             };
+
+            // Track last executed cycle on running -> not running transition
+            if (!self.enabled or self.state.wait_until != null) {
+                self.state.last_cycle = self.emu.s_dsp.cur_cycle();
+            }
         }
     }
 
@@ -231,6 +235,286 @@ pub const Script700 = struct {
         }
 
         self.state.wait_until = null;
+    }
+
+    pub const Operands = struct {
+        oper_1_prefix: ?[]const u8 = null,
+        oper_1_value:  ?u32        = null,
+
+        operator:      ?u8         = null,
+
+        oper_2_prefix: ?[]const u8 = null,
+        oper_2_value:  ?u32        = null,
+    };
+
+    pub const Compile = error {no_space, unencodable};
+
+    pub fn compile_instruction(buffer: []u32, mnemonic: []const u8, operands: Operands) Compile! void {
+        if (buffer.len == 0) {
+            return Compile.no_space;
+        }
+
+        const op = operands;
+
+        var instr_type: u8 = 0;
+        var oper:       u5 = 0;
+
+        if (std.mem.eql(u8, mnemonic, "m")) {
+            instr_type = 1;
+            oper = 0b0000;
+        }
+        else if (std.mem.eql(u8, mnemonic, "a")) {
+            instr_type = 1;
+            oper = 0b0001;
+        }
+        else if (std.mem.eql(u8, mnemonic, "s")) {
+            instr_type = 1;
+            oper = 0b0010;
+        }
+        else if (std.mem.eql(u8, mnemonic, "u")) {
+            instr_type = 1;
+            oper = 0b0011;
+        }
+        else if (std.mem.eql(u8, mnemonic, "d")) {
+            instr_type = 1;
+            oper = 0b0100;
+        }
+        else if (std.mem.eql(u8, mnemonic, "n")) {
+            instr_type = 1;
+            if (op.operator) |opr| {
+                oper = switch (opr) {
+                    '\\' => 0b0101,
+                    '%'  => 0b0110,
+                    '$'  => 0b0111,
+                    '&'  => 0b1000,
+                    '|'  => 0b1001,
+                    '^'  => 0b1010,
+                    '<'  => 0b1011,
+                    '_'  => 0b1100,
+                    '>'  => 0b1101,
+                    '!'  => 0b1110,
+                    else => {
+                        return Compile.unencodable;
+                    }
+                };
+            }
+            else {
+                return Compile.unencodable;
+            }
+        }
+        else if (std.mem.eql(u8, mnemonic, "c")) {
+            instr_type = 1;
+            oper = 0b1111;
+        }
+        else if (std.mem.eql(u8, mnemonic, "nop")) {
+            buffer[0] = 0x8000_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "q")) {
+            buffer[0] = 0x80FF_FFFF;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "i")) {
+            buffer[0] = 0xF700_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "ib")) {
+            buffer[0] = 0xF701_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "sw")) {
+            buffer[0] = 0xF702_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "r")) {
+            buffer[0] = 0xF000_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "r0")) {
+            buffer[0] = 0xF100_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "r1")) {
+            buffer[0] = 0xF200_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "f")) {
+            buffer[0] = 0xF400_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "f0")) {
+            buffer[0] = 0xF500_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "f1")) {
+            buffer[0] = 0xF600_0000;
+            return;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bra")) {
+            instr_type = 3;
+            oper = 0b0000;
+        }
+        else if (std.mem.eql(u8, mnemonic, "beq")) {
+            instr_type = 3;
+            oper = 0b0001;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bne")) {
+            instr_type = 3;
+            oper = 0b0010;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bge")) {
+            instr_type = 3;
+            oper = 0b0011;
+        }
+        else if (std.mem.eql(u8, mnemonic, "ble")) {
+            instr_type = 3;
+            oper = 0b0100;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bgt")) {
+            instr_type = 3;
+            oper = 0b0101;
+        }
+        else if (std.mem.eql(u8, mnemonic, "blt")) {
+            instr_type = 3;
+            oper = 0b0110;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bcc")) {
+            instr_type = 3;
+            oper = 0b0111;
+        }
+        else if (std.mem.eql(u8, mnemonic, "blo")) {
+            instr_type = 3;
+            oper = 0b1000;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bhi")) {
+            instr_type = 3;
+            oper = 0b1001;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bcs")) {
+            instr_type = 3;
+            oper = 0b1010;
+        }
+
+        switch (instr_type) {
+            1 => {
+                if (op.oper_1_prefix == null or op.oper_2_prefix == null) {
+                    return Compile.unencodable;
+                }
+
+                const p1 = op.oper_1_prefix.?;
+                const p2 = op.oper_2_prefix.?;
+
+                var v1: u32 = 0;
+                var v2: u32 = 0;
+
+                const s_mt_, const s_sz_, const s_dp = try parse_memtype(p1);
+                const d_mt_, const d_sz_, const d_dp = try parse_memtype(p2);
+
+                const s_mt = s_mt_ orelse .port_out;
+                const s_sz = s_sz_ orelse 0;
+                const d_mt = d_mt_ orelse if (oper == 0b1111) @as(MemType, .port_out) else @as(MemType, .port_in);
+                const d_sz = d_sz_ orelse 0;
+
+                if (!s_dp) {
+                    if (op.oper_1_value == null) {
+                        return Compile.unencodable;
+                    }
+                    v1 = op.oper_1_value.?;
+                }
+
+                if (!d_dp) {
+                    if (op.oper_2_value == null) {
+                        return Compile.unencodable;
+                    }
+                    v2 = op.oper_2_value.?;
+                }
+
+                if (d_mt == .imm and !d_dp and s_mt == .imm and !s_dp) {
+                    // Encode as two set cmp instructions
+                    if (buffer.len < 4) {
+                        return Compile.no_space;
+                    }
+
+                    buffer[0] = 0xF300_0000; // Affects CMP1
+                    buffer[1] = v1;          // CMP1 immediate value
+                    buffer[2] = 0xF380_0000; // Affects CMP2
+                    buffer[3] = v2;          // CMP2 immediate value
+                }
+                else if (d_mt == .imm and !d_dp) {
+                    // Swap operands and encode as revcmp
+                    try encode_type_1_instr(
+                        buffer,
+                        .rcmp,
+                        d_mt, d_dp, d_sz, v2,
+                        s_mt, s_dp, s_sz, v1
+                    );
+                }
+                else {
+                    // General behavior
+                    try encode_type_1_instr(
+                        buffer,
+                        @enumFromInt(oper),
+                        s_mt, s_dp, s_sz, v1,
+                        d_mt, d_dp, d_sz, v2
+                    );
+                }
+            },
+            2 => {
+
+            },
+            3 => {
+
+            },
+            else => unreachable
+        }
+    }
+
+    inline fn parse_memtype(prefix: []const u8) Compile! struct{?MemType, ?u2, bool} {
+        const p = prefix;
+        const d = p.len >= 1 and p[p.len - 1] == '?';
+
+        if (p.len == 0 or p.len == 1 and p[0] == '?') {
+            return .{null, null, d};
+        }
+        else if (p.len == 1 or p.len == 2 and p[1] == '?') {
+            return switch (p[0]) {
+                'o'  => .{.port_out, null, d},
+                'i'  => .{.port_in,  null, d},
+                'w'  => .{.work,     null, d},
+                'r'  => .{.aram,        0, d},
+                'x'  => .{.xram,        0, d},
+                'd'  => .{.data,        0, d},
+                '#'  => .{.imm,      null, d},
+                'l'  => .{.label,    null, d},
+                else => Compile.unencodable
+            };
+        }
+        else if (p.len == 2 or p.len == 3 and p[2] == '?') {
+            if (std.mem.eql(u8, p[0..2], "rb")) {
+                return .{.aram, 0, d};
+            }
+            else if (std.mem.eql(u8, p[0..2], "rw")) {
+                return .{.aram, 1, d};
+            }
+            else if (std.mem.eql(u8, p[0..2], "rd")) {
+                return .{.aram, 2, d};
+            }
+            else if (std.mem.eql(u8, p[0..2], "db")) {
+                return .{.data, 0, d};
+            }
+            else if (std.mem.eql(u8, p[0..2], "dw")) {
+                return .{.data, 1, d};
+            }
+            else if (std.mem.eql(u8, p[0..2], "dd")) {
+                return .{.data, 2, d};
+            }
+            else {
+                return Compile.unencodable;
+            }
+        }
+        else {
+            return Compile.unencodable;
+        }
     }
 
     inline fn proc_instr_general(self: *Script700, instr: u32) !void {
@@ -1045,6 +1329,236 @@ pub const Script700 = struct {
                     unreachable;
                 }
             }
+        }
+    }
+
+    inline fn encode_type_1_instr(buffer: []u32,
+                                  optype: OpType,
+                                  src_memtype:  MemType, src_dyn_ptr:  bool, src_size:  u2, src_addr:  u32,
+                                  dest_memtype: MemType, dest_dyn_ptr: bool, dest_size: u2, dest_addr: u32) Compile! void
+    {
+        var icode: u32 = 0x0000_0000;
+
+        if (optype == .rcmp) {
+            icode = 0xF800_0000;
+        }
+        else {
+            const opval: u4 = @intCast(@intFromEnum(optype));
+            icode = @as(u32, opval) << 27;
+        }
+
+        var enc_src: u5 = undefined;
+        var use_2nd_word: bool = false;
+
+        if (src_dyn_ptr) {
+            switch (src_memtype) {
+                .imm => {
+                    enc_src = 0b10100;
+                },
+                .port_in => {
+                    enc_src = 0b10101;
+                },
+                .port_out => {
+                    enc_src = 0b10110;
+                },
+                .work => {
+                    enc_src = 0b10111;
+                },
+                .aram => {
+                    if (src_size == 0) {
+                        enc_src = 0b11000;
+                    }
+                    else if (src_size == 1) {
+                        enc_src = 0b11001;
+                    }
+                    else if (src_size == 2) {
+                        enc_src = 0b11010;
+                    }
+                    else {
+                        return Compile.unencodable;
+                    }
+                },
+                .xram => {
+                    enc_src = 0b11011;
+                },
+                .data => {
+                    if (src_size == 0) {
+                        enc_src = 0b11100;
+                    }
+                    else if (src_size == 1) {
+                        enc_src = 0b11101;
+                    }
+                    else if (src_size == 2) {
+                        enc_src = 0b11110;
+                    }
+                    else {
+                        return Compile.unencodable;
+                    }
+                },
+                .label => {
+                    enc_src = 0b11111;
+                }
+            }
+        }
+        else {
+            switch (src_memtype) {
+                .port_in => {
+                    enc_src = @intCast(src_addr & 0b11);
+                },
+                .port_out => {
+                    enc_src = @intCast(src_addr & 0b11);
+                    enc_src |= 0b00100;
+                },
+                .work => {
+                    enc_src = @intCast(src_addr & 0b111);
+                    enc_src |= 0b01000;
+                },
+                .data => {
+                    enc_src = 0b10000;
+                    use_2nd_word = true;
+                },
+                .imm => {
+                    enc_src = 0b10001;
+                    use_2nd_word = true;
+                },
+                .aram, .xram => {
+                    enc_src = 0b10010;
+                    use_2nd_word = true;
+                },
+                .label => {
+                    enc_src = 0b10011;
+                    use_2nd_word = true;
+                }
+            }
+        }
+
+        if (use_2nd_word and buffer.len == 1) {
+            return Compile.no_space;
+        }
+
+        icode |= @as(u32, enc_src) << 22;
+
+        var enc_dest: u22 = 0;
+
+        if (dest_dyn_ptr) {
+            switch (dest_memtype) {
+                .imm => {
+                    enc_dest = @as(u22, 0b10100) << 13;
+                },
+                .port_in => {
+                    enc_dest = @as(u22, 0b10101) << 13;
+                },
+                .port_out => {
+                    enc_dest = @as(u22, 0b10110) << 13;
+                },
+                .work => {
+                    enc_dest = @as(u22, 0b10111) << 13;
+                },
+                .aram => {
+                    if (src_size == 0) {
+                        enc_dest = @as(u22, 0b11000) << 13;
+                    }
+                    else if (src_size == 1) {
+                        enc_dest = @as(u22, 0b11001) << 13;
+                    }
+                    else if (src_size == 2) {
+                        enc_dest = @as(u22, 0b11010) << 13;
+                    }
+                    else {
+                        return Compile.unencodable;
+                    }
+                },
+                .xram => {
+                    enc_dest = @as(u22, 0b11011) << 13;
+                },
+                .data => {
+                    if (src_size == 0) {
+                        enc_dest = @as(u22, 0b11100) << 13;
+                    }
+                    else if (src_size == 1) {
+                        enc_dest = @as(u22, 0b11101) << 13;
+                    }
+                    else if (src_size == 2) {
+                        enc_dest = @as(u22, 0b11110) << 13;
+                    }
+                    else {
+                        return Compile.unencodable;
+                    }
+                },
+                .label => {
+                    enc_dest = @as(u22, 0b11111) << 13;
+                }
+            }
+        }
+        else {
+            switch (dest_memtype) {
+                .port_in => {
+                    const addr: u22 = @intCast(dest_addr & 0b11);
+                    enc_dest = @as(u22, addr) << 13;
+                },
+                .port_out => {
+                    const addr: u22 = @intCast(dest_addr & 0b11);
+                    enc_dest = @as(u22, 0b00100 | addr) << 13;
+                },
+                .work => {
+                    const addr: u22 = @intCast(dest_addr & 0b111);
+                    enc_dest = @as(u22, 0b01000 | addr) << 13;
+                },
+                .label => {
+                    enc_dest = @intCast(dest_addr & 0x3FF);
+                    enc_dest |= @as(u22, 0b10011) << 13;
+                },
+                .aram => {
+                    enc_dest = @intCast(dest_addr & 0xFFFF);
+                    enc_dest |= @as(u22, 0b001) << 19 | @as(u22, dest_size) << 16;
+                },
+                .xram => {
+                    enc_dest = @intCast(dest_addr & 0x003F);
+                    enc_dest |= @as(u22, 0b001) << 19 | @as(u22, 0b11) << 16;
+                },
+                .data => {
+                    enc_dest = @intCast(dest_addr & 0xF_FFFF);
+                    enc_dest |= @as(u22, dest_size +| 1) << 20;
+                },
+                else => {
+                    return Compile.unencodable;
+                }
+            }
+        }
+
+        icode |= @as(u32, enc_src) << 22 | @as(u32, enc_dest);
+        buffer[0] = icode;
+
+        if (use_2nd_word) {
+            var icode_2: u32 = 0x0000_0000;
+
+            switch (src_memtype) {
+                .label => {
+                    icode_2 = src_addr & 0x3FF;
+                },
+                .aram => {
+                    icode_2 = src_addr & 0xFFFF;
+                    icode_2 |= @as(u32, src_size) << 16;
+                },
+                .xram => {
+                    icode_2 = src_addr & 0x3F;
+                    icode_2 |= @as(u32, 0b11) << 16;
+                },
+                .data => {
+                    if (src_size == 3) {
+                        return Compile.unencodable;
+                    }
+
+                    icode_2 = src_addr & 0xF_FFFF;
+                    icode_2 |= @as(u32, src_size) << 20;
+                },
+                .imm => {
+                    icode_2 = src_addr;
+                },
+                else => unreachable
+            }
+
+            buffer[1] = icode_2;
         }
     }
 

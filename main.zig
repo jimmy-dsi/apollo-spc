@@ -19,12 +19,18 @@ pub fn main() !void {
     defer args.deinit();
 
     var spc_file_path: ?[]const u8 = null;
+    var debug_mode: bool = false;
 
     var i: usize = 0;
     while (args.next()) |arg| {
         if (i == 1) {
             spc_file_path = arg;
-            break;
+        }
+        else if (i == 2) {
+            const str: []const u8 = arg;
+            if (std.mem.eql(u8, str, "--debug") or std.mem.eql(u8, str, "-d")) {
+                debug_mode = true;
+            }
         }
         i += 1;
     }
@@ -39,6 +45,36 @@ pub fn main() !void {
     );
     defer emu.script700.deinit();
 
+    // Load and run Script700 test script
+    var sb: [100]u32 = [_]u32 {0x8000_0000} ** 99 ++ [_]u32 {0x80FF_FFFF}; // Pre-fill with all NOPs and a QUIT instruction at the end.
+    var ix: u32 = 0;
+    
+    var sl: []u32 = undefined;
+
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m", .{.oper_1_prefix =  "#", .oper_1_value =  12, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m", .{.oper_1_prefix =  "w", .oper_1_value =   0, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 1;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m", .{.oper_1_prefix =  "#", .oper_1_value =   6, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
+    sl = sb[ix..(ix+4)]; try Script700.compile_instruction(sl, "c", .{.oper_1_prefix =  "#", .oper_1_value =   3, .oper_2_prefix =  "#", .oper_2_value =  15}); ix += 4;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "nop", .{}); ix += 1;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "sw",  .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "i",   .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "ib",  .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "r",   .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "r0",  .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "r1",  .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f",   .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f0",  .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f1",  .{}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q",   .{}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m", .{.oper_1_prefix =  "#", .oper_1_value =  16, .oper_2_prefix =  "i", .oper_2_value =   2}); ix += 2;
+
+    // Test print out instructions
+    for (0..ix) |i_| {
+        const word = sb[i_];
+        std.debug.print("[{b:0>8} {b:0>8} {b:0>8} {b:0>8}]\n", .{word >> 24, word >> 16 & 0xFF, word >> 8 & 0xFF, word & 0xFF});
+    } 
+
+    emu.script700.load_bytecode(sb[0..]);
     emu.script700.run(.{});
 
     // Load SPC file from path if present
@@ -58,46 +94,48 @@ pub fn main() !void {
         std.debug.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
         try metadata.print();
     
-        while (true) {
-            for (0..2048000) |_| {
-                emu.step_cycle();
-            }
-
-            const l1, const r1, const l2, const r2 = emu.consume_dac_samples();
-            var buf: [128000]u8 = [_]u8 {0} ** 128000;
-
-            for (0..l1.len) |x| {
-                const a: u8 = @intCast(l1[x] & 0xFF);
-                const b: u8 = @intCast(l1[x] >>   8);
-                const c: u8 = @intCast(r1[x] & 0xFF);
-                const d: u8 = @intCast(r1[x] >>   8);
-
-                buf[4*x + 0] = a;
-                buf[4*x + 1] = b;
-                buf[4*x + 2] = c;
-                buf[4*x + 3] = d;
-            }
-
-            if (l2 != null and r2 != null) {
-                for (0..l2.?.len) |x| {
-                    const a: u8 = @intCast(l2.?[x] & 0xFF);
-                    const b: u8 = @intCast(l2.?[x] >>   8);
-                    const c: u8 = @intCast(r2.?[x] & 0xFF);
-                    const d: u8 = @intCast(r2.?[x] >>   8);
-
-                    const y = x + l1.len;
-
-                    buf[4*y + 0] = a;
-                    buf[4*y + 1] = b;
-                    buf[4*y + 2] = c;
-                    buf[4*y + 3] = d;
+        if (!debug_mode) {
+            while (true) {
+                for (0..2048000) |_| {
+                    emu.step_cycle();
                 }
+
+                const l1, const r1, const l2, const r2 = emu.consume_dac_samples();
+                var buf: [128000]u8 = [_]u8 {0} ** 128000;
+
+                for (0..l1.len) |x| {
+                    const a: u8 = @intCast(l1[x] & 0xFF);
+                    const b: u8 = @intCast(l1[x] >>   8);
+                    const c: u8 = @intCast(r1[x] & 0xFF);
+                    const d: u8 = @intCast(r1[x] >>   8);
+
+                    buf[4*x + 0] = a;
+                    buf[4*x + 1] = b;
+                    buf[4*x + 2] = c;
+                    buf[4*x + 3] = d;
+                }
+
+                if (l2 != null and r2 != null) {
+                    for (0..l2.?.len) |x| {
+                        const a: u8 = @intCast(l2.?[x] & 0xFF);
+                        const b: u8 = @intCast(l2.?[x] >>   8);
+                        const c: u8 = @intCast(r2.?[x] & 0xFF);
+                        const d: u8 = @intCast(r2.?[x] >>   8);
+
+                        const y = x + l1.len;
+
+                        buf[4*y + 0] = a;
+                        buf[4*y + 1] = b;
+                        buf[4*y + 2] = c;
+                        buf[4*y + 3] = d;
+                    }
+                }
+
+                const stdout_file   = std.io.getStdOut();
+                var   stdout_writer = stdout_file.writer();
+
+                try stdout_writer.writeAll(&buf);
             }
-
-            const stdout_file   = std.io.getStdOut();
-            var   stdout_writer = stdout_file.writer();
-
-            try stdout_writer.writeAll(&buf);
         }
     }
 
@@ -107,6 +145,7 @@ pub fn main() !void {
     std.debug.print("   v = Memory viewer \n", .{});
     std.debug.print("   r = DSP register map viewer \n", .{});
     std.debug.print("   b = DSP debug viewer \n", .{});
+    std.debug.print("   7 = Script700 debug viewer \n", .{});
     std.debug.print("Action commands: \n", .{});
     std.debug.print("   s = Step instruction [default] \n", .{});
     std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
@@ -229,6 +268,11 @@ pub fn main() !void {
                 std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print_dsp_debug_state(&emu, .{.is_dsp = true});
             },
+            '7' => {
+                cur_mode = '7';
+                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_script700_state(&emu);
+            },
             'w' => {
                 cur_action = 'w';
 
@@ -334,6 +378,10 @@ pub fn main() !void {
                 else if (cur_mode == 'b') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                }
+                else if (cur_mode == '7') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_script700_state(&emu);
                 }
             },
             else => {
