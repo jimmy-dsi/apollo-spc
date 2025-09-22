@@ -1846,8 +1846,11 @@ pub fn print_script700_state(emu: *Emu) void {
         std.debug.print("{X:0>16} ({d})\n", .{s7s.wait_until.?, s7s.wait_until.?});
     }
 
-    std.debug.print("Script Size : {X:0>6}\n",        .{s7.script_bytecode.len});
-    std.debug.print("Data Size   : {X:0>6} ",         .{s7.data_area.len});
-    std.debug.print("(PC={X:0>6} SP={X:0>2})\n",      .{s7s.pc, s7s.sp});
-    std.debug.print("Cur. Cycle  : {X:0>16} ({d})\n", .{s7s.cur_cycle, s7s.cur_cycle});
+    std.debug.print("Script Size : {X:0>6}\n",              .{s7.script_bytecode.len});
+    std.debug.print("Data Size   : {X:0>6} ",               .{s7.data_area.len});
+    std.debug.print("(PC={X:0>6} SP={X:0>2} ST={X:0>2})\n", .{s7s.pc, s7s.sp, s7s.sp_top});
+    std.debug.print("Cur. Cycle  : {X:0>16} ({d})\n",       .{s7s.cur_cycle, s7s.cur_cycle});
+    std.debug.print("Begin Cycle : {X:0>16} ({d})\n",       .{s7s.begin_cycle, s7s.begin_cycle});
+    //std.debug.print("Wait Accum  : {d}\n",                  .{s7s.wait_accum});
+    //std.debug.print("Clk Offset  : {d}\n",                  .{s7s.clock_offset});
 }

@@ -248,6 +248,10 @@ pub const Emu = struct {
         // To account for this, we will execute the step function for both the S-DSP and S-SMP every single DSP cycle.
         // All staggering execution delay will be handled in each one's own main loop function.
 
+        if (!self.script700.finished()) {
+            return; // Don't allow emulator to resume until a wait, quit, or error is triggered by Script700
+        }
+
         self.s_dsp.last_processed_cycle = self.s_dsp.clock_counter;
 
         var null_transition = false;
@@ -282,7 +286,7 @@ pub const Emu = struct {
             if (s7.state.wait_until) |wt| {
                 if (!s7.compat_mode) {
                     if (cycle == wt) {
-                        s7.resume_script(cycle, cycle, false);
+                        s7.resume_script(cycle, cycle, cycle, false);
                     }
                     else if (cycle % 2 == 0 and s7.state.wait_device == .input) {
                         const logs = self.s_smp.get_access_logs_range(cycle -| 2);
@@ -290,7 +294,7 @@ pub const Emu = struct {
 
                         for (logs) |log| {
                             if (log.type == .read and log.address == port_addr) {
-                                s7.resume_script(cycle, self.s_smp.prev_exec_cycle, true);
+                                s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                 break;
                             }
                         }
@@ -298,7 +302,7 @@ pub const Emu = struct {
                     else if (cycle % 2 == 0 and s7.state.wait_device == .output and s7.state.wait_value != null) {
                         const port_val = self.s_smp.state.output_ports[s7.state.wait_port];
                         if (s7.state.wait_value.?.* == port_val) {
-                            s7.resume_script(cycle, self.s_smp.prev_exec_cycle, true);
+                            s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                         }
                     }
                     else if (cycle % 2 == 0 and s7.state.wait_device == .output) {
@@ -307,7 +311,7 @@ pub const Emu = struct {
 
                         for (logs) |log| {
                             if (log.type == .write and log.address == port_addr) {
-                                s7.resume_script(cycle, self.s_smp.prev_exec_cycle, true);
+                                s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                 break;
                             }
                         }
@@ -315,7 +319,7 @@ pub const Emu = struct {
                 }
                 else if (self.s_smp.instr_boundary) { // In compat mode, Script700 can only resume during SPC instruction transition
                     if (cycle >= wt) {
-                        s7.resume_script(wt, self.s_smp.prev_exec_cycle, false);
+                        s7.resume_script(wt, wt, self.s_smp.prev_exec_cycle, false);
                     }
                     else if (s7.state.wait_device == .input) {
                         const logs = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
@@ -323,7 +327,7 @@ pub const Emu = struct {
 
                         for (logs) |log| {
                             if (log.type == .read and log.address == port_addr) {
-                                s7.resume_script(cycle, self.s_smp.prev_exec_cycle, true);
+                                s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                 break;
                             }
                         }
@@ -339,14 +343,14 @@ pub const Emu = struct {
 
                             // If input and output port are already equal 32 cycles after the previous sync point, resume
                             if (wv.* == port_val and cycle >= prev_sync_point + 32) {
-                                s7.resume_script(prev_sync_point + 32, self.s_smp.prev_exec_cycle, true);
+                                s7.resume_script(prev_sync_point + 32, cycle, self.s_smp.prev_exec_cycle, true);
                             }
                             else {
                                 // Otherwise, trigger on any IO port write where the specified port value equals the target value
                                 for (logs) |log| {
                                     const la = log.address;
                                     if (log.type == .write and la >= 0x00F4 and la <= 0x00F7 and wv.* == port_val) {
-                                        s7.resume_script(cycle, self.s_smp.prev_exec_cycle, true);
+                                        s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                         break;
                                     }
                                 }
@@ -355,7 +359,7 @@ pub const Emu = struct {
                         else {
                             for (logs) |log| {
                                 if (log.type == .write and log.address == port_addr) {
-                                    s7.resume_script(cycle, self.s_smp.prev_exec_cycle, true);
+                                    s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                     break;
                                 }
                             }
@@ -366,10 +370,6 @@ pub const Emu = struct {
 
             // Run Script700 if viable
             self.script700.run(.{});
-
-            if (!self.script700.finished()) {
-                return; // Don't allow emulator to resume until a wait, quit, or error is triggered by Script700
-            }
         }
     }
 

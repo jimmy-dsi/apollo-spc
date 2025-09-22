@@ -107,7 +107,7 @@ pub const Script700 = struct {
 
     pub inline fn finished(self: *Script700) bool {
         const result = self._finished;
-        self._finished = false;
+        //self._finished = false;
         return result;
     }
 
@@ -205,11 +205,11 @@ pub const Script700 = struct {
         self.state.step +%= 1;
     }
 
-    pub inline fn resume_script(self: *Script700, cur_cycle: u64, cur_begin_cycle: u64, dynamic_wait: bool) void {
+    pub inline fn resume_script(self: *Script700, cur_cycle: u64, cur_cycle_real: u64, cur_begin_cycle: u64, dynamic_wait: bool) void {
         const prev_cycle       = self.state.cur_cycle;
         const prev_begin_cycle = self.state.begin_cycle;
 
-        self.state.cur_cycle   = cur_cycle;
+        self.state.cur_cycle   = cur_cycle_real;
         self.state.begin_cycle = cur_begin_cycle;
 
         if (dynamic_wait) {
@@ -231,10 +231,13 @@ pub const Script700 = struct {
             }
         }
         else {
-            self.state.wait_accum = 0;
+            if (!self.compat_mode) {
+                self.state.wait_accum = 0;
+            }
         }
 
-        self.state.wait_until = null;
+        self.state.wait_until  = null;
+        self.state.wait_device = .none;
     }
 
     pub const Operands = struct {
@@ -394,6 +397,33 @@ pub const Script700 = struct {
             instr_type = 3;
             oper = 0b1010;
         }
+        else if (std.mem.eql(u8, mnemonic, "w")) {
+            instr_type = 2;
+            oper = 0b11000;
+        }
+        else if (std.mem.eql(u8, mnemonic, "wi")) {
+            instr_type = 2;
+            oper = 0b11001;
+        }
+        else if (std.mem.eql(u8, mnemonic, "wo")) {
+            instr_type = 2;
+            oper = 0b11010;
+        }
+        else if (std.mem.eql(u8, mnemonic, "bp")) {
+            instr_type = 2;
+            oper = 0b11100;
+        }
+        else if (std.mem.eql(u8, mnemonic, "iw")) {
+            instr_type = 2;
+            oper = 0b11101;
+        }
+        else if (std.mem.eql(u8, mnemonic, "iv")) {
+            instr_type = 2;
+            oper = 0b11011;
+        }
+        else {
+            return Compile.unencodable;
+        }
 
         switch (instr_type) {
             1 => {
@@ -460,10 +490,66 @@ pub const Script700 = struct {
                 }
             },
             2 => {
+                if (op.oper_1_prefix == null) {
+                    return Compile.unencodable;
+                }
 
+                const p1 = op.oper_1_prefix.?;
+
+                var v1: u32 = 0;
+
+                const s_mt_, const s_sz_, const s_dp = try parse_memtype(p1);
+
+                const s_mt = s_mt_ orelse .imm;
+                const s_sz = s_sz_ orelse 0;
+
+                if (!s_dp) {
+                    if (op.oper_1_value == null) {
+                        return Compile.unencodable;
+                    }
+                    v1 = op.oper_1_value.?;
+                }
+
+                try encode_type_2_instr(
+                    buffer,
+                    oper,
+                    s_mt, s_dp, s_sz, v1
+                );
             },
             3 => {
+                if (op.oper_1_prefix == null or op.oper_1_value == null) {
+                    return Compile.unencodable;
+                }
 
+                const p1 = op.oper_1_prefix.?;
+                const v1 = op.oper_1_value.?;
+
+                const s_mt_, _, const s_dp = try parse_memtype(p1);
+                const s_mt = s_mt_ orelse .imm;
+
+                if (s_dp) {
+                    return Compile.unencodable;
+                }
+
+                var icode: u32 = 0x9000_0000;
+                var param: u11 = 0b000_00000000;
+
+                icode |= @as(u32, oper) << 24;
+
+                switch (s_mt) {
+                    .imm => {
+                        param = 0b100_00000000;
+                        param |= @intCast(v1 & 0x3FF);
+                    },
+                    .work => {
+                        param = @intCast(v1 & 0b111);
+                    },
+                    else => {
+                        return Compile.unencodable;
+                    }
+                }
+
+                buffer[0] = icode | @as(u32, param);
             },
             else => unreachable
         }
@@ -627,6 +713,9 @@ pub const Script700 = struct {
 
                             self.state.clock_offset = 0;
                         }
+                        else if (self.state.clock_offset == 0) {
+                            self.state.wait_accum -= step_amt;
+                        }
                     }
                 }
                 else {
@@ -665,8 +754,9 @@ pub const Script700 = struct {
         switch (cmd) {
             0 => { // ret (r)
                 const cs_index = self.state.sp >> 2;
-                self.jump(self.state.callstack[cs_index], false);
-                if (self.state.sp > 0) {
+                // Treat return as NOP if we've reached the stack top already
+                if (self.state.sp != self.state.sp_top) {
+                    self.jump(self.state.callstack[cs_index], false);
                     self.state.sp +%= 4;
                 }
             },
@@ -1562,6 +1652,141 @@ pub const Script700 = struct {
         }
     }
 
+    inline fn encode_type_2_instr(buffer: []u32,
+                                  optype: u5,
+                                  src_memtype: MemType, src_dyn_ptr: bool, src_size: u2, src_addr: u32) Compile! void
+    {
+        var icode: u32 = 0x0000_0000;
+        icode = @as(u32, optype) << 27;
+
+        var enc_src: u5 = undefined;
+        var use_2nd_word: bool = false;
+
+        if (src_dyn_ptr) {
+            switch (src_memtype) {
+                .imm => {
+                    enc_src = 0b10100;
+                },
+                .port_in => {
+                    enc_src = 0b10101;
+                },
+                .port_out => {
+                    enc_src = 0b10110;
+                },
+                .work => {
+                    enc_src = 0b10111;
+                },
+                .aram => {
+                    if (src_size == 0) {
+                        enc_src = 0b11000;
+                    }
+                    else if (src_size == 1) {
+                        enc_src = 0b11001;
+                    }
+                    else if (src_size == 2) {
+                        enc_src = 0b11010;
+                    }
+                    else {
+                        return Compile.unencodable;
+                    }
+                },
+                .xram => {
+                    enc_src = 0b11011;
+                },
+                .data => {
+                    if (src_size == 0) {
+                        enc_src = 0b11100;
+                    }
+                    else if (src_size == 1) {
+                        enc_src = 0b11101;
+                    }
+                    else if (src_size == 2) {
+                        enc_src = 0b11110;
+                    }
+                    else {
+                        return Compile.unencodable;
+                    }
+                },
+                .label => {
+                    enc_src = 0b11111;
+                }
+            }
+        }
+        else {
+            switch (src_memtype) {
+                .port_in => {
+                    enc_src = @intCast(src_addr & 0b11);
+                },
+                .port_out => {
+                    enc_src = @intCast(src_addr & 0b11);
+                    enc_src |= 0b00100;
+                },
+                .work => {
+                    enc_src = @intCast(src_addr & 0b111);
+                    enc_src |= 0b01000;
+                },
+                .data => {
+                    enc_src = 0b10000;
+                },
+                .imm => {
+                    enc_src = 0b10001;
+                    use_2nd_word = true;
+                },
+                .aram, .xram => {
+                    enc_src = 0b10010;
+                },
+                .label => {
+                    enc_src = 0b10011;
+                }
+            }
+        }
+
+        if (use_2nd_word and buffer.len == 1) {
+            return Compile.no_space;
+        }
+
+        icode |= @as(u32, enc_src) << 22;
+
+        var enc_src_2: u22 = 0;
+    
+        switch (src_memtype) {
+            .label => {
+                enc_src_2 = @intCast(src_addr & 0x3FF);
+            },
+            .aram => {
+                enc_src_2 = @intCast(src_addr & 0xFFFF);
+                enc_src_2 |= @as(u22, src_size) << 16;
+            },
+            .xram => {
+                enc_src_2 = @intCast(src_addr & 0x003F);
+                enc_src_2 |= @as(u22, 0b11) << 16;
+            },
+            .data => {
+                enc_src_2 = @intCast(src_addr & 0xF_FFFF);
+                enc_src_2 |= @as(u22, src_size) << 20;
+            },
+            else => {
+                enc_src_2 = 0;
+            }
+        }
+
+        icode |= @as(u32, enc_src) << 22 | @as(u32, enc_src_2);
+        buffer[0] = icode;
+
+        if (use_2nd_word) {
+            var icode_2: u32 = 0x0000_0000;
+
+            switch (src_memtype) {
+                .imm => {
+                    icode_2 = src_addr;
+                },
+                else => unreachable
+            }
+
+            buffer[1] = icode_2;
+        }
+    }
+
     inline fn fetch(self: *Script700) u32 {
         if (self.state.pc >= self.script_bytecode.len) { // Terminate script if PC goes out of range
             return 0x80FFFFFF; // Return quit instruction
@@ -1697,6 +1922,10 @@ pub const Script700 = struct {
             if (use_stack and self.state.callstack_on) {
                 self.state.sp -%= 4;
                 self.state.callstack[self.state.sp >> 2] = self.state.pc;
+
+                if (self.state.sp == self.state.sp_top) {
+                    self.state.sp_top -%= 4; // Adjust stack top so that it's always 64 or fewer returns away from current SP
+                }
             }
             self.state.pc = address;
         }

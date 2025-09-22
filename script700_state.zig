@@ -10,6 +10,7 @@ pub const Script700State = struct {
 
     callstack: [64]u32 = [_]u32 {0} ** 64,
     sp: u8 = 0x00,
+    sp_top: u8 = 0x00,
 
     callstack_on:  bool = true,
     port_queue_on: bool = false,
