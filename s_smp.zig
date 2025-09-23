@@ -43,7 +43,9 @@ pub const SSMP = struct {
         address:    u16,
         pre_data:   ?u8 = null,
         write_data: ?u8 = null,
-        post_data:  ?u8 = null
+        post_data:  ?u8 = null,
+
+        s700_consumed: bool = false,
     };
 
     pub const TimerLogType = enum {

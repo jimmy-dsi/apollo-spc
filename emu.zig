@@ -353,21 +353,25 @@ pub const Emu = struct {
                         if (s7.state.wait_value) |wv| {
                             const port_val = self.s_smp.state.output_ports[s7.state.wait_port];
 
-                            // If input and output port are already equal 32 cycles after the previous sync point, resume
-                            if (wv.* == port_val and cycle == prev_sync_point + 32) {
-                                s7.resume_script(prev_sync_point + 32, cycle, self.s_smp.prev_exec_cycle, true);
-                            }
-                            else {
-                                // Otherwise, trigger on any IO port write where the specified port value equals the target value
-                                logs = logs_;
-                                while (logs.step()) {
-                                    const log = logs.value();
-                                    const la = log.address;
-                                    if (log.type == .write and la >= 0x00F4 and la <= 0x00F7 and wv.* == port_val) {
-                                        s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
-                                        break;
-                                    }
+                            var resumed: bool = false;
+
+                            // Trigger on any IO port write where the specified port value equals the target value
+                            logs = logs_;
+                            while (logs.step()) {
+                                const log = logs.ref();
+                                const la = log.address;
+
+                                if (!log.s700_consumed and log.type == .write and la >= 0x00F4 and la <= 0x00F7 and wv.* == port_val) {
+                                    log.s700_consumed = true;
+                                    s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
+                                    resumed = true;
+                                    break;
                                 }
+                            }
+
+                            // If input and output port are already equal 32 cycles after the previous sync point, resume regardless
+                            if (!resumed and wv.* == port_val and cycle >= prev_sync_point + 32) {
+                                s7.resume_script(prev_sync_point + 32, cycle, prev_sync_point + 32, true);
                             }
                         }
                         else {

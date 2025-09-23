@@ -8,6 +8,7 @@ pub fn RingBuffer(comptime T: type, comptime N: usize) type {
             current:  usize = 0,
 
             _cached: T = undefined,
+            _cached_idx: usize = 0,
             _consumed: usize = 0,
 
             pub inline fn new(parent: *Self, reverse: bool) Iter {
@@ -24,6 +25,8 @@ pub fn RingBuffer(comptime T: type, comptime N: usize) type {
                 }
 
                 self._cached = self.parent._buf[self.current];
+                self._cached_idx = self.current;
+
                 self._consumed += 1;
 
                 if (self.reverse) {
@@ -56,6 +59,14 @@ pub fn RingBuffer(comptime T: type, comptime N: usize) type {
 
             pub fn value(self: *const Iter) T {
                 return self._cached;
+            }
+
+            pub fn index(self: *const Iter) usize {
+                return self._cached_idx;
+            }
+
+            pub fn ref(self: *Iter) *T {
+                return &self.parent._buf[self._cached_idx];
             }
         };
 

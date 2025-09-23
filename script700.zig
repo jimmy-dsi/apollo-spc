@@ -214,7 +214,7 @@ pub const Script700 = struct {
         self.state.begin_cycle = cur_begin_cycle;
         self.state.sync_point  = @divFloor(cur_begin_cycle, 32) * 32;
 
-        const wr: i64 = @intCast(cur_cycle_real - self.state.sync_point);
+        const wr: i64 = @intCast(cur_cycle - self.state.sync_point);
 
         if (dynamic_wait) {
             if (self.compat_mode) {
