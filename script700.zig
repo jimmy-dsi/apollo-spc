@@ -207,22 +207,20 @@ pub const Script700 = struct {
 
     pub inline fn resume_script(self: *Script700, cur_cycle: u64, cur_cycle_real: u64, cur_begin_cycle: u64, dynamic_wait: bool) void {
         const prev_cycle       = self.state.cur_cycle;
-        const prev_begin_cycle = self.state.begin_cycle;
+        //const prev_begin_cycle = self.state.begin_cycle;
+        const prev_sync_point  = self.state.sync_point;
 
         self.state.cur_cycle   = cur_cycle_real;
         self.state.begin_cycle = cur_begin_cycle;
+        self.state.sync_point  = @divFloor(cur_begin_cycle, 32) * 32;
+
+        const wr: i64 = @intCast(cur_cycle_real - self.state.sync_point);
 
         if (dynamic_wait) {
             if (self.compat_mode) {
-                const wr: i64 = @intCast(cur_cycle % 32);
-                self.state.clock_offset = -32;
-                self.state.wait_accum = -wr;
+                self.state.clock_offset = 0;
+                self.state.wait_accum   = -wr;
 
-                if (self.state.wait_accum == 0) {
-                    self.state.wait_accum = -32;
-                }
-
-                const prev_sync_point: u64 = @divFloor(prev_begin_cycle, 32) * 32;
                 self.state.cmp[0] = @intCast((cur_cycle - prev_sync_point) & 0xFFFF_FFFF);
             }
             else {
@@ -231,7 +229,10 @@ pub const Script700 = struct {
             }
         }
         else {
-            if (!self.compat_mode) {
+            if (self.compat_mode) {
+                self.state.clock_offset = 0;
+            }
+            else {
                 self.state.wait_accum = 0;
             }
         }
@@ -703,18 +704,13 @@ pub const Script700 = struct {
                         const w: f64 = @floatFromInt(self.state.wait_accum);
                         const step_amt: i64 = @intFromFloat(@ceil(w / 32) * 32);
 
-                        self.state.clock_offset +|= step_amt;
+                        if (step_amt > 0) {
+                            const amt: u64 = @intCast(step_amt);
 
-                        if (self.state.clock_offset > 0) {
-                            const co: u64 = @intCast(self.state.clock_offset);
-
-                            self.state.wait_until = self.state.cur_cycle +| co;
+                            self.state.wait_until = self.state.sync_point +| amt;
                             self.state.wait_accum -= step_amt;
 
                             self.state.clock_offset = 0;
-                        }
-                        else if (self.state.clock_offset == 0) {
-                            self.state.wait_accum -= step_amt;
                         }
                     }
                 }

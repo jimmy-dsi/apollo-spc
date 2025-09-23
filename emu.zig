@@ -321,8 +321,11 @@ pub const Emu = struct {
                 }
                 else if (self.s_smp.instr_boundary) { // In compat mode, Script700 can only resume during SPC instruction transition
                     if (cycle >= wt) {
-                        s7.resume_script(wt, wt, self.s_smp.prev_exec_cycle, false);
+                        s7.resume_script(wt, wt, wt, false);
                     }
+                    //else if (cycle > wt) {
+                    //    s7.resume_script(wt, wt, self.s_smp.prev_exec_cycle, false);
+                    //}
                     else if (s7.state.wait_device == .input) {
                         var logs = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
                         const port_addr = 0x00F4 + @as(u16, s7.state.wait_port);

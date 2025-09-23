@@ -25,6 +25,7 @@ pub const Script700State = struct {
                            // In compat mode, Script700 has the SPC700 step ahead to the end of the current instruction
                            // But this value would reflect what the current cycle was before stepping ahead
     begin_cycle:  u64 = 0, // The cycle at which the currently executing SPC700 instruction began
+    sync_point:   u64 = 0, // The last multiple-of-32 cycle before the begin_cycle
     last_cycle:   u64 = 0, // The true state of the DSP clock counter when the Script700 was last run
     clock_offset: i64 = 0,
 
