@@ -1177,14 +1177,17 @@ pub fn print_dsp_cycle(emu: *Emu) void {
     std.debug.print("Cycle: {d} -> {d} (+{d})", .{prev_cycle, cycle, cycle - prev_cycle});
 }
 
-pub fn filter_access_logs(logs: []SSMP.AccessLog) [8]?SSMP.AccessLog {
-    var ignore_cycles = [8]?u64 {
+pub fn filter_access_logs(logs_: SSMP.LogBuffer.Iter) [16]?SSMP.AccessLog {
+    var ignore_cycles = [16]?u64 {
+        null, null, null, null, null, null, null, null,
         null, null, null, null, null, null, null, null
     };
-    var ignore_writes = [8]?u16 {
+    var ignore_writes = [16]?u16 {
+        null, null, null, null, null, null, null, null,
         null, null, null, null, null, null, null, null
     };
-    var filtered = [8]?SSMP.AccessLog {
+    var filtered = [16]?SSMP.AccessLog {
+        null, null, null, null, null, null, null, null,
         null, null, null, null, null, null, null, null
     };
 
@@ -1192,7 +1195,10 @@ pub fn filter_access_logs(logs: []SSMP.AccessLog) [8]?SSMP.AccessLog {
     var write_index:  u32 = 0;
     var filter_index: u32 = 0;
 
-    for (logs) |log| {
+    var logs = logs_;
+    while (logs.step()) {
+        const log = logs.value();
+
         const ignore =
             switch (log.type) {
                 SSMP.AccessType.fetch, SSMP.AccessType.exec, SSMP.AccessType.dummy_read => true,
@@ -1201,23 +1207,28 @@ pub fn filter_access_logs(logs: []SSMP.AccessLog) [8]?SSMP.AccessLog {
         if (ignore) {
             ignore_cycles[insert_index] = log.dsp_cycle;
             insert_index += 1;
-            if (insert_index == 8) {
+            if (insert_index == 16) {
                 break;
             }
         }
     }
 
-    for (logs) |log| {
+    logs = logs_;
+    while (logs.step()) {
+        const log = logs.value();
+
         if (log.type == SSMP.AccessType.write) {
             ignore_writes[write_index] = log.address;
             write_index += 1;
-            if (write_index == 8) {
+            if (write_index == 16) {
                 break;
             }
         }
     }
 
-    for (logs) |log| {
+    logs = logs_;
+    while (logs.step()) {
+        const log = logs.value();
         var ignore = false;
 
         for (ignore_cycles) |cycle| {
@@ -1237,7 +1248,7 @@ pub fn filter_access_logs(logs: []SSMP.AccessLog) [8]?SSMP.AccessLog {
         if (!ignore) {
             filtered[filter_index] = log;
             filter_index += 1;
-            if (filter_index == 8) {
+            if (filter_index == 16) {
                 break;
             }
         }
@@ -1379,7 +1390,7 @@ const OptionStruct = struct {
     prev_pc: ?u16 = null,
     prev_state: ?*const SMPState = null,
     is_dsp: bool = false,
-    logs: ?[]SSMP.AccessLog = null
+    logs: ?SSMP.LogBuffer.Iter = null
 };
 
 pub fn print_memory_page(emu: *Emu, page: u8, offset: u8, options: OptionStruct) void {
@@ -1626,8 +1637,10 @@ fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: Opt
         var is_read:  bool = false;
         var is_write: bool = false;
 
-        if (options.logs) |logs| {
-            for (logs) |log| {
+        if (options.logs) |_logs| {
+            var logs = _logs;
+            while (logs.step()) {
+                const log = logs.value();
                 if (!options.is_dsp and log.address == address or options.is_dsp and log.address == 0x00F3 and emu.s_smp.state.dsp_address == address) {
                     switch (log.type) {
                         SSMP.AccessType.dummy_read, SSMP.AccessType.exec, SSMP.AccessType.fetch => {

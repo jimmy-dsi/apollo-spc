@@ -52,6 +52,7 @@ pub fn main() !void {
     var sl: []u32 = undefined;
 
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "o", .oper_1_value =   0, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 1;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#", .oper_1_value =  31}); ix += 2;
     sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   1, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f",   .{}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "o", .oper_1_value =   0, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 1;
@@ -251,7 +252,8 @@ pub fn main() !void {
         std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
         //std.debug.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
 
-        const last_pc = emu.s_smp.spc.pc();
+        const last_cycle = emu.s_dsp.cur_cycle();
+        const last_pc    = emu.s_smp.spc.pc();
         const prev_state = emu.s_smp.state;
 
         sw: switch (std.ascii.toLower(buffer[0])) {
@@ -375,18 +377,18 @@ pub fn main() !void {
 
                 emu.step_instruction();
 
-                const all_logs = emu.s_smp.get_access_logs(.{.exclude_at_end = 0});
+                const all_logs = emu.s_smp.get_access_logs_range(last_cycle);
                 var logs = db.filter_access_logs(all_logs);
 
                 //var buffer_writer = std.io.countingWriter(std.io.getStdOut().writer());
                 //var writer = buffer_writer.writer();
-//
+                //
                 //for (all_logs) |log| {
                 //    _ = db.print_log(&prev_state, &log, &writer, .{}) catch 0;
                 //    std.debug.print("\n", .{});
                 //}
 
-                emu.s_smp.clear_access_logs();
+                //emu.s_smp.clear_access_logs();
 
                 if (cur_mode == 'i') {
                     try db.print_logs(&prev_state, logs[0..]);
@@ -413,18 +415,18 @@ pub fn main() !void {
                 }
                 else if (cur_mode == 'v') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                 }
                 else if (cur_mode == 'r') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                    db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
                     std.debug.print("\n", .{});
-                    db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                    db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                 }
                 else if (cur_mode == 'b') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs[0..]});
+                    db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                 }
                 else if (cur_mode == '7') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)

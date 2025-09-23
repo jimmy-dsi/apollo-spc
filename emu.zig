@@ -289,10 +289,11 @@ pub const Emu = struct {
                         s7.resume_script(cycle, cycle, cycle, false);
                     }
                     else if (cycle % 2 == 0 and s7.state.wait_device == .input) {
-                        const logs = self.s_smp.get_access_logs_range(cycle -| 2);
+                        var logs = self.s_smp.get_access_logs_range(cycle -| 2);
                         const port_addr = 0x00F4 + @as(u16, s7.state.wait_port);
 
-                        for (logs) |log| {
+                        while (logs.step()) {
+                            const log = logs.value();
                             if (log.type == .read and log.address == port_addr) {
                                 s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                 break;
@@ -306,10 +307,11 @@ pub const Emu = struct {
                         }
                     }
                     else if (cycle % 2 == 0 and s7.state.wait_device == .output) {
-                        const logs = self.s_smp.get_access_logs_range(cycle -| 2);
+                        var logs = self.s_smp.get_access_logs_range(cycle -| 2);
                         const port_addr = 0x00F4 + @as(u16, s7.state.wait_port);
 
-                        for (logs) |log| {
+                        while (logs.step()) {
+                            const log = logs.value();
                             if (log.type == .write and log.address == port_addr) {
                                 s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                 break;
@@ -322,10 +324,11 @@ pub const Emu = struct {
                         s7.resume_script(wt, wt, self.s_smp.prev_exec_cycle, false);
                     }
                     else if (s7.state.wait_device == .input) {
-                        const logs = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
+                        var logs = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
                         const port_addr = 0x00F4 + @as(u16, s7.state.wait_port);
 
-                        for (logs) |log| {
+                        while (logs.step()) {
+                            const log = logs.value();
                             if (log.type == .read and log.address == port_addr) {
                                 s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                 break;
@@ -333,7 +336,13 @@ pub const Emu = struct {
                         }
                     }
                     else if (s7.state.wait_device == .output) {
-                        const logs = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
+                        const logs_ = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
+                        var logs = logs_;
+
+                        //while (logs.step()) {
+                        //    const log = logs.value();
+                        //    std.debug.print("\nlog {d} {s} {X:0>4}\n", .{log.dsp_cycle, @tagName(log.type), log.address});
+                        //}
                         const port_addr = 0x00F4 + @as(u16, s7.state.wait_port);
 
                         const prev_sync_point: u64 = @divFloor(s7.state.begin_cycle, 32) * 32;
@@ -342,12 +351,14 @@ pub const Emu = struct {
                             const port_val = self.s_smp.state.output_ports[s7.state.wait_port];
 
                             // If input and output port are already equal 32 cycles after the previous sync point, resume
-                            if (wv.* == port_val and cycle >= prev_sync_point + 32) {
+                            if (wv.* == port_val and cycle == prev_sync_point + 32) {
                                 s7.resume_script(prev_sync_point + 32, cycle, self.s_smp.prev_exec_cycle, true);
                             }
                             else {
                                 // Otherwise, trigger on any IO port write where the specified port value equals the target value
-                                for (logs) |log| {
+                                logs = logs_;
+                                while (logs.step()) {
+                                    const log = logs.value();
                                     const la = log.address;
                                     if (log.type == .write and la >= 0x00F4 and la <= 0x00F7 and wv.* == port_val) {
                                         s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
@@ -357,7 +368,9 @@ pub const Emu = struct {
                             }
                         }
                         else {
-                            for (logs) |log| {
+                            logs = logs_;
+                            while (logs.step()) {
+                                const log = logs.value();
                                 if (log.type == .write and log.address == port_addr) {
                                     s7.resume_script(cycle, cycle, self.s_smp.prev_exec_cycle, true);
                                     break;

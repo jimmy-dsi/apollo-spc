@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const RingBuffer = @import("common/ring_buf.zig").RingBuffer;
+
 const Emu       = @import("emu.zig").Emu;
 const SDSP      = @import("s_dsp.zig").SDSP;
 const SMPState  = @import("smp_state.zig").SMPState;
@@ -13,6 +15,8 @@ const Co = CoState.Co;
 pub const SSMP = struct {
     pub const cycles_per_sample: u32 = SDSP.cycles_per_sample / 2;
     pub const clock_rate:        u32 = SDSP.sample_rate * cycles_per_sample;
+
+    pub const LogBuffer = RingBuffer(AccessLog, 256);
 
     pub const Options = struct {
         a: ?u8 = null,
@@ -79,11 +83,7 @@ pub const SSMP = struct {
     last_read_bytes: [3]u8 = [3]u8 { 0x00, 0x00, 0x00 },
 
     enable_access_logs: bool = false,
-    access_logs: [256]AccessLog = undefined,
-    last_log_index: u32 = 0,
-
-    secondary_access_logs: [32]AccessLog = undefined,
-    secondary_log_index: u32 = 0,
+    access_logs: LogBuffer = .{},
 
     enable_timer_logs: bool = false,
     timer_logs: [256]TimerLog = undefined,
@@ -252,81 +252,26 @@ pub const SSMP = struct {
         }
     }
 
-    pub fn get_access_logs(self: *SSMP, options: struct { exclude_at_end: u32 = 0 }) []AccessLog {
-        if (options.exclude_at_end > self.last_log_index) {
-            return self.access_logs[0..self.last_log_index];
-        }
-        else {
-            return self.access_logs[0..(self.last_log_index - options.exclude_at_end)];
-        }
+    pub fn get_access_logs(self: *SSMP, _: struct { exclude_at_end: u32 = 0 }) LogBuffer.Iter {
+        return self.access_logs.iter(false);
     }
 
-    pub fn get_access_logs_range(self: *SSMP, start_cycle: u64) []AccessLog {
-        if (self.secondary_log_index > 0) {
-            // If secondary logs are present, read from those instead
-            var start_index: i32 = @intCast(self.secondary_log_index);
-            while (start_index >= 0) {
-                const si: usize = @intCast(start_index);
-                if (self.secondary_access_logs[si].dsp_cycle < start_cycle) {
-                    break;
-                }
-                start_index -= 1;
+    pub fn get_access_logs_range(self: *SSMP, start_cycle: u64) LogBuffer.Iter {
+        var iter = self.access_logs.iter(true);
+        while (iter.step()) {
+            if (iter.value().dsp_cycle < start_cycle) {
+                break;
             }
-
-            if (start_index < 0) {
-                start_index = 0;
-            }
-
-            const si_: usize = @intCast(start_index);
-            return self.secondary_access_logs[si_..];
         }
-        else {
-            // Otherwise, grab from main log array
-            var start_index: i32 = @intCast(self.last_log_index);
-            while (start_index >= 0) {
-                const si: usize = @intCast(start_index);
-                if (self.access_logs[si].dsp_cycle < start_cycle) {
-                    break;
-                }
-                start_index -= 1;
-            }
 
-            if (start_index < 0) {
-                start_index = 0;
-            }
+        var fw_iter = iter.get_reversed();
+        _ = fw_iter.step();
 
-            const si_: usize = @intCast(start_index);
-            return self.access_logs[si_..];
-        }
+        return fw_iter;
     }
 
     pub fn clear_access_logs(self: *SSMP) void {
-        // Copy to secondary buffer, for Script700 to use if main one has been cleared
-        if (self.last_log_index > 32) {
-            var index:   u32 = self.last_log_index - 1;
-            var s_index: i32 = 31;
-
-            while (s_index >= 0) {
-                const si: usize = @intCast(s_index);
-                const i:  usize = @intCast(index);
-
-                self.secondary_access_logs[si] = self.access_logs[i];
-                index   -= 1;
-                s_index -= 1;
-            }
-
-            self.secondary_log_index = 32;
-        }
-        else {
-            for (0..self.last_log_index) |i| {
-                self.secondary_access_logs[i] = self.access_logs[i];
-            }
-            self.secondary_log_index = self.last_log_index;
-        }
-
-        // Clear the main log buffer
-        self.access_logs[0] = .{ .dsp_cycle = 0, .address = 0 };
-        self.last_log_index = 0;
+        self.access_logs = .{};
     }
 
     inline fn append_read_log(self: *SSMP, address: u16, data: u8) void {
@@ -384,13 +329,7 @@ pub const SSMP = struct {
     }
 
     inline fn append_access_log(self: *SSMP, entry: AccessLog) void {
-        if (self.last_log_index < self.access_logs.len) {
-            self.access_logs[self.last_log_index] = entry;
-            self.last_log_index += 1;
-        }
-        if (self.last_log_index < self.access_logs.len) {
-            self.access_logs[self.last_log_index] = .{ .dsp_cycle = 0, .address = 0 };
-        }
+        self.access_logs.push(entry);
     }
 
     pub fn get_timer_logs(self: *SSMP, options: struct { exclude_at_end: u32 = 0 }) []TimerLog {
