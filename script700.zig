@@ -3,6 +3,8 @@ const std = @import("std");
 const State = @import("script700_state.zig").Script700State;
 const Emu   = @import("emu.zig").Emu;
 
+const db = @import("debug.zig");
+
 pub const Script700 = struct {
     pub const RunOptions = struct {
         max_steps: u32 = 1000
@@ -891,7 +893,7 @@ pub const Script700 = struct {
                         result = @as(u32, value);
                     },
                     2 => {
-                        const value = self.read_u32(info.src_memtype, address) & 0xFFFF;
+                        const value = self.read_u32(info.src_memtype, address);
                         result = value;
                     }
                 }
