@@ -60,6 +60,8 @@ pub fn main() !void {
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f",   .{}); ix += 1;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   3, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f",   .{}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   5, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f",   .{}); ix += 1;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   3, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "f",   .{}); ix += 1;
     sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#", .oper_1_value =  33}); ix += 2;

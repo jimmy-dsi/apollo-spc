@@ -320,6 +320,12 @@ pub const Emu = struct {
                     }
                 }
                 else if (self.s_smp.instr_boundary) { // In compat mode, Script700 can only resume during SPC instruction transition
+                    var begin_cycle: u64 = @max(self.s_smp.prev_exec_cycle, s7.state.sync_point);
+                    if (begin_cycle > self.s_smp.prev_exec_cycle) {
+                        begin_cycle = cycle;
+                    }
+                    begin_cycle += 1;
+
                     if (cycle >= wt) {
                         s7.resume_script(wt, wt, wt, false);
                     }
@@ -327,7 +333,7 @@ pub const Emu = struct {
                     //    s7.resume_script(wt, wt, self.s_smp.prev_exec_cycle, false);
                     //}
                     else if (s7.state.wait_device == .input) {
-                        var logs = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
+                        var logs = self.s_smp.get_access_logs_range(begin_cycle);
                         const port_addr = 0x00F4 + @as(u16, s7.state.wait_port);
 
                         while (logs.step()) {
@@ -339,7 +345,7 @@ pub const Emu = struct {
                         }
                     }
                     else if (s7.state.wait_device == .output) {
-                        const logs_ = self.s_smp.get_access_logs_range(self.s_smp.prev_exec_cycle);
+                        const logs_ = self.s_smp.get_access_logs_range(begin_cycle);
                         var logs = logs_;
 
                         //while (logs.step()) {
