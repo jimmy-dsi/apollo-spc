@@ -725,7 +725,7 @@ fn determine_format(id666_main_pt2: []const u8) ID666Fmt {
         binary_score -= 2;
     }
     else {
-        binary_score += 10;
+        binary_score += 4;
     }
 
     const emu_id = id666_main_pt2[(0xD2 - 0x9E)..(0xD3 - 0x9E)];
