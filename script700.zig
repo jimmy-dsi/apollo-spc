@@ -965,17 +965,29 @@ pub const Script700 = struct {
                 final_result = dest_result *% result;
             },
             .div => {
+                if (rhs_s == 0) {
+                    return; // No operation if attempted division by zero
+                }
                 const res: i32 = @divFloor(lhs_s, rhs_s);
                 final_result = @bitCast(res);
             },
             .udiv => {
+                if (result == 0) {
+                    return; // No operation if attempted division by zero
+                }
                 final_result = dest_result / result;
             },
             .mod => {
-                const res: i32 = @mod(lhs_s, rhs_s);
+                if (rhs_s == 0) {
+                    return; // No operation if attempted division by zero
+                }
+                const res: i32 = @rem(lhs_s, rhs_s);
                 final_result = @bitCast(res);
             },
             .umod => {
+                if (result == 0) {
+                    return; // No operation if attempted division by zero
+                }
                 final_result = dest_result % result;
             },
             .band => {
