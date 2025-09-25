@@ -56,8 +56,8 @@ pub const Script700 = struct {
         };
     }
 
-    pub fn init(self: *Script700, script_bytecode: []u32) void {
-        self.load_bytecode(script_bytecode);
+    pub fn init(self: *Script700, script_bytecode: []u32) Load! void {
+        try self.load_bytecode(script_bytecode);
 
         for (0..1024) |i| {
             self.label_addresses[i] = 0xFFFFFFFF;
@@ -84,7 +84,14 @@ pub const Script700 = struct {
         }
     }
 
-    pub fn load_bytecode(self: *Script700, script_bytecode: []u32) void {
+    pub const Load = error { bytecode_too_large };
+
+    pub fn load_bytecode(self: *Script700, script_bytecode: []u32) Load! void {
+        if (script_bytecode.len > 0x1000_0000) {
+            // Script bytecode cannot be more than 0x10000000 32-bit words (or 1 GB of data)
+            return Load.bytecode_too_large;
+        }
+
         self.enabled = true;
         self.script_bytecode = script_bytecode;
         self.initialized = false;
@@ -120,6 +127,8 @@ pub const Script700 = struct {
                 self.state.wait_until = self.state.cur_cycle +| 32;
             }
             self.initialized = true;
+            self._finished = true;
+            return;
         }
 
         self.state.step = 0;
@@ -143,7 +152,7 @@ pub const Script700 = struct {
     }
 
     pub inline fn step_instruction(self: *Script700) !void {
-        const instr = self.fetch();
+        const instr = try self.fetch();
 
         // Apollo Script700 extended instructions
         if ((instr & 0xFF00_0000) >> 24 == 0b11110111) { // Extended commands group 1
@@ -164,10 +173,10 @@ pub const Script700 = struct {
             }
         }
         else if ((instr & 0xF800_0000) >> 27 == 0b11101) { // Send interrupt instruction and wait format
-            self.proc_instr_send_int_wait(instr);
+            try self.proc_instr_send_int_wait(instr);
         }
         else if ((instr & 0xF800_0000) >> 27 == 0b11011) { // Set interrupt vector instruction format
-            self.proc_instr_set_vector(instr);
+            try self.proc_instr_set_vector(instr);
         }
         // Original Script700 instructions
         else if (instr & 0x8000_0000 == 0) { // General instruction format
@@ -177,13 +186,13 @@ pub const Script700 = struct {
             self.proc_instr_branch(instr);
         }
         else if ((instr & 0xE000_0000) >> 29 == 0b110) { // Wait instruction format
-            self.proc_instr_wait(instr);
+            try self.proc_instr_wait(instr);
         }
         else if ((instr & 0xF800_0000) >> 27 == 0b11100) { // Breakpoint instruction format
-            self.proc_instr_bp(instr);
+            try self.proc_instr_bp(instr);
         }
         else if ((instr & 0xFF00_0000) >> 24 == 0b11110011) { // Set CMPx instruction format (Supplemental command)
-            self.proc_instr_set_cmp(instr);
+            try self.proc_instr_set_cmp(instr);
         }
         else if ((instr & 0xFC00_0000) >> 26 == 0b111100) { // Return instruction format
             self.proc_instr_return(instr);
@@ -689,8 +698,8 @@ pub const Script700 = struct {
         }
     }
 
-    inline fn proc_instr_wait(self: *Script700, instr: u32) void {
-        const result = self.process_type_2_instr(instr);
+    inline fn proc_instr_wait(self: *Script700, instr: u32) Runtime! void {
+        const result = try self.process_type_2_instr(instr);
 
         const cmd: u2 = @intCast((instr & 0x1800_0000) >> 27);
         switch (cmd) {
@@ -735,14 +744,14 @@ pub const Script700 = struct {
         }
     }
 
-    inline fn proc_instr_bp(self: *Script700, instr: u32) void {
-        const aram_addr: u16 = @intCast(self.process_type_2_instr(instr) & 0xFFFF);
+    inline fn proc_instr_bp(self: *Script700, instr: u32) Runtime! void {
+        const aram_addr: u16 = @intCast(try self.process_type_2_instr(instr) & 0xFFFF);
         self.state.enable_breakpoint(aram_addr);
     }
 
-    inline fn proc_instr_set_cmp(self: *Script700, instr: u32) void {
+    inline fn proc_instr_set_cmp(self: *Script700, instr: u32) Runtime! void {
         const cmp_index: u1 = @intCast(instr >> 23 & 1);
-        const imm = self.fetch();
+        const imm = try self.fetch();
 
         self.state.cmp[cmp_index] = imm;
     }
@@ -801,11 +810,11 @@ pub const Script700 = struct {
         self.state.cmp[1] = if (successful) 1 else 0;
     }
 
-    inline fn proc_instr_send_int_wait(self: *Script700, instr: u32) void {
+    inline fn proc_instr_send_int_wait(self: *Script700, instr: u32) Runtime! void {
         const successful = self.emu.s_smp.spc.trigger_interrupt(null);
         self.state.cmp[1] = if (successful) 1 else 0;
 
-        const out_port: u2 = @intCast(self.process_type_2_instr(instr) & 3);
+        const out_port: u2 = @intCast(try self.process_type_2_instr(instr) & 3);
 
         if (successful) {
             self.state.set_wait_condition(.output, out_port, null);
@@ -822,8 +831,8 @@ pub const Script700 = struct {
         self.state.cmp[1] = prev_cmp_0;
     }
 
-    inline fn proc_instr_set_vector(self: *Script700, instr: u32) void {
-        const new_vector: u16 = @intCast(self.process_type_2_instr(instr) & 0xFFFF);
+    inline fn proc_instr_set_vector(self: *Script700, instr: u32) Runtime! void {
+        const new_vector: u16 = @intCast(try self.process_type_2_instr(instr) & 0xFFFF);
         self.emu.s_smp.update_interrupt_vector(new_vector);
     }
 
@@ -833,13 +842,13 @@ pub const Script700 = struct {
         if (!info.src_dyn_ptr) {
             switch (info.src_memtype) {
                 .data => {
-                    const next = self.fetch();
+                    const next = try self.fetch();
                     info.src_data_size = @intCast(next >> 20 & 0b11);
                     info.src_address   = @intCast(next & 0x000F_FFFF);
                 },
                 .imm => { },
                 .aram, .xram => {
-                    const next = self.fetch();
+                    const next = try self.fetch();
                     info.src_data_size = @intCast(next >> 16 & 0b11);
                     info.src_address   = next & 0xFFFF;
                     if (info.src_data_size == 3) {
@@ -847,7 +856,7 @@ pub const Script700 = struct {
                     }
                 },
                 .label => {
-                    const next = self.fetch();
+                    const next = try self.fetch();
                     info.src_address = next & 0x03FF;
                 },
                 else => { }
@@ -879,7 +888,7 @@ pub const Script700 = struct {
                     if (info.src_dyn_ptr)
                         address
                     else
-                        self.fetch();
+                        try self.fetch();
                 result = value;
             },
             else => {
@@ -1064,7 +1073,7 @@ pub const Script700 = struct {
         }
     } 
 
-    inline fn process_type_2_instr(self: *Script700, instr: u32) u32 {
+    inline fn process_type_2_instr(self: *Script700, instr: u32) Runtime! u32 {
         const info = decode_type_2_instr(instr);
         
         var result: u32 = undefined;
@@ -1089,7 +1098,7 @@ pub const Script700 = struct {
                     if (info.dyn_ptr)
                         address
                     else
-                        self.fetch();
+                        try self.fetch();
                 result = value;
             },
             else => {
@@ -1797,9 +1806,11 @@ pub const Script700 = struct {
         }
     }
 
-    inline fn fetch(self: *Script700) u32 {
+    pub const Runtime = error { fetch_range };
+
+    inline fn fetch(self: *Script700) Runtime! u32 {
         if (self.state.pc >= self.script_bytecode.len) { // Terminate script if PC goes out of range
-            return 0x80FFFFFF; // Return quit instruction
+            return Runtime.fetch_range; // Return fetch out of range error
         }
 
         const instr = self.script_bytecode[self.state.pc];
