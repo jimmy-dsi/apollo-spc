@@ -5,6 +5,8 @@ const SSMP      = @import("s_smp.zig").SSMP;
 const Script700 = @import("script700.zig").Script700;
 
 pub const Emu = struct {
+    pub const Error = error { Timeout };
+
     pub const DebugMode = enum {
         none, shadow_mode, shadow_exec
     };
@@ -249,23 +251,61 @@ pub const Emu = struct {
         }
     }
 
-    pub fn step_instruction(self: *Emu) void {
-        self.step();
-        // TODO: Add timeout for infinite loop protection
-        while (!self.s_smp.instr_boundary) {
-            self.step();
+    pub fn step_instruction(self: *Emu) Error! void {
+        if (self.script700.enabled) {
+            try self.step_cycle(true);
+            // Add timeout for infinite loop protection
+            var steps: u32 = 0;
+            while (!self.s_smp.instr_boundary) {
+                const prev_cycle = self.s_dsp.clock_counter;
+
+                if (steps == StepTimeout) {
+                    return Error.Timeout;
+                }
+
+                self.step();
+
+                if (self.s_dsp.clock_counter == prev_cycle) {
+                    steps += 1;
+                }
+                else {
+                    steps = 0;
+                }
+            }
+        }
+        else {
+            self.step_cycle_fast();
+            while (!self.s_smp.instr_boundary) {
+                self.step();
+            }
         }
     }
 
-    pub fn event_loop(self: *Emu) void {
-        for (0..200) |_| {
-            self.step();
+    pub inline fn step_cycle(self: *Emu, comptime script700_enabled: bool) Error! void {
+        if (script700_enabled) {
+            try self.step_cycle_safe();
+        }
+        else {
+            self.step_cycle_fast();
         }
     }
 
-    pub fn step_cycle(self: *Emu) void {
+    pub inline fn step_cycle_safe(self: *Emu) Error! void {
         const cur_cycle = self.s_dsp.clock_counter;
-        // TODO: Add timeout for infinite loop protection
+        
+        // Add timeout for infinite loop protection
+        var steps: u32 = 0;
+        while (self.s_dsp.clock_counter == cur_cycle) {
+            if (steps == StepTimeout) {
+                return Error.Timeout;
+            }
+            self.step();
+            steps += 1;
+        }
+    }
+
+    pub inline fn step_cycle_fast(self: *Emu) void {
+        const cur_cycle = self.s_dsp.clock_counter;
         while (self.s_dsp.clock_counter == cur_cycle) {
             self.step();
         }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Atomic = std.atomic.Value;
 
 const db = @import("debug.zig");
@@ -13,7 +14,12 @@ const spc_loader = @import("spc_loader.zig");
 var t_started    = Atomic(bool).init(false);
 var break_signal = Atomic(bool).init(false);
 
+var stdout_file: std.fs.File = undefined;
+
 pub fn main() !void {
+    const stdout = std.io.getStdOut();
+    stdout_file = stdout;
+
     // Get SPC file path from cmd line argument - if present
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -55,7 +61,13 @@ pub fn main() !void {
     
     var sl: []u32 = undefined;
 
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 20480000}); ix += 2;
+    emu.script700.label_addresses[0] = ix;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
+
+
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
 
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value = 6000, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "r0",  .{}); ix += 1;
@@ -74,31 +86,31 @@ pub fn main() !void {
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 4096000}); ix += 2;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value = 0x2A, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
 
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   1, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   0, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
-    emu.script700.label_addresses[0] = ix;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "db?", .oper_2_prefix =  "w", .oper_2_value  =    2}); ix += 1;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  = 0xFF, .oper_2_prefix =  "w", .oper_2_value =   2}); ix += 2;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bne", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "dd?", .oper_2_prefix =  "w", .oper_2_value  =    1}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
-    emu.script700.label_addresses[1] = ix;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "db?", .oper_2_prefix =  "w", .oper_2_value  =    3}); ix += 1;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "dd?", .oper_2_prefix =  "w", .oper_2_value  =    4}); ix += 1;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    4, .oper_2_prefix =  "w", .oper_2_value  =   1}); ix += 2;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    3, .oper_2_prefix =   "", .oper_2_value  =   1}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    2, .oper_2_prefix =   "", .oper_2_value  =   2}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    0, .oper_2_prefix =   "", .oper_2_value  =   0}); ix += 1;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "n",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .operator      =  '^', .oper_2_prefix = "w", .oper_2_value = 0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x35}); ix += 2;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "w",   .oper_1_value  =    4}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   1, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   0, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
+    //emu.script700.label_addresses[0] = ix;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "db?", .oper_2_prefix =  "w", .oper_2_value  =    2}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  = 0xFF, .oper_2_prefix =  "w", .oper_2_value =   2}); ix += 2;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bne", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "dd?", .oper_2_prefix =  "w", .oper_2_value  =    1}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
+    //emu.script700.label_addresses[1] = ix;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "db?", .oper_2_prefix =  "w", .oper_2_value  =    3}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "dd?", .oper_2_prefix =  "w", .oper_2_value  =    4}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    4, .oper_2_prefix =  "w", .oper_2_value  =   1}); ix += 2;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    3, .oper_2_prefix =   "", .oper_2_value  =   1}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    2, .oper_2_prefix =   "", .oper_2_value  =   2}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    0, .oper_2_prefix =   "", .oper_2_value  =   0}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "n",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .operator      =  '^', .oper_2_prefix = "w", .oper_2_value = 0}); ix += 2;
+    ////sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x35}); ix += 2;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "w",   .oper_1_value  =    4}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
 
     var data = blk: {
         const embed_u8 = @embedFile("data/c700-test.bin");
@@ -141,7 +153,11 @@ pub fn main() !void {
         if (!debug_mode) {
             t_started.store(true, std.builtin.AtomicOrder.seq_cst);
             while (true) {
-                const res = try run_loop(&emu);
+                const res = run_loop(&emu) catch {
+                    std.debug.print("Script700 timed out\n", .{});
+                    stdout_file.close();
+                    std.process.exit(1);
+                };
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
 
                 if (!res) {
@@ -238,7 +254,11 @@ pub fn main() !void {
                 t_started.store(true, std.builtin.AtomicOrder.seq_cst);
 
                 cur_action = 'c';
-                const res = try run_loop(&emu);
+                const res = run_loop(&emu) catch {
+                    std.debug.print("Script700 timed out\n", .{});
+                    stdout_file.close();
+                    std.process.exit(1);
+                };
 
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
 
@@ -377,7 +397,11 @@ pub fn main() !void {
                     std.debug.print("  ", .{});
                 }
 
-                emu.step_instruction();
+                emu.step_instruction() catch {
+                    std.debug.print("Script700 timed out\n", .{});
+                    stdout_file.close();
+                    std.process.exit(1);
+                };
 
                 const all_logs = emu.s_smp.get_access_logs_range(last_cycle);
                 var logs = db.filter_access_logs(all_logs);
@@ -464,11 +488,22 @@ pub fn main() !void {
 
 fn run_loop(emu: *Emu) !bool {
     const samples = 1000;
+    const cycles  = samples * 64;
 
-    for (0..(samples * 64)) |_| {
-        emu.step_cycle();
-        if (emu.break_check()) {
-            return false;
+    if (emu.script700.enabled) {
+        for (0..cycles) |_| {
+            try emu.step_cycle_safe();
+            if (emu.break_check()) {
+                return false;
+            }
+        }
+    }
+    else {
+        for (0..cycles) |_| {
+            emu.step_cycle_fast();
+            if (emu.break_check()) {
+                return false;
+            }
         }
     }
 
@@ -503,8 +538,7 @@ fn run_loop(emu: *Emu) !bool {
         }
     }
 
-    const stdout_file   = std.io.getStdOut();
-    var   stdout_writer = stdout_file.writer();
+    var stdout_writer = stdout_file.writer();
 
     try stdout_writer.writeAll(&buf);
 
