@@ -1285,7 +1285,7 @@ const WriterType = @TypeOf(blk: {
 });
 
 pub fn print_logs(state: *const SMPState, logs: []?SSMP.AccessLog) !void {
-    var buffer_writer = std.io.countingWriter(std.io.getStdOut().writer());
+    var buffer_writer = std.io.countingWriter(std.io.getStdErr().writer());
     var writer = buffer_writer.writer();
 
     var pad_length: u32 = 63;

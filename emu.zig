@@ -14,6 +14,7 @@ pub const Emu = struct {
         force_exit:    bool = false
     };
 
+    const StepTimeout = 10_000;
     const DacBufSize = 96_000;
 
     pub var rand: std.Random = undefined;
@@ -23,6 +24,8 @@ pub const Emu = struct {
     s_smp: SSMP,
 
     script700: Script700,
+
+    break_exec: bool = false,
 
     dac_buffer_left:  [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
     dac_buffer_right: [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
@@ -113,6 +116,35 @@ pub const Emu = struct {
 
         const start_2: u32 = 0;
         const end_2:   u32 = self.dac_buffer_offset;
+
+        return .{
+            self.dac_buffer_left [start_1..end_1],
+            self.dac_buffer_right[start_1..end_1],
+            self.dac_buffer_left [start_2..end_2],
+            self.dac_buffer_right[start_2..end_2],
+        };
+    }
+
+    pub fn view_dac_samples(self: *Emu, length: u32) struct {[]i16, []i16, ?[]i16, ?[]i16} {
+        const start_1 = (self.dac_buffer_offset + DacBufSize - length) % DacBufSize;
+        const end_1 =
+            if (start_1 + length <= DacBufSize)
+                start_1 + length
+            else
+                DacBufSize;
+
+        const has_second = start_1 + length > DacBufSize;
+
+        if (!has_second) {
+            return .{
+                self.dac_buffer_left [start_1..end_1],
+                self.dac_buffer_right[start_1..end_1],
+                null, null
+            };
+        }
+
+        const start_2: u32 = 0;
+        const end_2:   u32 = (start_1 + length) % DacBufSize;
 
         return .{
             self.dac_buffer_left [start_1..end_1],
@@ -300,12 +332,22 @@ pub const Emu = struct {
         self.s_dsp.unpause();
     }
 
+    pub inline fn break_check(self: *Emu) bool {
+        const res = self.break_exec;
+        self.break_exec = false;
+        return res;
+    }
+
     inline fn run_script700(self: *Emu) void {
         const cycle = self.s_dsp.clock_counter;
         const s7 = &self.script700;
 
         // Resume Script700 processing if viable
         if (s7.state.wait_until) |wt| {
+            if (self.s_smp.instr_boundary and s7.state.has_breakpoint(self.s_smp.spc.pc())) {
+                self.break_exec = true;
+            }
+
             if (!s7.compat_mode) {
                 if (cycle == wt) {
                     s7.resume_script(cycle, cycle, cycle, false);

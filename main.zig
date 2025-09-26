@@ -1,4 +1,5 @@
 const std = @import("std");
+const Atomic = std.atomic.Value;
 
 const db = @import("debug.zig");
 
@@ -8,6 +9,9 @@ const SSMP      = @import("s_smp.zig").SSMP;
 const Script700 = @import("script700.zig").Script700;
 
 const spc_loader = @import("spc_loader.zig");
+
+var t_started    = Atomic(bool).init(false);
+var break_signal = Atomic(bool).init(false);
 
 pub fn main() !void {
     // Get SPC file path from cmd line argument - if present
@@ -51,6 +55,8 @@ pub fn main() !void {
     
     var sl: []u32 = undefined;
 
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
+
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value = 6000, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "r0",  .{}); ix += 1;
     //emu.script700.label_addresses[0] = ix;
@@ -90,6 +96,7 @@ pub fn main() !void {
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    2, .oper_2_prefix =   "", .oper_2_value  =   2}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    0, .oper_2_prefix =   "", .oper_2_value  =   0}); ix += 1;
     sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "n",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .operator      =  '^', .oper_2_prefix = "w", .oper_2_value = 0}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x35}); ix += 2;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "w",   .oper_1_value  =    4}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
 
@@ -111,6 +118,9 @@ pub fn main() !void {
     emu.script700.load_data(data[0..]);
     emu.script700.run(.{});
 
+    var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
+    defer t_break_listener.join();
+
     // Load SPC file from path if present
     if (spc_file_path) |path| {
         var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
@@ -129,46 +139,15 @@ pub fn main() !void {
         try metadata.print();
     
         if (!debug_mode) {
+            t_started.store(true, std.builtin.AtomicOrder.seq_cst);
             while (true) {
-                for (0..2048000) |_| {
-                    emu.step_cycle();
+                const res = try run_loop(&emu);
+                break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
+
+                if (!res) {
+                    t_started.store(false, std.builtin.AtomicOrder.seq_cst);
+                    break;
                 }
-
-                const l1, const r1, const l2, const r2 = emu.consume_dac_samples();
-                var buf: [128000]u8 = [_]u8 {0} ** 128000;
-
-                for (0..l1.len) |x| {
-                    const a: u8 = @intCast(l1[x] & 0xFF);
-                    const b: u8 = @intCast(l1[x] >>   8);
-                    const c: u8 = @intCast(r1[x] & 0xFF);
-                    const d: u8 = @intCast(r1[x] >>   8);
-
-                    buf[4*x + 0] = a;
-                    buf[4*x + 1] = b;
-                    buf[4*x + 2] = c;
-                    buf[4*x + 3] = d;
-                }
-
-                if (l2 != null and r2 != null) {
-                    for (0..l2.?.len) |x| {
-                        const a: u8 = @intCast(l2.?[x] & 0xFF);
-                        const b: u8 = @intCast(l2.?[x] >>   8);
-                        const c: u8 = @intCast(r2.?[x] & 0xFF);
-                        const d: u8 = @intCast(r2.?[x] >>   8);
-
-                        const y = x + l1.len;
-
-                        buf[4*y + 0] = a;
-                        buf[4*y + 1] = b;
-                        buf[4*y + 2] = c;
-                        buf[4*y + 3] = d;
-                    }
-                }
-
-                const stdout_file   = std.io.getStdOut();
-                var   stdout_writer = stdout_file.writer();
-
-                try stdout_writer.writeAll(&buf);
             }
         }
     }
@@ -182,6 +161,8 @@ pub fn main() !void {
     std.debug.print("   7 = Script700 debug viewer \n", .{});
     std.debug.print("Action commands: \n", .{});
     std.debug.print("   s = Step instruction [default] \n", .{});
+    std.debug.print("   c = Continue to next breakpoint \n", .{});
+    std.debug.print("   k = Break execution \n", .{});
     std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
     std.debug.print("   x = Send interrupt signal \n", .{});
     std.debug.print("   q = Run shadow code \n", .{});
@@ -234,8 +215,10 @@ pub fn main() !void {
     //emu.s_dsp.audio_ram[0x000A] = 0xF1;
 
     while (true) {
-        _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
-        std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+        if (cur_action != 'c') {
+            _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+            std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+        }
         //std.debug.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
 
         const last_cycle = emu.s_dsp.cur_cycle();
@@ -249,6 +232,39 @@ pub fn main() !void {
                 if (cur_mode == 'v') {
                     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                }
+            },
+            'c' => {
+                t_started.store(true, std.builtin.AtomicOrder.seq_cst);
+
+                cur_action = 'c';
+                const res = try run_loop(&emu);
+
+                break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
+
+                if (!res) {
+                    t_started.store(false, std.builtin.AtomicOrder.seq_cst);
+                    cur_action = 's';
+                }
+
+                if (cur_mode == 'v') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
+                }
+                else if (cur_mode == 'r') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
+
+                    std.debug.print("\n", .{});
+                    db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
+                }
+                else if (cur_mode == 'b') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
+                }
+                else if (cur_mode == '7') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_script700_state(&emu);
                 }
             },
             'p' => {
@@ -423,7 +439,10 @@ pub fn main() !void {
                 continue :sw cur_action;
             }
         }
-        std.debug.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
+
+        if (cur_action != 'c' or cur_mode != 'i') {
+            std.debug.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
+        }
 
         //std.debug.print("\n", .{});
     }
@@ -441,4 +460,73 @@ pub fn main() !void {
     //for (SDSP.gauss_table) |item| {
     //    std.debug.print("{X:0>4}\n", .{item});
     //}
+}
+
+fn run_loop(emu: *Emu) !bool {
+    const samples = 1000;
+
+    for (0..(samples * 64)) |_| {
+        emu.step_cycle();
+        if (emu.break_check()) {
+            return false;
+        }
+    }
+
+    const l1, const r1, const l2, const r2 = emu.view_dac_samples(samples);
+    var buf: [samples * 4]u8 = [_]u8 {0} ** (samples * 4);
+
+    for (0..l1.len) |x| {
+        const a: u8 = @intCast(l1[x] & 0xFF);
+        const b: u8 = @intCast(l1[x] >>   8);
+        const c: u8 = @intCast(r1[x] & 0xFF);
+        const d: u8 = @intCast(r1[x] >>   8);
+
+        buf[4*x + 0] = a;
+        buf[4*x + 1] = b;
+        buf[4*x + 2] = c;
+        buf[4*x + 3] = d;
+    }
+
+    if (l2 != null and r2 != null) {
+        for (0..l2.?.len) |x| {
+            const a: u8 = @intCast(l2.?[x] & 0xFF);
+            const b: u8 = @intCast(l2.?[x] >>   8);
+            const c: u8 = @intCast(r2.?[x] & 0xFF);
+            const d: u8 = @intCast(r2.?[x] >>   8);
+
+            const y = x + l1.len;
+
+            buf[4*y + 0] = a;
+            buf[4*y + 1] = b;
+            buf[4*y + 2] = c;
+            buf[4*y + 3] = d;
+        }
+    }
+
+    const stdout_file   = std.io.getStdOut();
+    var   stdout_writer = stdout_file.writer();
+
+    try stdout_writer.writeAll(&buf);
+
+    const signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
+    return !signal;
+}
+
+fn break_listener() void {
+    while (true) {
+        // Wait until main thread starts playing
+        var started = t_started.load(std.builtin.AtomicOrder.seq_cst);
+        while (!started) {
+            started = t_started.load(std.builtin.AtomicOrder.seq_cst);
+        }
+
+        var buffer: [8]u8 = undefined;
+        const stdin = std.io.getStdIn().reader();
+        _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+
+        break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+
+        // Sleep for 200 ms to allow main thread time to block stdin waiting on this one
+        std.time.sleep(200 * std.time.ns_per_ms);
+    }
 }

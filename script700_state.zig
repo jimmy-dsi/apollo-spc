@@ -73,7 +73,7 @@ pub const Script700State = struct {
         self.aram_breakpoints[bit_addr] |= @as(u8, 1) << bit;
     }
 
-    pub inline fn has_breakpoint(self: *const Script700State, address: u16) void {
+    pub inline fn has_breakpoint(self: *const Script700State, address: u16) bool {
         const bit_addr: u13 = @intCast(address >> 3);
         const bit:      u3  = @intCast(address & 7);
 

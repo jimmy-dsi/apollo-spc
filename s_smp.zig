@@ -422,7 +422,7 @@ pub const SSMP = struct {
         sw: switch (substate) {
             0, 1 => {
                 if (substate == 0) {
-                    if (self.enable_access_logs) {
+                    if (self.enable_access_logs or self.emu.script700.enabled) {
                         self.append_exec_log(self.spc.pc());
                     }
                     //std.debug.print("SMP | Current DSP cycle: {d} | PC: {d}\n", .{self.s_dsp().*.cur_cycle(), self.spc.pc()});
@@ -952,7 +952,7 @@ pub const SSMP = struct {
                 self.last_read_bytes[1] = self.last_read_bytes[0];
                 self.last_read_bytes[0] = self.read_data(address);
 
-                if (self.enable_access_logs) {
+                if (self.enable_access_logs or self.emu.script700.enabled) {
                     self.append_read_log(address, self.last_read_bytes[0]);
                 }
 
@@ -1142,7 +1142,7 @@ pub const SSMP = struct {
                 self.write_data(address, data);
                 const post_data = self.debug_read_data(address);
 
-                if (self.enable_access_logs) {
+                if (self.enable_access_logs or self.emu.script700.enabled) {
                     self.append_write_log(address, pre_data, data, post_data);
                 }
 
