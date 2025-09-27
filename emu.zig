@@ -45,6 +45,9 @@ pub const Emu = struct {
     debug_persist_spc_state:    bool = false,
     debug_return_on_force_exit: bool = true,
 
+    script700_attempt_start: bool = false,
+    script700_error: ?anyerror = null,
+
     pub fn static_init() void {
         prng = std.Random.DefaultPrng.init(blk: {
             var seed: u64 = undefined;
@@ -253,6 +256,7 @@ pub const Emu = struct {
 
     pub fn step_instruction(self: *Emu) Error! void {
         if (self.script700.enabled) {
+            self.script700_attempt_start = true;
             try self.step_cycle(true);
             // Add timeout for infinite loop protection
             var steps: u32 = 0;
@@ -292,6 +296,7 @@ pub const Emu = struct {
 
     pub inline fn step_cycle_safe(self: *Emu) Error! void {
         const cur_cycle = self.s_dsp.clock_counter;
+        self.script700_attempt_start = true;
         
         // Add timeout for infinite loop protection
         var steps: u32 = 0;
@@ -328,7 +333,7 @@ pub const Emu = struct {
             self.run_script700();
         }
 
-        if (!self.script700.finished()) {
+        if (!self.script700_attempt_start and !self.script700.finished()) {
             return; // Don't allow emulator to resume until a wait, quit, or error is triggered by Script700
         }
 
@@ -359,6 +364,7 @@ pub const Emu = struct {
         // Attempt Script700 processing on every DSP cycle
         if (self.script700.enabled and cycle.* > self.script700.state.last_cycle) {
             self.run_script700();
+            self.script700_attempt_start = false;
         }
     }
 
@@ -499,6 +505,8 @@ pub const Emu = struct {
         }
 
         // Run Script700 if viable
-        self.script700.run(.{});
+        self.script700.run(.{}) catch |e| {
+            self.script700_error = e;
+        };
     }
 };

@@ -7,7 +7,7 @@ const db = @import("debug.zig");
 
 pub const Script700 = struct {
     pub const RunOptions = struct {
-        max_steps: u32 = 1000
+        max_steps: u32 = 10_000
     };
 
     pub const MemType = enum {
@@ -120,7 +120,7 @@ pub const Script700 = struct {
         return result or !self.enabled;
     }
 
-    pub fn run(self: *Script700, options: RunOptions) void {
+    pub fn run(self: *Script700, options: RunOptions) !void {
         if (!self.initialized) {
             if (self.compat_mode) {
                 // SPCPlay's Script700 engine does not start running until 32 DSP cycles have elapsed after SPC reset
@@ -139,9 +139,9 @@ pub const Script700 = struct {
                 self._finished = true;
                 return;
             }
-            self.step_instruction() catch {
+            self.step_instruction() catch |e| {
                 self.enabled = false; // Disable script if we run into an unrecoverable error (such as an issue when allocating memory)
-                // TODO: Add error reporting mechanism for when this happens
+                return e;
             };
 
             // Track last executed cycle on running -> not running transition
@@ -1806,7 +1806,7 @@ pub const Script700 = struct {
         }
     }
 
-    pub const Runtime = error { fetch_range };
+    pub const Runtime = error { fetch_range, out_of_memory };
 
     inline fn fetch(self: *Script700) Runtime! u32 {
         if (self.state.pc >= self.script_bytecode.len) { // Terminate script if PC goes out of range
@@ -1953,7 +1953,7 @@ pub const Script700 = struct {
         // No operation if jump destination is out of range
     }
 
-    inline fn expand_data_area(self: *Script700, min_size: u32) !void {
+    inline fn expand_data_area(self: *Script700, min_size: u32) Runtime! void {
         const old_data = self.data_area;
 
         var new_size: u32 = @intCast(
@@ -1971,7 +1971,9 @@ pub const Script700 = struct {
             new_size = 0x10_0000;
         }
 
-        var new_data = try allocator.alloc(u8, new_size);
+        var new_data = allocator.alloc(u8, new_size) catch {
+            return Runtime.out_of_memory;
+        };
         @memcpy(new_data, old_data);
         // Fill the remainder with zeroes
         for (old_data.len..new_data.len) |i| {

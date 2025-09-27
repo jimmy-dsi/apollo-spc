@@ -12,6 +12,9 @@ const SongMetadata = @import("song_metadata.zig").SongMetadata;
 
 const spc_loader = @import("spc_loader.zig");
 
+const max_consecutive_timeouts: u32 = 90;
+const busyloop_relief_ms:       u32 = 20;
+
 var t_started      = Atomic(bool).init(false);
 var break_signal   = Atomic(bool).init(false);
 var is_breakpoint  = Atomic(bool).init(false);
@@ -68,11 +71,15 @@ pub fn main() !void {
     var sl: []u32 = undefined;
 
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x1549}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 20480000}); ix += 2;
-    //emu.script700.label_addresses[0] = ix;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
+    emu.script700.label_addresses[0] = ix;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 20480000}); ix += 2;
+    emu.script700.label_addresses[1] = ix;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x3FFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "blt", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
-
 
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
 
@@ -133,9 +140,15 @@ pub fn main() !void {
         break :blk table_u8;
     };
 
-    try emu.script700.load_bytecode(sb[0..]);
-    emu.script700.load_data(data[0..]);
-    emu.script700.run(.{});
+    var script700_load_error: ?anyerror = null;
+
+    emu.script700.load_bytecode(sb[0..]) catch |e| {
+        script700_load_error = e;
+    };
+    if (script700_load_error == null) {
+        emu.script700.load_data(data[0..]);
+        try emu.script700.run(.{});
+    }
 
     var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
     defer t_break_listener.join();
@@ -158,6 +171,10 @@ pub fn main() !void {
 
         std.debug.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
         try metadata.?.print();
+
+        if (script700_load_error) |err| {
+            report_error(err, true);
+        }
     
         if (!debug_mode) {
             // Output 1.25 second of blank audio first, to compensate for ffplay nobuffer option
@@ -167,15 +184,34 @@ pub fn main() !void {
             }
 
             t_started.store(true, std.builtin.AtomicOrder.seq_cst);
+            var s7en = emu.script700.enabled;
+
             while (true) {
+                s7en = emu.script700.enabled;
+
                 var res = run_loop(&emu) catch null;
+                var attempts: u32 = 0;
 
                 while (res == null) {
-                    report_timeout();
-                    if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
-                        emu.script700.enabled = false;
+                    std.time.sleep(busyloop_relief_ms * std.time.ns_per_ms);
+                    attempts += 1;
+
+                    if (attempts == max_consecutive_timeouts) {
+                        report_timeout();
+                        attempts = 0;
+
+                        if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
+                            emu.script700.enabled = false;
+                        }
                     }
+
                     res = run_loop(&emu) catch null;
+                }
+
+                if (s7en and emu.script700_error != null) {
+                    const err = emu.script700_error.?;
+                    s7en = false;
+                    report_error(err, false);
                 }
 
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
@@ -717,6 +753,29 @@ fn report_timeout() void {
 
     while (!m_expect_input.tryLock()) { }
     m_expect_input.unlock();
+
+    t_input_mode.store(0, std.builtin.AtomicOrder.seq_cst);
+}
+
+fn report_error(err: anyerror, load: bool) void {
+    std.debug.print("\n\x1B[91mScript700 {s}: ", .{if (load) "load error" else "crashed"});
+
+    switch (err) {
+        error.out_of_memory => {
+            std.debug.print("not enough memory to resize data area.", .{});
+        },
+        error.fetch_range => {
+            std.debug.print("script area fetch went out of bounds.", .{});
+        },
+        error.bytecode_too_large => {
+            std.debug.print("script area bytecode is too large.", .{});
+        },
+        else => {
+            std.debug.print("unknown error.", .{});
+        }
+    }
+
+    std.debug.print("\x1B[39m\n", .{});
 
     t_input_mode.store(0, std.builtin.AtomicOrder.seq_cst);
 }
