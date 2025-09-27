@@ -117,7 +117,7 @@ pub const Script700 = struct {
     pub inline fn finished(self: *Script700) bool {
         const result = self._finished;
         //self._finished = false;
-        return result;
+        return result or !self.enabled;
     }
 
     pub fn run(self: *Script700, options: RunOptions) void {

@@ -4,15 +4,21 @@ const Atomic = std.atomic.Value;
 
 const db = @import("debug.zig");
 
-const Emu       = @import("emu.zig").Emu;
-const SDSP      = @import("s_dsp.zig").SDSP;
-const SSMP      = @import("s_smp.zig").SSMP;
-const Script700 = @import("script700.zig").Script700;
+const Emu          = @import("emu.zig").Emu;
+const SDSP         = @import("s_dsp.zig").SDSP;
+const SSMP         = @import("s_smp.zig").SSMP;
+const Script700    = @import("script700.zig").Script700;
+const SongMetadata = @import("song_metadata.zig").SongMetadata;
 
 const spc_loader = @import("spc_loader.zig");
 
-var t_started    = Atomic(bool).init(false);
-var break_signal = Atomic(bool).init(false);
+var t_started      = Atomic(bool).init(false);
+var break_signal   = Atomic(bool).init(false);
+var is_breakpoint  = Atomic(bool).init(false);
+var t_timeout_wait = Atomic(bool).init(false);
+var t_input_mode   = Atomic(u32).init(0);
+
+var m_expect_input = std.Thread.Mutex{};
 
 var stdout_file: std.fs.File = undefined;
 
@@ -61,9 +67,10 @@ pub fn main() !void {
     
     var sl: []u32 = undefined;
 
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 20480000}); ix += 2;
-    emu.script700.label_addresses[0] = ix;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x1549}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 20480000}); ix += 2;
+    //emu.script700.label_addresses[0] = ix;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
 
 
@@ -133,6 +140,8 @@ pub fn main() !void {
     var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
     defer t_break_listener.join();
 
+    var metadata: ?SongMetadata = null;
+
     // Load SPC file from path if present
     if (spc_file_path) |path| {
         var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
@@ -145,24 +154,38 @@ pub fn main() !void {
         //defer allocator.free(buffer); // The entire app appears to just die after exiting scope if this is uncommented. No idea why
 
         _ = try file.readAll(buffer);
-        const metadata = try spc_loader.load_spc(&emu, buffer);
+        metadata = try spc_loader.load_spc(&emu, buffer);
 
         std.debug.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
-        try metadata.print();
+        try metadata.?.print();
     
         if (!debug_mode) {
+            // Output 1.25 second of blank audio first, to compensate for ffplay nobuffer option
+            for (0..40) |_| {
+                var stdout_writer = stdout_file.writer();
+                try stdout_writer.writeAll(&buf);
+            }
+
             t_started.store(true, std.builtin.AtomicOrder.seq_cst);
             while (true) {
-                const res = run_loop(&emu) catch {
-                    std.debug.print("Script700 timed out\n", .{});
-                    stdout_file.close();
-                    std.process.exit(1);
-                };
+                var res = run_loop(&emu) catch null;
+
+                while (res == null) {
+                    report_timeout();
+                    if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
+                        emu.script700.enabled = false;
+                    }
+                    res = run_loop(&emu) catch null;
+                }
+
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
 
-                if (!res) {
+                if (!res.?) {
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
                     break;
+                }
+                else {
+                    t_started.store(true, std.builtin.AtomicOrder.seq_cst);
                 }
             }
         }
@@ -232,8 +255,27 @@ pub fn main() !void {
 
     while (true) {
         if (cur_action != 'c') {
+            const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
+            if (bp_hit) {
+                std.debug.print("Breakpoint hit. Press enter\n", .{});
+
+                var signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
+                while (!signal) {
+                    signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
+                }
+
+                is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
+            }
+            
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
             std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+
+            if (std.ascii.toLower(buffer[0]) == 'c') {
+                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                if (cur_mode == 'i' and metadata != null) {
+                    try metadata.?.print();
+                }
+            }
         }
         //std.debug.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
 
@@ -254,17 +296,24 @@ pub fn main() !void {
                 t_started.store(true, std.builtin.AtomicOrder.seq_cst);
 
                 cur_action = 'c';
-                const res = run_loop(&emu) catch {
-                    std.debug.print("Script700 timed out\n", .{});
-                    stdout_file.close();
-                    std.process.exit(1);
-                };
+                var res = run_loop(&emu) catch null;
+
+                while (res == null) {
+                    report_timeout();
+                    if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
+                        emu.script700.enabled = false;
+                    }
+                    res = run_loop(&emu) catch null;
+                }
 
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
 
-                if (!res) {
+                if (!res.?) {
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
                     cur_action = 's';
+                }
+                else {
+                    t_started.store(true, std.builtin.AtomicOrder.seq_cst);
                 }
 
                 if (cur_mode == 'v') {
@@ -397,11 +446,20 @@ pub fn main() !void {
                     std.debug.print("  ", .{});
                 }
 
+                var is_error = false;
                 emu.step_instruction() catch {
-                    std.debug.print("Script700 timed out\n", .{});
-                    stdout_file.close();
-                    std.process.exit(1);
+                    is_error = true;
                 };
+
+                while (is_error) {
+                    report_timeout();
+                    if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
+                        emu.script700.enabled = false;
+                    }
+                    emu.step_instruction() catch {
+                        is_error = true;
+                    };
+                }
 
                 const all_logs = emu.s_smp.get_access_logs_range(last_cycle);
                 var logs = db.filter_access_logs(all_logs);
@@ -486,29 +544,41 @@ pub fn main() !void {
     //}
 }
 
+const samples = 1000;
+var buf: [samples * 4]u8 = [_]u8 {0} ** (samples * 4);
+var stream_start: u32 = 0;
+
 fn run_loop(emu: *Emu) !bool {
-    const samples = 1000;
-    const cycles  = samples * 64;
+    const cycles = samples * 64;
+
+    is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
 
     if (emu.script700.enabled) {
-        for (0..cycles) |_| {
-            try emu.step_cycle_safe();
+        for (stream_start..cycles) |i| {
+            emu.step_cycle_safe() catch |e| {
+                stream_start = @intCast(i);
+                return e;
+            };
+
             if (emu.break_check()) {
+                is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
+                stream_start = @intCast(i);
                 return false;
             }
         }
     }
     else {
-        for (0..cycles) |_| {
+        for (stream_start..cycles) |i| {
             emu.step_cycle_fast();
             if (emu.break_check()) {
+                is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
+                stream_start = @intCast(i);
                 return false;
             }
         }
     }
 
     const l1, const r1, const l2, const r2 = emu.view_dac_samples(samples);
-    var buf: [samples * 4]u8 = [_]u8 {0} ** (samples * 4);
 
     for (0..l1.len) |x| {
         const a: u8 = @intCast(l1[x] & 0xFF);
@@ -541,6 +611,7 @@ fn run_loop(emu: *Emu) !bool {
     var stdout_writer = stdout_file.writer();
 
     try stdout_writer.writeAll(&buf);
+    stream_start = 0;
 
     const signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
     return !signal;
@@ -556,11 +627,96 @@ fn break_listener() void {
 
         var buffer: [8]u8 = undefined;
         const stdin = std.io.getStdIn().reader();
-        _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
-        break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+        if (m_expect_input.tryLock()) {
+            _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+
+            switch (t_input_mode.load(std.builtin.AtomicOrder.seq_cst)) {
+                0 => {
+                    const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
+                    if (bp_hit) {
+                        std.debug.print("\x1B[A\x1B[A\x1B[A", .{});
+                        std.debug.print("                                                                                  \n", .{});
+                        std.debug.print("                                                                                  \n", .{});
+                        std.debug.print("                                                                                  \n", .{});
+                        std.debug.print("\x1B[A\x1B[A", .{});
+                        //std.debug.print("\x1B[A\x1B[A", .{});
+                    }
+                    else {
+                        std.debug.print("\x1B[A\x1B[A", .{});
+                        std.debug.print("                                                                                  \n", .{});
+                    }
+
+                    break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+                },
+                1 => {
+                    sw: switch (std.ascii.toLower(buffer[0])) {
+                        'w' => {
+                            t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
+                        },
+                        'c' => {
+                            t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
+                        },
+                        'q' => {
+                            stdout_file.close();
+                            std.process.exit(1);
+                        },
+                        else => {
+                            continue :sw 'w';
+                        }
+                    }
+
+                    t_started.store(false, std.builtin.AtomicOrder.seq_cst);
+                },
+                else => unreachable
+            }
+
+            m_expect_input.unlock();
+        }
 
         // Sleep for 200 ms to allow main thread time to block stdin waiting on this one
         std.time.sleep(200 * std.time.ns_per_ms);
     }
+}
+
+fn report_timeout() void {
+    std.debug.print("\n\x1B[38;2;250;125;25mScript700 timed out. Enter one of the following:\n", .{});
+    std.debug.print("----------------------------------------------------------------------------------\n", .{});
+    std.debug.print("   w = Attempt wait until Script700 finishes or yields execution \n", .{});
+    std.debug.print("   c = Disable Script700 and continue SPC execution \n", .{});
+    std.debug.print("   q = Quit program \n", .{});
+    std.debug.print("----------------------------------------------------------------------------------\x1B[39m\n", .{});
+
+    t_input_mode.store(1, std.builtin.AtomicOrder.seq_cst);
+
+    var buffer: [8]u8 = undefined;
+    const stdin = std.io.getStdIn().reader();
+
+    if (m_expect_input.tryLock()) {
+        _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+        
+        sw: switch (std.ascii.toLower(buffer[0])) {
+            'w' => {
+                t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
+            },
+            'c' => {
+                t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
+            },
+            'q' => {
+                stdout_file.close();
+                std.process.exit(1);
+            },
+            else => {
+                continue :sw 'w';
+            }
+        }
+
+        t_started.store(false, std.builtin.AtomicOrder.seq_cst);
+        m_expect_input.unlock();
+    }
+
+    while (!m_expect_input.tryLock()) { }
+    m_expect_input.unlock();
+
+    t_input_mode.store(0, std.builtin.AtomicOrder.seq_cst);
 }
