@@ -19,6 +19,7 @@ var t_started      = Atomic(bool).init(false);
 var break_signal   = Atomic(bool).init(false);
 var is_breakpoint  = Atomic(bool).init(false);
 var t_timeout_wait = Atomic(bool).init(false);
+var t_menu_mode    = Atomic(u8).init('i');
 var t_input_mode   = Atomic(u32).init(0);
 
 var m_expect_input = std.Thread.Mutex{};
@@ -73,10 +74,10 @@ pub fn main() !void {
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x1549}); ix += 2;
     emu.script700.label_addresses[0] = ix;
     sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 20480000}); ix += 2;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  64}); ix += 2;
     emu.script700.label_addresses[1] = ix;
     sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x3FFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x0FFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "blt", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
@@ -155,6 +156,11 @@ pub fn main() !void {
 
     var metadata: ?SongMetadata = null;
 
+    var cur_page: u8 = 0x00;
+    var cur_offset: u8 = 0x00;
+    var cur_mode: u8 = 'i';
+    var cur_action: u8 = 's';
+
     // Load SPC file from path if present
     if (spc_file_path) |path| {
         var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
@@ -182,12 +188,132 @@ pub fn main() !void {
                 var stdout_writer = stdout_file.writer();
                 try stdout_writer.writeAll(&buf);
             }
+            
+            cur_action = 'c';
+        }
+    }
 
-            t_started.store(true, std.builtin.AtomicOrder.seq_cst);
-            var s7en = emu.script700.enabled;
+    //std.debug.print("----------------------------------------------------------------------------------\n", .{});
+    //std.debug.print("Mode commands: \n", .{});
+    //std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
+    //std.debug.print("   v = Memory viewer \n", .{});
+    //std.debug.print("   r = DSP register map viewer \n", .{});
+    //std.debug.print("   b = DSP debug viewer \n", .{});
+    //std.debug.print("   7 = Script700 debug viewer \n", .{});
+    //std.debug.print("Action commands: \n", .{});
+    //std.debug.print("   s = Step instruction [default] \n", .{});
+    //std.debug.print("   c = Continue to next breakpoint \n", .{});
+    //std.debug.print("   k = Break execution \n", .{});
+    //std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
+    //std.debug.print("   x = Send interrupt signal \n", .{});
+    //std.debug.print("   q = Run shadow code \n", .{});
+    //std.debug.print("   e = Exit shadow execution \n", .{});
+    //std.debug.print("   p = View previous page \n", .{});
+    //std.debug.print("   n = View next page \n", .{});
+    //std.debug.print("   u = Shift memory view up one row \n", .{});
+    //std.debug.print("   d = Shift memory view down one row \n", .{});
+    //std.debug.print("----------------------------------------------------------------------------------\n\n", .{});
+    //std.debug.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
+    //std.debug.print("\n", .{});
 
-            while (true) {
-                s7en = emu.script700.enabled;
+    const stdin = std.io.getStdIn().reader();
+    var buffer: [8]u8 = undefined;
+
+    emu.s_smp.enable_access_logs = true;
+    emu.s_smp.enable_timer_logs = true;
+    emu.s_smp.clear_access_logs();
+    emu.s_smp.clear_timer_logs();
+
+    const shadow_routine: [23]u8 = [23]u8 {
+        0x20,             //    clrp
+        0xE5, 0x00, 0x02, //    mov a, $0200
+        0xBC,             //    inc a
+        0xC5, 0x00, 0x02, //    mov $0200, a
+        0x8F, 0x01, 0x00, //    mov $FC, #$01 (Set timer 2 period to 1)
+        0x8F, 0x84, 0x00, //    mov $F1, #$84 (Enable timer 2)
+        0x8D, 0x03,       //    mov y, #$10
+        0x3F, 0x8A, 0x15, //    call $158A
+        0xFE, 0xFE,       // -: dbnz y, -
+        0x7F,             //    reti
+        0xC5,             //    mov ----, a
+    };
+    
+    emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
+
+    while (true) {
+        if (cur_action == 'c') {
+            const m = t_menu_mode.load(std.builtin.AtomicOrder.seq_cst);
+            switch (m) {
+                'n' => {
+                    cur_page +%= 1;
+                    t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                },
+                'p' => {
+                    cur_page -%= 1;
+                    t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                },
+                'd' => {
+                    if (cur_offset > 0xEF) {
+                        cur_page +%= 1;
+                    }
+                    cur_offset +%= 0x10;
+                    t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                },
+                'u' => {
+                    if (cur_offset < 0x10) {
+                        cur_page -%= 1;
+                    }
+                    cur_offset -%= 0x10;
+                    t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                },
+                else => {
+                    cur_mode = m;
+                }
+            }
+            buffer[0] = 'c';
+        }
+        else {
+            const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
+            if (bp_hit) {
+                std.debug.print("Breakpoint hit. Press enter\n", .{});
+
+                var signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
+                while (!signal) {
+                    signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
+                }
+
+                is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
+            }
+            
+            _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+            std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+
+            if (std.ascii.toLower(buffer[0]) == 'c') {
+                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                if (cur_mode == 'i' and metadata != null) {
+                    try metadata.?.print();
+                }
+            }
+        }
+
+        const last_cycle = emu.s_dsp.cur_cycle();
+        const last_pc    = emu.s_smp.spc.pc();
+        const prev_state = emu.s_smp.state;
+
+        sw: switch (std.ascii.toLower(buffer[0])) {
+            'n' => {
+                cur_action = 'n';
+                cur_page +%= 1;
+                if (cur_mode == 'v') {
+                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                }
+            },
+            'c' => {
+                t_started.store(true, std.builtin.AtomicOrder.seq_cst);
+                cur_action = 'c';
+
+                var s7en = emu.script700.enabled;
 
                 var res = run_loop(&emu) catch null;
                 var attempts: u32 = 0;
@@ -212,134 +338,6 @@ pub fn main() !void {
                     const err = emu.script700_error.?;
                     s7en = false;
                     report_error(err, false);
-                }
-
-                break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
-
-                if (!res.?) {
-                    t_started.store(false, std.builtin.AtomicOrder.seq_cst);
-                    break;
-                }
-                else {
-                    t_started.store(true, std.builtin.AtomicOrder.seq_cst);
-                }
-            }
-        }
-    }
-
-    std.debug.print("----------------------------------------------------------------------------------\n", .{});
-    std.debug.print("Mode commands: \n", .{});
-    std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
-    std.debug.print("   v = Memory viewer \n", .{});
-    std.debug.print("   r = DSP register map viewer \n", .{});
-    std.debug.print("   b = DSP debug viewer \n", .{});
-    std.debug.print("   7 = Script700 debug viewer \n", .{});
-    std.debug.print("Action commands: \n", .{});
-    std.debug.print("   s = Step instruction [default] \n", .{});
-    std.debug.print("   c = Continue to next breakpoint \n", .{});
-    std.debug.print("   k = Break execution \n", .{});
-    std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
-    std.debug.print("   x = Send interrupt signal \n", .{});
-    std.debug.print("   q = Run shadow code \n", .{});
-    std.debug.print("   e = Exit shadow execution \n", .{});
-    std.debug.print("   p = View previous page \n", .{});
-    std.debug.print("   n = View next page \n", .{});
-    std.debug.print("   u = Shift memory view up one row \n", .{});
-    std.debug.print("   d = Shift memory view down one row \n", .{});
-    std.debug.print("----------------------------------------------------------------------------------\n\n", .{});
-    std.debug.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
-    std.debug.print("\n", .{});
-
-    const stdin = std.io.getStdIn().reader();
-    var buffer: [8]u8 = undefined;
-
-    emu.s_smp.enable_access_logs = true;
-    emu.s_smp.enable_timer_logs = true;
-    emu.s_smp.clear_access_logs();
-    emu.s_smp.clear_timer_logs();
-
-    var cur_page: u8 = 0x00;
-    var cur_offset: u8 = 0x00;
-    var cur_mode: u8 = 'i';
-    var cur_action: u8 = 's';
-
-    const shadow_routine: [23]u8 = [23]u8 {
-        0x20,             //    clrp
-        0xE5, 0x00, 0x02, //    mov a, $0200
-        0xBC,             //    inc a
-        0xC5, 0x00, 0x02, //    mov $0200, a
-        0x8F, 0x01, 0x00, //    mov $FC, #$01 (Set timer 2 period to 1)
-        0x8F, 0x84, 0x00, //    mov $F1, #$84 (Enable timer 2)
-        0x8D, 0x03,       //    mov y, #$10
-        0x3F, 0x8A, 0x15, //    call $158A
-        0xFE, 0xFE,       // -: dbnz y, -
-        0x7F,             //    reti
-        0xC5,             //    mov ----, a
-    };
-    
-    emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
-
-    //emu.s_dsp.audio_ram[0x0002] = 0x40;
-    //emu.s_dsp.audio_ram[0x0003] = 0x00;
-    //emu.s_dsp.audio_ram[0x0004] = 0x20;
-    //emu.s_dsp.audio_ram[0x0005] = 0x8F;
-    //emu.s_dsp.audio_ram[0x0006] = 0x01;
-    //emu.s_dsp.audio_ram[0x0007] = 0xFC;
-    //emu.s_dsp.audio_ram[0x0008] = 0x8F;
-    //emu.s_dsp.audio_ram[0x0009] = 0x84;
-    //emu.s_dsp.audio_ram[0x000A] = 0xF1;
-
-    while (true) {
-        if (cur_action != 'c') {
-            const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
-            if (bp_hit) {
-                std.debug.print("Breakpoint hit. Press enter\n", .{});
-
-                var signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
-                while (!signal) {
-                    signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
-                }
-
-                is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
-            }
-            
-            _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
-            std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
-
-            if (std.ascii.toLower(buffer[0]) == 'c') {
-                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                if (cur_mode == 'i' and metadata != null) {
-                    try metadata.?.print();
-                }
-            }
-        }
-        //std.debug.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
-
-        const last_cycle = emu.s_dsp.cur_cycle();
-        const last_pc    = emu.s_smp.spc.pc();
-        const prev_state = emu.s_smp.state;
-
-        sw: switch (std.ascii.toLower(buffer[0])) {
-            'n' => {
-                cur_action = 'n';
-                cur_page +%= 1;
-                if (cur_mode == 'v') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
-                }
-            },
-            'c' => {
-                t_started.store(true, std.builtin.AtomicOrder.seq_cst);
-
-                cur_action = 'c';
-                var res = run_loop(&emu) catch null;
-
-                while (res == null) {
-                    report_timeout();
-                    if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
-                        emu.script700.enabled = false;
-                    }
-                    res = run_loop(&emu) catch null;
                 }
 
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
@@ -475,12 +473,22 @@ pub fn main() !void {
                 cur_action = 's';
                 // Default behavior: Step instruction
 
+                var buffer_list = std.ArrayList(u8).init(allocator);
+                defer buffer_list.deinit();
+
+                var buffer_writer = std.io.bufferedWriter(buffer_list.writer());
+                var writer = buffer_writer.writer();
+
                 if (cur_mode == 'i') {
-                    db.print_pc(&emu);
-                    std.debug.print(" |  ", .{});
-                    db.print_opcode(&emu);
-                    std.debug.print("  ", .{});
+                    try db.print_pc(&emu, writer);
+                    try writer.print(" |  ", .{});
+                    try db.print_opcode(&emu, writer);
+                    try writer.print("  ", .{});
+                    try buffer_writer.flush();
                 }
+
+                var s7en = emu.script700.enabled;
+                var attempts: u32 = 0;
 
                 var is_error = false;
                 emu.step_instruction() catch {
@@ -488,29 +496,35 @@ pub fn main() !void {
                 };
 
                 while (is_error) {
-                    report_timeout();
-                    if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
-                        emu.script700.enabled = false;
+                    std.time.sleep(busyloop_relief_ms * std.time.ns_per_ms);
+                    attempts += 1;
+
+                    if (attempts == max_consecutive_timeouts) {
+                        report_timeout();
+                        attempts = 0;
+
+                        if (!t_timeout_wait.load(std.builtin.AtomicOrder.seq_cst)) {
+                            emu.script700.enabled = false;
+                        }
                     }
+
+                    is_error = false;
                     emu.step_instruction() catch {
                         is_error = true;
                     };
                 }
 
+                if (s7en and emu.script700_error != null) {
+                    s7en = false;
+                    const err = emu.script700_error.?;
+                    report_error(err, false);
+                }
+
                 const all_logs = emu.s_smp.get_access_logs_range(last_cycle);
                 var logs = db.filter_access_logs(all_logs);
 
-                //var buffer_writer = std.io.countingWriter(std.io.getStdOut().writer());
-                //var writer = buffer_writer.writer();
-                //
-                //for (all_logs) |log| {
-                //    _ = db.print_log(&prev_state, &log, &writer, .{}) catch 0;
-                //    std.debug.print("\n", .{});
-                //}
-
-                //emu.s_smp.clear_access_logs();
-
                 if (cur_mode == 'i') {
+                    std.debug.print("{s}", .{buffer_list.items});
                     try db.print_logs(&prev_state, logs[0..]);
 
                     db.print_spc_state(&emu);
@@ -654,6 +668,8 @@ fn run_loop(emu: *Emu) !bool {
 }
 
 fn break_listener() void {
+    var prev_input: u8 = 'k';
+
     while (true) {
         // Wait until main thread starts playing
         var started = t_started.load(std.builtin.AtomicOrder.seq_cst);
@@ -665,25 +681,42 @@ fn break_listener() void {
         const stdin = std.io.getStdIn().reader();
 
         if (m_expect_input.tryLock()) {
+            buffer[0] = ' ';
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
             switch (t_input_mode.load(std.builtin.AtomicOrder.seq_cst)) {
                 0 => {
-                    const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
-                    if (bp_hit) {
-                        std.debug.print("\x1B[A\x1B[A\x1B[A", .{});
-                        std.debug.print("                                                                                  \n", .{});
-                        std.debug.print("                                                                                  \n", .{});
-                        std.debug.print("                                                                                  \n", .{});
-                        std.debug.print("\x1B[A\x1B[A", .{});
-                        //std.debug.print("\x1B[A\x1B[A", .{});
-                    }
-                    else {
-                        std.debug.print("\x1B[A\x1B[A", .{});
-                        std.debug.print("                                                                                  \n", .{});
+                    var cur_mode = t_menu_mode.load(std.builtin.AtomicOrder.seq_cst);
+                    sw: switch (buffer[0]) {
+                        'i', 'v', 'r', 'b', '7', 'u', 'd', 'n', 'p' => {
+                            cur_mode   = buffer[0];
+                            prev_input = buffer[0];
+                        },
+                        'k' => {
+                            const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
+                            if (bp_hit) {
+                                std.debug.print("\x1B[A\x1B[A\x1B[A", .{});
+                                std.debug.print("                                                                                  \n", .{});
+                                std.debug.print("                                                                                  \n", .{});
+                                std.debug.print("                                                                                  \n", .{});
+                                std.debug.print("\x1B[A\x1B[A", .{});
+                                //std.debug.print("\x1B[A\x1B[A", .{});
+                            }
+                            else {
+                                std.debug.print("\x1B[A\x1B[A", .{});
+                                std.debug.print("                                                                                  \n", .{});
+                            }
+
+                            break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+                            prev_input = buffer[0];
+                        },
+                        else => {
+                            buffer[0] = prev_input;
+                            continue :sw prev_input;
+                        }
                     }
 
-                    break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+                    t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 },
                 1 => {
                     sw: switch (std.ascii.toLower(buffer[0])) {
