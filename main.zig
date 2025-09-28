@@ -71,15 +71,15 @@ pub fn main() !void {
     
     var sl: []u32 = undefined;
 
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x1549}); ix += 2;
-    emu.script700.label_addresses[0] = ix;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  64}); ix += 2;
-    emu.script700.label_addresses[1] = ix;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x0FFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "blt", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x7B8}); ix += 2;
+    //emu.script700.label_addresses[0] = ix;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  64}); ix += 2;
+    //emu.script700.label_addresses[1] = ix;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x3FFFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "blt", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
+    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
 
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
@@ -275,8 +275,6 @@ pub fn main() !void {
         else {
             const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
             if (bp_hit) {
-                std.debug.print("Breakpoint hit. Press enter\n", .{});
-
                 var signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
                 while (!signal) {
                     signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
@@ -344,6 +342,7 @@ pub fn main() !void {
 
                 if (!res.?) {
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
+                    std.debug.print("Breakpoint hit. Press enter\n", .{});
                     cur_action = 's';
                 }
                 else {
@@ -695,16 +694,16 @@ fn break_listener() void {
                         'k' => {
                             const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
                             if (bp_hit) {
-                                std.debug.print("\x1B[A\x1B[A\x1B[A", .{});
-                                std.debug.print("                                                                                  \n", .{});
-                                std.debug.print("                                                                                  \n", .{});
-                                std.debug.print("                                                                                  \n", .{});
-                                std.debug.print("\x1B[A\x1B[A", .{});
+                                //std.debug.print("\x1B[A\x1B[A\x1B[A", .{});
+                                //std.debug.print("                                                                                  \n", .{});
+                                //std.debug.print("                                                                                  \n", .{});
+                                //std.debug.print("                                                                                  \n", .{});
+                                //std.debug.print("\x1B[A\x1B[A", .{});
                                 //std.debug.print("\x1B[A\x1B[A", .{});
                             }
                             else {
-                                std.debug.print("\x1B[A\x1B[A", .{});
-                                std.debug.print("                                                                                  \n", .{});
+                                //std.debug.print("\x1B[A\x1B[A", .{});
+                                //std.debug.print("                                                                                  \n", .{});
                             }
 
                             break_signal.store(true, std.builtin.AtomicOrder.seq_cst);

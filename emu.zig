@@ -16,7 +16,7 @@ pub const Emu = struct {
         force_exit:    bool = false
     };
 
-    const StepTimeout = 10_000;
+    const StepTimeout = 100;
     const DacBufSize = 96_000;
 
     pub var rand: std.Random = undefined;
@@ -45,7 +45,6 @@ pub const Emu = struct {
     debug_persist_spc_state:    bool = false,
     debug_return_on_force_exit: bool = true,
 
-    script700_attempt_start: bool = false,
     script700_error: ?anyerror = null,
 
     pub fn static_init() void {
@@ -256,7 +255,6 @@ pub const Emu = struct {
 
     pub fn step_instruction(self: *Emu) Error! void {
         if (self.script700.enabled) {
-            self.script700_attempt_start = true;
             try self.step_cycle(true);
             // Add timeout for infinite loop protection
             var steps: u32 = 0;
@@ -296,7 +294,6 @@ pub const Emu = struct {
 
     pub inline fn step_cycle_safe(self: *Emu) Error! void {
         const cur_cycle = self.s_dsp.clock_counter;
-        self.script700_attempt_start = true;
         
         // Add timeout for infinite loop protection
         var steps: u32 = 0;
@@ -333,7 +330,11 @@ pub const Emu = struct {
             self.run_script700();
         }
 
-        if (!self.script700_attempt_start and !self.script700.finished()) {
+        if (!self.script700.finished() and cycle.* != 0) {
+            self.run_script700(); // Attempt re-run if not finished from previous step
+        }
+
+        if (!self.script700.finished()) {
             return; // Don't allow emulator to resume until a wait, quit, or error is triggered by Script700
         }
 
@@ -361,10 +362,14 @@ pub const Emu = struct {
             self.s_dsp.inc_cycle(); // Increment clock counter by 1 DSP cycle.
         }
 
+        // Breakpoints should continue to be checked even if the script700 script has ended
+        if (self.s_smp.instr_boundary and self.script700.state.has_breakpoint(self.s_smp.spc.pc())) {
+            self.break_exec = true;
+        }
+
         // Attempt Script700 processing on every DSP cycle
         if (self.script700.enabled and cycle.* > self.script700.state.last_cycle) {
             self.run_script700();
-            self.script700_attempt_start = false;
         }
     }
 
@@ -390,10 +395,6 @@ pub const Emu = struct {
 
         // Resume Script700 processing if viable
         if (s7.state.wait_until) |wt| {
-            if (self.s_smp.instr_boundary and s7.state.has_breakpoint(self.s_smp.spc.pc())) {
-                self.break_exec = true;
-            }
-
             if (!s7.compat_mode) {
                 if (cycle == wt) {
                     s7.resume_script(cycle, cycle, cycle, false);
