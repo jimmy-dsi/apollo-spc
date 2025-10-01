@@ -573,20 +573,6 @@ pub fn main() !void {
 
         //db.print("\n", .{});
     }
-
-    emu.event_loop();
-
-    //db.print("Hello, {d}!\n", .{emu.s_smp.?.boot_rom.len});
-//
-    //for (emu.s_smp.?.boot_rom) |item| {
-    //    db.print("{X:0>2}\n", .{item});
-    //}
-//
-    //db.print("Hello, {d}!\n", .{SDSP.gauss_table.len});
-//
-    //for (SDSP.gauss_table) |item| {
-    //    db.print("{X:0>4}\n", .{item});
-    //}
 }
 
 const samples = 1000;
@@ -628,10 +614,13 @@ fn run_loop(emu: *Emu) !bool {
     const l1, const r1, const l2, const r2 = emu.view_dac_samples(samples);
 
     for (0..l1.len) |x| {
-        const a: u8 = @intCast(l1[x] & 0xFF);
-        const b: u8 = @intCast(l1[x] >>   8);
-        const c: u8 = @intCast(r1[x] & 0xFF);
-        const d: u8 = @intCast(r1[x] >>   8);
+        const l1_: []u16 = @ptrCast(l1);
+        const r1_: []u16 = @ptrCast(r1);
+
+        const a: u8 = @intCast(l1_[x] & 0xFF);
+        const b: u8 = @intCast(l1_[x] >>   8);
+        const c: u8 = @intCast(r1_[x] & 0xFF);
+        const d: u8 = @intCast(r1_[x] >>   8);
 
         buf[4*x + 0] = a;
         buf[4*x + 1] = b;
@@ -641,10 +630,13 @@ fn run_loop(emu: *Emu) !bool {
 
     if (l2 != null and r2 != null) {
         for (0..l2.?.len) |x| {
-            const a: u8 = @intCast(l2.?[x] & 0xFF);
-            const b: u8 = @intCast(l2.?[x] >>   8);
-            const c: u8 = @intCast(r2.?[x] & 0xFF);
-            const d: u8 = @intCast(r2.?[x] >>   8);
+            const l2_: []u16 = @ptrCast(l2.?);
+            const r2_: []u16 = @ptrCast(r2.?);
+
+            const a: u8 = @intCast(l2_[x] & 0xFF);
+            const b: u8 = @intCast(l2_[x] >>   8);
+            const c: u8 = @intCast(r2_[x] & 0xFF);
+            const d: u8 = @intCast(r2_[x] >>   8);
 
             const y = x + l1.len;
 
@@ -663,10 +655,17 @@ fn run_loop(emu: *Emu) !bool {
     const expected_next_time = last_time + @as(i128, samples) * std.time.ns_per_s / 32000;
 
     const now = std.time.nanoTimestamp();
-    const sleep_amt: u64 = @intCast(expected_next_time - now - 1 * std.time.ns_per_ms);
-
-    std.time.sleep(sleep_amt);
-    last_time = expected_next_time;
+    const amt = expected_next_time - now - 1 * std.time.ns_per_ms;
+    if (amt > 0) {
+        const sleep_amt: u64 = @intCast(expected_next_time - now - 1 * std.time.ns_per_ms);
+        std.time.sleep(sleep_amt);
+    }
+    if (now > expected_next_time) {
+        last_time = now;
+    }
+    else {
+        last_time = expected_next_time;
+    }
 
     const signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
     return !signal;

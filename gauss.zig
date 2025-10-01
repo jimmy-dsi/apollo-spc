@@ -29,5 +29,7 @@ pub fn interpolate(s: *const DSPStateInternal, v_idx: u3, tbl: [*]const u16) i16
     }
 
     // Zero out LSB as Ares does - However, FullSNES says result should be SAR'd by 1. The perceived bit depth is the same either way
-    return @intCast(output & 0xFFFE);
+    const o_u32: u32 = @bitCast(output);
+    const o_u16: u16 = @intCast(o_u32 & 0xFFFE);
+    return @bitCast(o_u16);
 }

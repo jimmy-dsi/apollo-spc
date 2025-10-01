@@ -1965,9 +1965,9 @@ pub inline fn print(comptime fmt: []const u8, args: anytype) void {
                                 print_canvas[index - i] = ' ';
                             }
 
-                            index -= 4;
-                            sub_index -= 4;
-                            noprint_offset -= 4;
+                            index -%= 4;
+                            sub_index -%= 4;
+                            noprint_offset -%= 4;
                         }
                         else if (c == 'A') { // Handle shift up
                             inline for (0..3) |i| {
@@ -1988,20 +1988,20 @@ pub inline fn print(comptime fmt: []const u8, args: anytype) void {
                                 print_canvas[index - i] = ' ';
                             }
 
-                            index -= 3;
-                            sub_index -= 3;
+                            index -= 2;
+                            sub_index -= 2;
                             noprint_offset -= 2;
 
                             flush(false);
                             return;
                         }
                     }
-                    noprint_offset +|= 1;
+                    noprint_offset +%= 1;
                     canvas_line_lengths[line_index] = cli_width + noprint_offset;
                 }
 
-                index += 1;
-                sub_index += 1;
+                index +%= 1;
+                sub_index +%= 1;
             }
 
             prev_start_line = start_line;
