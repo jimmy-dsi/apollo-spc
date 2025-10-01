@@ -26,6 +26,8 @@ var m_expect_input = std.Thread.Mutex{};
 
 var stdout_file: std.fs.File = undefined;
 
+var metadata: ?SongMetadata = null;
+
 pub fn main() !void {
     db.set_cli_width(190);
     std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
@@ -157,8 +159,6 @@ pub fn main() !void {
     var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
     defer t_break_listener.join();
 
-    var metadata: ?SongMetadata = null;
-
     var cur_page: u8 = 0x00;
     var cur_offset: u8 = 0x00;
     var cur_mode: u8 = 'i';
@@ -180,10 +180,7 @@ pub fn main() !void {
 
         db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
 
-        var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
-        const metastring = try metadata.?.print(&print_buf);
-        db.print("{s}\n", .{metastring});
-        db.flush(true);
+        show_metadata();
 
         if (script700_load_error) |err| {
             report_error(err, true);
@@ -199,29 +196,6 @@ pub fn main() !void {
             cur_action = 'c';
         }
     }
-
-    //db.print("----------------------------------------------------------------------------------\n", .{});
-    //db.print("Mode commands: \n", .{});
-    //db.print("   i = Instruction trace log viewer [default] \n", .{});
-    //db.print("   v = Memory viewer \n", .{});
-    //db.print("   r = DSP register map viewer \n", .{});
-    //db.print("   b = DSP debug viewer \n", .{});
-    //db.print("   7 = Script700 debug viewer \n", .{});
-    //db.print("Action commands: \n", .{});
-    //db.print("   s = Step instruction [default] \n", .{});
-    //db.print("   c = Continue to next breakpoint \n", .{});
-    //db.print("   k = Break execution \n", .{});
-    //db.print("   w = Write to IO port (snes -> spc) \n", .{});
-    //db.print("   x = Send interrupt signal \n", .{});
-    //db.print("   q = Run shadow code \n", .{});
-    //db.print("   e = Exit shadow execution \n", .{});
-    //db.print("   p = View previous page \n", .{});
-    //db.print("   n = View next page \n", .{});
-    //db.print("   u = Shift memory view up one row \n", .{});
-    //db.print("   d = Shift memory view down one row \n", .{});
-    //db.print("----------------------------------------------------------------------------------\n\n", .{});
-    //db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
-    //db.print("\n", .{});
 
     const stdin = std.io.getStdIn().reader();
     var buffer: [8]u8 = undefined;
@@ -252,6 +226,12 @@ pub fn main() !void {
         if (cur_action == 'c') {
             const m = t_menu_mode.load(std.builtin.AtomicOrder.seq_cst);
             switch (m) {
+                'h' => {
+                    show_help_menu();
+                },
+                'm' => {
+                    show_metadata();
+                },
                 'n' => {
                     cur_page +%= 1;
                     t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
@@ -296,11 +276,8 @@ pub fn main() !void {
 
             if (std.ascii.toLower(buffer[0]) == 'c') {
                 db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                if (cur_mode == 'i' and metadata != null) {
-                    var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
-                    const metastring = try metadata.?.print(&print_buf);
-                    db.print("{s}\n", .{metastring});
-                    db.flush(true);
+                if (cur_mode == 'i') {
+                    show_metadata();
                 }
             }
         }
@@ -310,6 +287,12 @@ pub fn main() !void {
         const prev_state = emu.s_smp.state;
 
         sw: switch (std.ascii.toLower(buffer[0])) {
+            'h' => {
+                show_help_menu();
+            },
+            'm' => {
+                show_metadata();
+            },
             'n' => {
                 cur_action = 'n';
                 cur_page +%= 1;
@@ -582,7 +565,7 @@ pub fn main() !void {
             }
         }
 
-        if (cur_action != 'c' or cur_mode != 'i') {
+        if ((cur_action != 'c' or cur_mode != 'i') and (std.ascii.toLower(buffer[0]) != 'm' and std.ascii.toLower(buffer[0]) != 'h')) {
             //db.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
             //db.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
             db.flush(true);
@@ -689,6 +672,43 @@ fn run_loop(emu: *Emu) !bool {
     return !signal;
 }
 
+fn show_help_menu() void {
+    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+    db.print("----------------------------------------------------------------------------------\n", .{});
+    db.print("Mode commands: \n", .{});
+    db.print("   i = Instruction trace log viewer [default] \n", .{});
+    db.print("   v = Memory viewer \n", .{});
+    db.print("   r = DSP register map viewer \n", .{});
+    db.print("   b = DSP debug viewer \n", .{});
+    db.print("   7 = Script700 debug viewer \n", .{});
+    db.print("Action commands: \n", .{});
+    db.print("   s = Step instruction [default] \n", .{});
+    db.print("   c = Continue to next breakpoint \n", .{});
+    db.print("   k = Break execution \n", .{});
+    db.print("   w = Write to IO port (snes -> spc) \n", .{});
+    db.print("   x = Send interrupt signal \n", .{});
+    db.print("   q = Run shadow code \n", .{});
+    db.print("   e = Exit shadow execution \n", .{});
+    db.print("   p = View previous page \n", .{});
+    db.print("   n = View next page \n", .{});
+    db.print("   u = Shift memory view up one row \n", .{});
+    db.print("   d = Shift memory view down one row \n", .{});
+    db.print("Other: \n", .{});
+    db.print("   h = Bring up this menu \n", .{});
+    db.print("   m = View ID666 metadata \n", .{});
+    db.print("----------------------------------------------------------------------------------\n\n", .{});
+    db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
+    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+}
+
+fn show_metadata() void {
+    var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
+    const metastring: []const u8 = metadata.?.print(&print_buf) catch print_buf[0..];
+    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+    db.print("{s}\n", .{metastring});
+    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+}
+
 fn break_listener() void {
     var prev_input: u8 = 'k';
 
@@ -710,6 +730,12 @@ fn break_listener() void {
                 0 => {
                     var cur_mode = t_menu_mode.load(std.builtin.AtomicOrder.seq_cst);
                     sw: switch (buffer[0]) {
+                        'h' => {
+                            show_help_menu();
+                        },
+                        'm' => {
+                            show_metadata();
+                        },
                         'i', 'v', 'r', 'b', '7', 'u', 'd', 'n', 'p' => {
                             cur_mode   = buffer[0];
                             prev_input = buffer[0];
