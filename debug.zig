@@ -31,7 +31,7 @@ pub fn print_spc_state(emu: *Emu) void {
     const z: u8 = if (state.z() == 1) 'Z' else 'z';
     const c: u8 = if (state.c() == 1) 'C' else 'c';
 
-    std.debug.print(
+    print(
         "A:{X:0>2} X:{X:0>2} Y:{X:0>2} SP:{X:0>2} PC:{X:0>4} {c}{c}{c}{c}{c}{c}{c}{c}",
         .{
             a, x, y, sp, pc,
@@ -1174,7 +1174,7 @@ pub fn print_dsp_cycle(emu: *Emu) void {
     const prev_cycle: i64 = @intCast(s_smp.prev_exec_cycle);
     const cycle:      i64 = @intCast(s_smp.cur_exec_cycle);
 
-    std.debug.print("Cycle: {d} -> {d} (+{d})", .{prev_cycle, cycle, cycle - prev_cycle});
+    print("Cycle: {d} -> {d} (+{d})", .{prev_cycle, cycle, cycle - prev_cycle});
 }
 
 pub fn filter_access_logs(logs_: SSMP.LogBuffer.Iter) [16]?SSMP.AccessLog {
@@ -1279,13 +1279,17 @@ pub fn filter_timer_logs(logs: []SSMP.TimerLog) [32]?SSMP.TimerLog {
 }
 
 const WriterType = @TypeOf(blk: {
-    var bw = std.io.countingWriter(std.io.getStdOut().writer());
+    var bw = std.io.countingWriter(std.io.getStdErr().writer());
     const w = bw.writer();
     break :blk w;
 });
 
 pub fn print_logs(state: *const SMPState, logs: []?SSMP.AccessLog) !void {
-    var buffer_writer = std.io.countingWriter(std.io.getStdErr().writer());
+    var buf: [1024]u8 = undefined;
+
+    var fbs = std.io.fixedBufferStream(&buf);
+
+    var buffer_writer = std.io.countingWriter(fbs.writer());
     var writer = buffer_writer.writer();
 
     var pad_length: u32 = 63;
@@ -1295,7 +1299,7 @@ pub fn print_logs(state: *const SMPState, logs: []?SSMP.AccessLog) !void {
             if (i > 0) {
                 _ = try writer.print(" ", .{});
             }
-            const extra_bytes = try print_log(state, &val, &writer, .{.prefix = false});
+            const extra_bytes = try print_log(state, &val, writer, .{.prefix = false});
             pad_length += extra_bytes;
         }
     }
@@ -1303,9 +1307,11 @@ pub fn print_logs(state: *const SMPState, logs: []?SSMP.AccessLog) !void {
     while (buffer_writer.bytes_written < pad_length) {
         _ = try writer.print(" ", .{});
     }
+
+    print("{s}", .{buf[0..buffer_writer.bytes_written]});
 }
 
-pub fn print_log(state: *const SMPState, log: *const SSMP.AccessLog, writer: *WriterType, options: struct { prefix: bool = true }) !u32 {
+pub fn print_log(state: *const SMPState, log: *const SSMP.AccessLog, writer: anytype, options: struct { prefix: bool = true }) !u32 {
     if (options.prefix) {
         _ = try writer.print("[{d}]\t {s}: ", .{log.dsp_cycle, @tagName(log.type)});
     }
@@ -1369,10 +1375,10 @@ pub fn print_log(state: *const SMPState, log: *const SSMP.AccessLog, writer: *Wr
 pub fn print_timer_log(log: *const SSMP.TimerLog, options: struct { prefix: bool = true }) void {
     if (options.prefix) {
         if (log.timer_number) |tn| {
-            std.debug.print("[{d}]\t: [Timer{d}-{s}] ", .{log.dsp_cycle, tn, @tagName(log.type)});
+            print("[{d}]\t: [Timer{d}-{s}] ", .{log.dsp_cycle, tn, @tagName(log.type)});
         }
         else {
-            std.debug.print("[{d}]\t: [TimerGlobal-{s}] ", .{log.dsp_cycle, @tagName(log.type)});
+            print("[{d}]\t: [TimerGlobal-{s}] ", .{log.dsp_cycle, @tagName(log.type)});
         }
     }
     
@@ -1380,7 +1386,7 @@ pub fn print_timer_log(log: *const SSMP.TimerLog, options: struct { prefix: bool
         SSMP.TimerLogType.read, SSMP.TimerLogType.reset => { },
         else => {
             if (log.timer_number != null) {
-                std.debug.print("internal-count: {X:0>2}, output: {X:0>1}", .{log.internal_counter, log.output});
+                print("internal-count: {X:0>2}, output: {X:0>1}", .{log.internal_counter, log.output});
             }
         }
     }
@@ -1399,7 +1405,7 @@ pub fn print_memory_page(emu: *Emu, page: u8, offset: u8, options: OptionStruct)
     for (0..16) |y| {
         const yy: u16 = @intCast(y);
         const line_start: u16 = page_start +% 16 * yy;
-        std.debug.print("{X:0>4} | ", .{line_start});
+        print("{X:0>4} | ", .{line_start});
 
         for (0..16) |x| {
             const xx: u16 = @intCast(x);
@@ -1409,7 +1415,7 @@ pub fn print_memory_page(emu: *Emu, page: u8, offset: u8, options: OptionStruct)
             print_mem_cell(emu, address, data, false, options);
         }
 
-        std.debug.print("| ", .{});
+        print("| ", .{});
 
         for (0..16) |x| {
             const xx: u16 = @intCast(x);
@@ -1419,7 +1425,7 @@ pub fn print_memory_page(emu: *Emu, page: u8, offset: u8, options: OptionStruct)
             print_mem_cell(emu, address, data, true, options);
         }
 
-        std.debug.print("\n", .{});
+        print("\n", .{});
     }
 }
 
@@ -1427,7 +1433,7 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
     for (0..8) |y| {
         const yy: u8 = @intCast(y);
         const line_start: u8 = 16 * yy;
-        std.debug.print("{X:0>2} | ", .{line_start});
+        print("{X:0>2} | ", .{line_start});
 
         for (0..16) |x| {
             const xx: u8 = @intCast(x);
@@ -1437,7 +1443,7 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
             print_mem_cell(emu, @as(u16, address), data, false, options);
         }
 
-        std.debug.print("| ", .{});
+        print("| ", .{});
 
         for (0..16) |x| {
             const xx: u8 = @intCast(x);
@@ -1447,7 +1453,7 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
             print_mem_cell(emu, @as(u16, address), data, true, options);
         }
 
-        std.debug.print("\n", .{});
+        print("\n", .{});
     }
 }
 
@@ -1456,9 +1462,9 @@ pub fn print_dsp_state(emu: *Emu, options: OptionStruct) void {
 
     // Print voice registers
     print_dsp_voices(emu, 0, options);
-    std.debug.print("\n", .{});
+    print("\n", .{});
     print_dsp_voices(emu, 4, options);
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     const kon =
           @as(u8, s.voice[0].keyon)      | @as(u8, s.voice[1].keyon) << 1
@@ -1504,37 +1510,37 @@ pub fn print_dsp_state(emu: *Emu, options: OptionStruct) void {
     const evolr: u8 = @bitCast(s.echo.vol_right);
     const efb:   u8 = @bitCast(s.echo.feedback);
 
-    std.debug.print("main volume - left:   {X:0>2}      ", .{mvoll});
-    std.debug.print("key on:                 {X:0>2}\n",   .{kon});
-    std.debug.print("main volume - right:  {X:0>2}      ", .{mvolr});
-    std.debug.print("key off:                {X:0>2}\n",   .{koff});
-    std.debug.print("echo volume - left:   {X:0>2}      ", .{evoll});
-    std.debug.print("source end (endx):      {X:0>2}\n",   .{0x00});
-    std.debug.print("echo volume - right:  {X:0>2}      ", .{evolr});
-    std.debug.print("echo feedback:          {X:0>2}\n",   .{efb});
-    std.debug.print("\n", .{});
+    print("main volume - left:   {X:0>2}      ", .{mvoll});
+    print("key on:                 {X:0>2}\n",   .{kon});
+    print("main volume - right:  {X:0>2}      ", .{mvolr});
+    print("key off:                {X:0>2}\n",   .{koff});
+    print("echo volume - left:   {X:0>2}      ", .{evoll});
+    print("source end (endx):      {X:0>2}\n",   .{0x00});
+    print("echo volume - right:  {X:0>2}      ", .{evolr});
+    print("echo feedback:          {X:0>2}\n",   .{efb});
+    print("\n", .{});
 
-    std.debug.print("pitch modulation:     {X:0>2}      ", .{pmon});
-    std.debug.print("echo buffer start:      {X:0>2}00\n", .{s.echo.esa_page});
-    std.debug.print("noise enable:         {X:0>2}      ", .{non});
-    std.debug.print("source directory start: {X:0>2}00\n", .{s.brr_bank});
-    std.debug.print("echo enable:          {X:0>2}      ", .{eon});
-    std.debug.print("echo delay:             {X:0>2}\n",   .{s.echo.delay});
-    std.debug.print("\n", .{});
+    print("pitch modulation:     {X:0>2}      ", .{pmon});
+    print("echo buffer start:      {X:0>2}00\n", .{s.echo.esa_page});
+    print("noise enable:         {X:0>2}      ", .{non});
+    print("source directory start: {X:0>2}00\n", .{s.brr_bank});
+    print("echo enable:          {X:0>2}      ", .{eon});
+    print("echo delay:             {X:0>2}\n",   .{s.echo.delay});
+    print("\n", .{});
 
-    std.debug.print("noise clock:     {X:0>2}\n", .{s.noise_rate});
-    std.debug.print("read-only echo:  {}\n",      .{s.echo.readonly == 1});
-    std.debug.print("mute:            {}\n",      .{s.mute          == 1});
-    std.debug.print("reset:           {}\n",      .{s.reset         == 1});
-    std.debug.print("\n", .{});
-    std.debug.print(
+    print("noise clock:     {X:0>2}\n", .{s.noise_rate});
+    print("read-only echo:  {}\n",      .{s.echo.readonly == 1});
+    print("mute:            {}\n",      .{s.mute          == 1});
+    print("reset:           {}\n",      .{s.reset         == 1});
+    print("\n", .{});
+    print(
         "fir:  {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",
         .{
             fir[0], fir[1], fir[2], fir[3],
             fir[4], fir[5], fir[6], fir[7],
         }
     );
-    std.debug.print("\n", .{});
+    print("\n", .{});
 }
 
 fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
@@ -1545,66 +1551,66 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
         const val: u8 = @bitCast(v.vol_left);
-        std.debug.print("V{d}  left volume:  {X:0>2}       ", .{idx, val});
+        print("V{d}  left volume:  {X:0>2}       ", .{idx, val});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
         const val: u8 = @bitCast(v.vol_right);
-        std.debug.print("    right volume: {X:0>2}       ", .{val});
+        print("    right volume: {X:0>2}       ", .{val});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        std.debug.print("    pitch:        {X:0>4}     ", .{v.pitch});
+        print("    pitch:        {X:0>4}     ", .{v.pitch});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        std.debug.print("    srcn:         {X:0>2}       ", .{v.source});
+        print("    srcn:         {X:0>2}       ", .{v.source});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        std.debug.print("    adsr 1:       {X:0>2}       ", .{v.adsr_0});
+        print("    adsr 1:       {X:0>2}       ", .{v.adsr_0});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        std.debug.print("    adsr 2:       {X:0>2}       ", .{v.adsr_1});
+        print("    adsr 2:       {X:0>2}       ", .{v.adsr_1});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        std.debug.print("    gain:         {X:0>2}       ", .{v.gain});
+        print("    gain:         {X:0>2}       ", .{v.gain});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        std.debug.print("    envx:         {X:0>2}       ", .{v.envx});
+        print("    envx:         {X:0>2}       ", .{v.envx});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         _ = &s.voice[idx];
-        std.debug.print("    outx:         {X:0>2}       ", .{0x00});
+        print("    outx:         {X:0>2}       ", .{0x00});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 }
 
 fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: OptionStruct) void {
@@ -1702,16 +1708,16 @@ fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: Opt
 }
 
 fn print_byte(before: []const u8, data: u8, after: []const u8, as_char: bool) void {
-    std.debug.print("{s}", .{before});
+    print("{s}", .{before});
     if (as_char) {
-        std.debug.print("{c}", .{if (data >= 32 and data < 127) data else '.'});
+        print("{c}", .{if (data >= 32 and data < 127) data else '.'});
     }
     else {
-        std.debug.print("{X:0>2}", .{data});
+        print("{X:0>2}", .{data});
     }
-    std.debug.print("{s}", .{after});
+    print("{s}", .{after});
     if (!as_char) {
-        std.debug.print(" ", .{});
+        print(" ", .{});
     }
 }
 
@@ -1720,58 +1726,58 @@ pub fn print_dsp_debug_state(emu: *Emu, options: OptionStruct) void {
 
     // Print voice registers
     print_dsp_debug_voices(emu, 0, options);
-    std.debug.print("\n", .{});
+    print("\n", .{});
     print_dsp_debug_voices(emu, 4, options);
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     _ = s;
 }
 
 fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
     print_dsp_voices(emu, base, options);
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     const s = emu.s_dsp.int();
 
-    std.debug.print("\x1B[90m", .{});
+    print("\x1B[90m", .{});
 
     // Print voice 0-3 states
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
         const val: u4 = @bitCast(v._buffer_offset);
-        std.debug.print("    buff. offset: {X:0>1}        ", .{val});
+        print("    buff. offset: {X:0>1}        ", .{val});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
         const val: u16 = @bitCast(v._gaussian_offset);
-        std.debug.print("    gauss offset: {X:0>4}     ", .{val});
+        print("    gauss offset: {X:0>4}     ", .{val});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        std.debug.print("    brr address:  {X:0>4}     ", .{v._brr_address});
+        print("    brr address:  {X:0>4}     ", .{v._brr_address});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        std.debug.print("    brr offset:   {X:0>1}        ", .{v._brr_offset});
+        print("    brr offset:   {X:0>1}        ", .{v._brr_offset});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        std.debug.print("    key on delay: {X:0>1}        ", .{v._key_on_delay});
+        print("    key on delay: {X:0>1}        ", .{v._key_on_delay});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
@@ -1783,21 +1789,21 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
                 .release => "reles",
                 .key_off => "keyof"
             };
-        std.debug.print("    env. mode:    {s}    ", .{res});
+        print("    env. mode:    {s}    ", .{res});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        std.debug.print("    env. level:   {X:0>2}.{X:0>1}     ", .{v._env_level >> 4, @as(u12, v._env_level) << 1 & 0xF});
+        print("    env. level:   {X:0>2}.{X:0>1}     ", .{v._env_level >> 4, @as(u12, v._env_level) << 1 & 0xF});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |_| {
-        std.debug.print("    buffer:                ", .{});
+        print("    buffer:                ", .{});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
@@ -1806,9 +1812,9 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
             @bitCast(v._buffer[0]), @bitCast(v._buffer[1]),
             @bitCast(v._buffer[2]), @bitCast(v._buffer[3]),
         };
-        std.debug.print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
@@ -1817,9 +1823,9 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
             @bitCast(v._buffer[4]), @bitCast(v._buffer[5]),
             @bitCast(v._buffer[6]), @bitCast(v._buffer[7]),
         };
-        std.debug.print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
@@ -1828,11 +1834,11 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
             @bitCast(v._buffer[8]),  @bitCast(v._buffer[9]),
             @bitCast(v._buffer[10]), @bitCast(v._buffer[11]),
         };
-        std.debug.print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
-    std.debug.print("\x1B[0m", .{});
+    print("\x1B[0m", .{});
 }
 
 pub fn print_script700_state(emu: *Emu) void {
@@ -1842,29 +1848,199 @@ pub fn print_script700_state(emu: *Emu) void {
     const smp  = &emu.s_smp;
     const smps = &smp.state;
 
-    std.debug.print("Running?    : {}\n", .{s7.enabled});
-    std.debug.print("Port In (Q) : {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",   .{s7s.port_in[0], s7s.port_in[1], s7s.port_in[2], s7s.port_in[3]});
-    std.debug.print("Port In     : {X:0>2} {X:0>2} {X:0>2} {X:0>2}    ", .{smps.input_ports [0], smps.input_ports [1], smps.input_ports [2], smps.input_ports [3]});
-    std.debug.print("Out : {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",           .{smps.output_ports[0], smps.output_ports[1], smps.output_ports[2], smps.output_ports[3]});
+    print("Running?    : {}\n", .{s7.enabled});
+    print("Port In (Q) : {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",   .{s7s.port_in[0], s7s.port_in[1], s7s.port_in[2], s7s.port_in[3]});
+    print("Port In     : {X:0>2} {X:0>2} {X:0>2} {X:0>2}    ", .{smps.input_ports [0], smps.input_ports [1], smps.input_ports [2], smps.input_ports [3]});
+    print("Out : {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n",           .{smps.output_ports[0], smps.output_ports[1], smps.output_ports[2], smps.output_ports[3]});
 
-    std.debug.print("Work 0-3    : {X:0>8} {X:0>8} {X:0>8} {X:0>8}\n", .{s7s.work[0], s7s.work[1], s7s.work[2], s7s.work[3]});
-    std.debug.print("     4-7    : {X:0>8} {X:0>8} {X:0>8} {X:0>8}\n", .{s7s.work[4], s7s.work[5], s7s.work[6], s7s.work[7]});
+    print("Work 0-3    : {X:0>8} {X:0>8} {X:0>8} {X:0>8}\n", .{s7s.work[0], s7s.work[1], s7s.work[2], s7s.work[3]});
+    print("     4-7    : {X:0>8} {X:0>8} {X:0>8} {X:0>8}\n", .{s7s.work[4], s7s.work[5], s7s.work[6], s7s.work[7]});
 
-    std.debug.print("Cmp Param   : {X:0>8} {X:0>8}\n", .{s7s.cmp[0], s7s.cmp[1]});
-    std.debug.print("Wait Until  : ", .{});
+    print("Cmp Param   : {X:0>8} {X:0>8}\n", .{s7s.cmp[0], s7s.cmp[1]});
+    print("Wait Until  : ", .{});
     if (s7s.wait_until == null) {
-        std.debug.print("---------------- (none)\n", .{});
+        print("---------------- (none)\n", .{});
     }
     else {
-        std.debug.print("{X:0>16} ({d})\n", .{s7s.wait_until.?, s7s.wait_until.?});
+        print("{X:0>16} ({d})\n", .{s7s.wait_until.?, s7s.wait_until.?});
     }
 
-    std.debug.print("Script Size : {X:0>6}\n",              .{s7.script_bytecode.len});
-    std.debug.print("Data Size   : {X:0>6} ",               .{s7.data_area.len});
-    std.debug.print("(PC={X:0>6} SP={X:0>2} ST={X:0>2})\n", .{s7s.pc, s7s.sp, s7s.sp_top});
-    std.debug.print("Cur. Cycle  : {X:0>16} ({d})\n",       .{s7s.cur_cycle, s7s.cur_cycle});
-    std.debug.print("Begin Cycle : {X:0>16} ({d})\n",       .{s7s.begin_cycle, s7s.begin_cycle});
-    std.debug.print("Sync Point  : {X:0>16} ({d})\n",       .{s7s.sync_point, s7s.sync_point});
-    //std.debug.print("Wait Accum  : {d}\n",                  .{s7s.wait_accum});
-    //std.debug.print("Clk Offset  : {d}\n",                  .{s7s.clock_offset});
+    print("Script Size : {X:0>6}\n",              .{s7.script_bytecode.len});
+    print("Data Size   : {X:0>6} ",               .{s7.data_area.len});
+    print("(PC={X:0>6} SP={X:0>2} ST={X:0>2})\n", .{s7s.pc, s7s.sp, s7s.sp_top});
+    print("Cur. Cycle  : {X:0>16} ({d})\n",       .{s7s.cur_cycle, s7s.cur_cycle});
+    print("Begin Cycle : {X:0>16} ({d})\n",       .{s7s.begin_cycle, s7s.begin_cycle});
+    print("Sync Point  : {X:0>16} ({d})\n",       .{s7s.sync_point, s7s.sync_point});
+    //print("Wait Accum  : {d}\n",                  .{s7s.wait_accum});
+    //print("Clk Offset  : {d}\n",                  .{s7s.clock_offset});
+}
+
+var cli_width: u8 = 120;
+
+pub inline fn set_cli_width(amt: u8) void {
+    cli_width = amt;
+    if (amt < 60) {
+        cli_width = 60;
+    }
+    for (0..max_lines) |i| {
+        canvas_line_lengths[i] = cli_width;
+    }
+}
+
+const max_lines: u32 = 47;
+
+var print_canvas:  [max_lines * 256]u8 = [_]u8 {' '} ** (max_lines * 256);
+var canvas_line_lengths: [max_lines]u8 = [_]u8 {120} ** max_lines;
+var start_line: u32 = 0;
+var canvas_index: u32 = 0;
+var canvas_ansi: bool = false;
+
+pub inline fn print(comptime fmt: []const u8, args: anytype) void {
+    var temp_buffer: [1024]u8 = [_]u8 {' '} ** 1024;
+    const slice: ?[]const u8 = std.fmt.bufPrint(&temp_buffer, fmt, args) catch null;
+
+    if (slice) |slc| {
+        var index: u32 = canvas_index;
+        var sub_index: u32 = index % 256;
+
+        //std.debug.print("{d} {d} {d}\n", .{index / 256, canvas_line_lengths[index / 256], cli_width});
+        var noprint_offset: u8 = canvas_line_lengths[index / 256] - cli_width;
+        var ansi: bool = canvas_ansi;
+
+        var prev_start_line = start_line;
+
+        for (slc) |c| {
+            if (sub_index >= 255) {
+                index -= sub_index - 255;
+                sub_index = 255;
+            }
+
+            var line_index = index / 256;
+            canvas_line_lengths[line_index] = cli_width + noprint_offset;
+
+            if (sub_index == cli_width + noprint_offset) {
+                break;
+            }
+
+            if (c == '\n') {
+                index = ((line_index + 1) % max_lines) * 256;
+                sub_index = 0;
+                ansi = false;
+                noprint_offset = 0;
+
+                line_index += 1;
+
+                if (line_index >= (start_line + max_lines - 1) % max_lines + 1) {
+                    //flush(true);
+
+                    line_index %= max_lines;
+                    start_line = (start_line + 1) % max_lines;
+                    index = line_index * 256;
+
+                    for (index..(index + 256)) |i| {
+                        print_canvas[i] = ' ';
+                    }
+
+                    canvas_line_lengths[line_index] = cli_width;
+                }
+            }
+            else {
+                if (sub_index >= 255) {
+                    // Don't print if we have overflowed the canvas horizontally
+                    continue;
+                }
+
+                print_canvas[index] = c;
+
+                if (!ansi and c == '\x1B') {
+                    ansi = true;
+                    noprint_offset +|= 1;
+                    canvas_line_lengths[line_index] = cli_width + noprint_offset;
+                }
+                else if (ansi) {
+                    if (c >= 'A' and c <= 'Z' or c >= 'a' and c <= 'z') {
+                        ansi = false;
+                        if (c == 'J') { // Ignore clears
+                            inline for (0..4) |i| {
+                                print_canvas[index - i] = ' ';
+                            }
+
+                            index -= 4;
+                            sub_index -= 4;
+                            noprint_offset -= 4;
+                        }
+                        else if (c == 'A') { // Handle shift up
+                            inline for (0..3) |i| {
+                                print_canvas[index - i] = ' ';
+                            }
+
+                            canvas_line_lengths[line_index] -= 2;
+
+                            index = (line_index + max_lines - 1) % max_lines * 256;
+                            sub_index = 0;
+                            ansi = false;
+                            noprint_offset = 0;
+
+                            continue;
+                        }
+                        else if (c == 'H') { // Flush on position reset
+                            inline for (0..3) |i| {
+                                print_canvas[index - i] = ' ';
+                            }
+
+                            index -= 3;
+                            sub_index -= 3;
+                            noprint_offset -= 2;
+
+                            flush(false);
+                            return;
+                        }
+                    }
+                    noprint_offset +|= 1;
+                    canvas_line_lengths[line_index] = cli_width + noprint_offset;
+                }
+
+                index += 1;
+                sub_index += 1;
+            }
+
+            prev_start_line = start_line;
+        }
+
+        canvas_index = index;
+        canvas_ansi = ansi;
+    }
+}
+
+pub inline fn flush(no_clear: bool) void {
+    var final_buffer: [max_lines * 257]u8 = undefined;
+    var total_chars: u32 = 0;
+
+    for (0..max_lines) |L_| {
+        const L: u8 = @intCast(L_);
+
+        const len   = canvas_line_lengths[(L + start_line) % max_lines];
+        const start = @as(u32, (L + start_line) % max_lines) * 256;
+
+        const res: ?[]const u8 = std.fmt.bufPrint(final_buffer[total_chars..], "{s}\n", .{print_canvas[start..(start + len)]}) catch null;
+        if (res) |r| {
+            total_chars += @intCast(r.len);
+        }
+    }
+
+    std.debug.print("\x1B[H{s}\nEnter a command (h for help menu): ", .{final_buffer[0..total_chars]});
+
+    if (!no_clear) {
+        for (print_canvas, 0..) |_, i| {
+            print_canvas[i] = ' ';
+        }
+
+        for (canvas_line_lengths, 0..) |_, i| {
+            canvas_line_lengths[i] = cli_width;
+        }
+
+        canvas_index = 0;
+        canvas_ansi = false;
+        start_line = 0;
+    }
 }

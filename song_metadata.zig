@@ -304,22 +304,25 @@ pub const SongMetadata = struct {
         return r;
     }
 
-    pub fn print(self: *const SongMetadata) !void {
+    pub fn print(self: *const SongMetadata, buf: []u8) ![]const u8 {
         const padding: u32 = 16;
         const max_len: u32 = 64;
 
         var md_copy = self.*;
         md_copy.strip_newlines();
 
-        std.debug.print("----------------------------------------------------------------------------------\n", .{});
-        print_str("Title:",       if (md_copy.title != null)    null_term(md_copy.title.?[0..])    else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Artist:",      if (md_copy.artist != null)   null_term(md_copy.artist.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Game:",        if (md_copy.game != null)     null_term(md_copy.game.?[0..])     else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Dumper:",      if (md_copy.dumper != null)   null_term(md_copy.dumper.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
-        print_str("Comments:",    if (md_copy.comments != null) null_term(md_copy.comments.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        var fbs = std.io.fixedBufferStream(buf);
+        var writer = fbs.writer();
+
+        try writer.print("----------------------------------------------------------------------------------\n", .{});
+        try print_str(writer, "Title:",       if (md_copy.title != null)    null_term(md_copy.title.?[0..])    else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        try print_str(writer, "Artist:",      if (md_copy.artist != null)   null_term(md_copy.artist.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        try print_str(writer, "Game:",        if (md_copy.game != null)     null_term(md_copy.game.?[0..])     else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        try print_str(writer, "Dumper:",      if (md_copy.dumper != null)   null_term(md_copy.dumper.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        try print_str(writer, "Comments:",    if (md_copy.comments != null) null_term(md_copy.comments.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
 
         if (self.date_other) |d| {
-            print_str("Date Dumped:", d[0..], padding, max_len);
+            try print_str(writer, "Date Dumped:", d[0..], padding, max_len);
         }
         else if (self.year != null and self.month != null and self.day != null) {
             var date_str = [_]u8 {'0', '0', '0', '0', '-', '0', '0', '-', '0', '0', 0};
@@ -328,26 +331,26 @@ pub const SongMetadata = struct {
             _ = try buf_print_padded(date_str[5..7],  self.month.?,    100);
             _ = try buf_print_padded(date_str[8..10], self.day.?,      100);
 
-            print_str("Date Dumped:", date_str[0..10], padding, max_len);
+            try print_str(writer, "Date Dumped:", date_str[0..10], padding, max_len);
         }
         else {
-            print_str("Date Dumped:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Date Dumped:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.length_in_seconds) |slis| {
             const song_length = try buf_print_time(slis, false);
-            print_str("Song Length:", song_length[0..], padding, max_len);
+            try print_str(writer, "Song Length:", song_length[0..], padding, max_len);
         }
         else {
-            print_str("Song Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Song Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.fade_length_in_ms) |flims| {
             const fade_length = try buf_print_time(flims, true);
-            print_str("Fade Time:", fade_length[0..], padding, max_len);
+            try print_str(writer, "Fade Time:", fade_length[0..], padding, max_len);
         }
         else {
-            print_str("Fade Time:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Fade Time:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         const chan_states: [8]u1 =
@@ -377,98 +380,101 @@ pub const SongMetadata = struct {
             );
         }
 
-        print_str("Channel States:", chan_buf[0..], padding, max_len);
+        try print_str(writer, "Channel States:", chan_buf[0..], padding, max_len);
 
         if (self.emulator_id) |emu_id| {
             var emu_buf = [_]u8 {' ', ' ', ' '};
             const emu_str = try std.fmt.bufPrint(emu_buf[0..], "{}", .{emu_id});
-            print_str("Emulator ID:", emu_str, padding, max_len);
+            try print_str(writer, "Emulator ID:", emu_str, padding, max_len);
         }
         else {
-            print_str("Emulator ID:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Emulator ID:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
-        print_str("OST Title:", if (md_copy.ost_title != null) null_term(md_copy.ost_title.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        try print_str(writer, "OST Title:", if (md_copy.ost_title != null) null_term(md_copy.ost_title.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
         if (self.ost_disc) |ost_disc| {
             var disc_buf = [_]u8 {' ', ' ', ' '};
             const disc_str = try std.fmt.bufPrint(disc_buf[0..], "{}", .{ost_disc});
-            print_str("OST Disc:", disc_str, padding, max_len);
+            try print_str(writer, "OST Disc:", disc_str, padding, max_len);
         }
         else {
-            print_str("OST Disc:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "OST Disc:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.ost_track) |ost_track| {
             if (ost_track[0] >= 0x21 and ost_track[0] <= 0x7E) {
                 var track_buf = [_]u8 {ost_track[0], ' ', ' ', ' '};
                 _ = try std.fmt.bufPrint(track_buf[1..], "{}", .{ost_track[1]});
-                print_str("OST Track:", track_buf[0..], padding, max_len);
+                try print_str(writer, "OST Track:", track_buf[0..], padding, max_len);
             }
             else {
                 var track_buf = [_]u8 {' ', ' ', ' '};
                 const track_str = try std.fmt.bufPrint(track_buf[0..], "{}", .{ost_track[1]});
-                print_str("OST Track:", track_str, padding, max_len);
+                try print_str(writer, "OST Track:", track_str, padding, max_len);
             }
         }
         else {
-            print_str("OST Track:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "OST Track:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
-        print_str("Publisher:", if (md_copy.publisher != null) null_term(md_copy.publisher.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
+        try print_str(writer, "Publisher:", if (md_copy.publisher != null) null_term(md_copy.publisher.?[0..]) else "\x1B[32m<none>\x1B[0m", padding, max_len);
 
         if (self.copyright_year) |cpr_year| {
             var cpr_buf = [_]u8 {' ', ' ', ' ', ' '};
             const cpr_str = try std.fmt.bufPrint(cpr_buf[0..], "{}", .{cpr_year});
-            print_str("Copyright Year:", cpr_str, padding, max_len);
+            try print_str(writer, "Copyright Year:", cpr_str, padding, max_len);
         }
         else {
-            print_str("Copyright Year:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Copyright Year:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.intro_length_in_timer2_steps) |int_len| {
             const intro_length = try buf_print_time(int_len / 64, true);
-            print_str("Intro Length:", intro_length[0..], padding, max_len);
+            try print_str(writer, "Intro Length:", intro_length[0..], padding, max_len);
         }
         else {
-            print_str("Intro Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Intro Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.loop_length_in_timer2_steps) |loop_len| {
             const loop_length = try buf_print_time(loop_len / 64, true);
-            print_str("Loop Length:", loop_length[0..], padding, max_len);
+            try print_str(writer, "Loop Length:", loop_length[0..], padding, max_len);
         }
         else {
-            print_str("Loop Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Loop Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.end_length_in_timer2_steps) |end_len| {
             const end_length = try buf_print_time(end_len / 64, true);
-            print_str("End Length:", end_length[0..], padding, max_len);
+            try print_str(writer, "End Length:", end_length[0..], padding, max_len);
         }
         else {
-            print_str("End Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "End Length:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.loop_times) |loop_times| {
             var loop_buf = [_]u8 {' ', ' ', ' '};
             const loop_str = try std.fmt.bufPrint(loop_buf[0..], "{}", .{loop_times});
-            print_str("Loop Count:", loop_str, padding, max_len);
+            try print_str(writer, "Loop Count:", loop_str, padding, max_len);
         }
         else {
-            print_str("Loop Count:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Loop Count:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
 
         if (self.mixing_level) |mix_lvl| {
             var mix_buf = [_]u8 {' ', ' ', ' ', '/', '2', '5', '5'};
             const mix_str = try std.fmt.bufPrint(mix_buf[0..3], "{}", .{mix_lvl});
-            print_str("Mixing Level:", mix_str, padding, max_len);
+            try print_str(writer, "Mixing Level:", mix_str, padding, max_len);
         }
         else {
-            print_str("Mixing Level:", "\x1B[32m<none>\x1B[0m", padding, max_len);
+            try print_str(writer, "Mixing Level:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
         
-        std.debug.print("----------------------------------------------------------------------------------\n", .{});
-        std.debug.print("\n", .{});
+        try writer.print("----------------------------------------------------------------------------------\n", .{});
+        try writer.print("\n", .{});
+
+        const length = try fbs.getPos();
+        return buf[0..@intCast(length)];
     }
 
     pub fn strip_newlines(self: *SongMetadata) void {
@@ -618,7 +624,7 @@ pub const SongMetadata = struct {
         }
     }
 
-    fn print_str(label: []const u8, str: []const u8, comptime padding: u32, max_len: u32) void {
+    fn print_str(writer: anytype, label: []const u8, str: []const u8, comptime padding: u32, max_len: u32) !void {
         const pad_str = [_]u8 {' '} ** padding;
 
         var remainder: u32 = @intCast(str.len);
@@ -629,22 +635,22 @@ pub const SongMetadata = struct {
             label_str[i] = char;
         }
 
-        std.debug.print("{s}", .{label_str});
+        try writer.print("{s}", .{label_str});
 
         while (remainder > max_len) {
             if (start > 0) {
-                std.debug.print("{s}", .{pad_str});
+                try writer.print("{s}", .{pad_str});
             }
-            std.debug.print("{s}\n", .{str[start..(start + max_len)]});
+            try writer.print("{s}\n", .{str[start..(start + max_len)]});
 
             remainder -= max_len;
             start     += max_len;
         }
 
         if (start > 0) {
-            std.debug.print("{s}", .{pad_str});
+            try writer.print("{s}", .{pad_str});
         }
-        std.debug.print("{s}\n", .{str[start..]});
+        try writer.print("{s}\n", .{str[start..]});
     }
 
     fn null_term(in_buf: []const u8) []const u8 {

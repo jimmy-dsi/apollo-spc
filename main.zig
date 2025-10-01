@@ -27,6 +27,9 @@ var m_expect_input = std.Thread.Mutex{};
 var stdout_file: std.fs.File = undefined;
 
 pub fn main() !void {
+    db.set_cli_width(190);
+    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+
     const stdout = std.io.getStdOut();
     stdout_file = stdout;
 
@@ -71,7 +74,7 @@ pub fn main() !void {
     
     var sl: []u32 = undefined;
 
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x7B8}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x7B8}); ix += 2;
     //emu.script700.label_addresses[0] = ix;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  64}); ix += 2;
@@ -175,8 +178,12 @@ pub fn main() !void {
         _ = try file.readAll(buffer);
         metadata = try spc_loader.load_spc(&emu, buffer);
 
-        std.debug.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
-        try metadata.?.print();
+        db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
+
+        var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
+        const metastring = try metadata.?.print(&print_buf);
+        db.print("{s}\n", .{metastring});
+        db.flush(true);
 
         if (script700_load_error) |err| {
             report_error(err, true);
@@ -184,37 +191,37 @@ pub fn main() !void {
     
         if (!debug_mode) {
             // Output 1.25 second of blank audio first, to compensate for ffplay nobuffer option
-            for (0..40) |_| {
-                var stdout_writer = stdout_file.writer();
-                try stdout_writer.writeAll(&buf);
-            }
+            //for (0..40) |_| {
+            //    var stdout_writer = stdout_file.writer();
+            //    try stdout_writer.writeAll(&buf);
+            //}
             
             cur_action = 'c';
         }
     }
 
-    //std.debug.print("----------------------------------------------------------------------------------\n", .{});
-    //std.debug.print("Mode commands: \n", .{});
-    //std.debug.print("   i = Instruction trace log viewer [default] \n", .{});
-    //std.debug.print("   v = Memory viewer \n", .{});
-    //std.debug.print("   r = DSP register map viewer \n", .{});
-    //std.debug.print("   b = DSP debug viewer \n", .{});
-    //std.debug.print("   7 = Script700 debug viewer \n", .{});
-    //std.debug.print("Action commands: \n", .{});
-    //std.debug.print("   s = Step instruction [default] \n", .{});
-    //std.debug.print("   c = Continue to next breakpoint \n", .{});
-    //std.debug.print("   k = Break execution \n", .{});
-    //std.debug.print("   w = Write to IO port (snes -> spc) \n", .{});
-    //std.debug.print("   x = Send interrupt signal \n", .{});
-    //std.debug.print("   q = Run shadow code \n", .{});
-    //std.debug.print("   e = Exit shadow execution \n", .{});
-    //std.debug.print("   p = View previous page \n", .{});
-    //std.debug.print("   n = View next page \n", .{});
-    //std.debug.print("   u = Shift memory view up one row \n", .{});
-    //std.debug.print("   d = Shift memory view down one row \n", .{});
-    //std.debug.print("----------------------------------------------------------------------------------\n\n", .{});
-    //std.debug.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
-    //std.debug.print("\n", .{});
+    //db.print("----------------------------------------------------------------------------------\n", .{});
+    //db.print("Mode commands: \n", .{});
+    //db.print("   i = Instruction trace log viewer [default] \n", .{});
+    //db.print("   v = Memory viewer \n", .{});
+    //db.print("   r = DSP register map viewer \n", .{});
+    //db.print("   b = DSP debug viewer \n", .{});
+    //db.print("   7 = Script700 debug viewer \n", .{});
+    //db.print("Action commands: \n", .{});
+    //db.print("   s = Step instruction [default] \n", .{});
+    //db.print("   c = Continue to next breakpoint \n", .{});
+    //db.print("   k = Break execution \n", .{});
+    //db.print("   w = Write to IO port (snes -> spc) \n", .{});
+    //db.print("   x = Send interrupt signal \n", .{});
+    //db.print("   q = Run shadow code \n", .{});
+    //db.print("   e = Exit shadow execution \n", .{});
+    //db.print("   p = View previous page \n", .{});
+    //db.print("   n = View next page \n", .{});
+    //db.print("   u = Shift memory view up one row \n", .{});
+    //db.print("   d = Shift memory view down one row \n", .{});
+    //db.print("----------------------------------------------------------------------------------\n\n", .{});
+    //db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
+    //db.print("\n", .{});
 
     const stdin = std.io.getStdIn().reader();
     var buffer: [8]u8 = undefined;
@@ -239,6 +246,7 @@ pub fn main() !void {
     };
     
     emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
+    last_time = std.time.nanoTimestamp();
 
     while (true) {
         if (cur_action == 'c') {
@@ -284,12 +292,15 @@ pub fn main() !void {
             }
             
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
-            std.debug.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+            //db.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
 
             if (std.ascii.toLower(buffer[0]) == 'c') {
-                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 if (cur_mode == 'i' and metadata != null) {
-                    try metadata.?.print();
+                    var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
+                    const metastring = try metadata.?.print(&print_buf);
+                    db.print("{s}\n", .{metastring});
+                    db.flush(true);
                 }
             }
         }
@@ -303,7 +314,7 @@ pub fn main() !void {
                 cur_action = 'n';
                 cur_page +%= 1;
                 if (cur_mode == 'v') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{});
                 }
             },
@@ -342,7 +353,7 @@ pub fn main() !void {
 
                 if (!res.?) {
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
-                    std.debug.print("Breakpoint hit. Press enter\n", .{});
+                    db.print("Breakpoint hit. Press enter\n", .{});
                     cur_action = 's';
                 }
                 else {
@@ -350,22 +361,22 @@ pub fn main() !void {
                 }
 
                 if (cur_mode == 'v') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                 }
                 else if (cur_mode == 'r') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
 
-                    std.debug.print("\n", .{});
+                    db.print("\n", .{});
                     db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                 }
                 else if (cur_mode == 'b') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                 }
                 else if (cur_mode == '7') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_script700_state(&emu);
                 }
             },
@@ -373,7 +384,7 @@ pub fn main() !void {
                 cur_action = 'p';
                 cur_page -%= 1;
                 if (cur_mode == 'v') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{});
                 }
             },
@@ -384,7 +395,7 @@ pub fn main() !void {
                 }
                 cur_offset +%= 0x10;
                 if (cur_mode == 'v') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{});
                 }
             },
@@ -395,41 +406,41 @@ pub fn main() !void {
                 }
                 cur_offset -%= 0x10;
                 if (cur_mode == 'v') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{});
                 }
             },
             'i' => {
                 cur_mode = 'i';
-                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
             },
             'v' => {
                 cur_mode = 'v';
-                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
             },
             'r' => {
                 cur_mode = 'r';
-                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print_dsp_map(&emu, .{.is_dsp = true});
 
-                std.debug.print("\n", .{});
+                db.print("\n", .{});
                 db.print_dsp_state(&emu, .{.is_dsp = true});
             },
             'b' => {
                 cur_mode = 'b';
-                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print_dsp_debug_state(&emu, .{.is_dsp = true});
             },
             '7' => {
                 cur_mode = '7';
-                std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print_script700_state(&emu);
             },
             'w' => {
                 cur_action = 'w';
 
-                std.debug.print("\nEnter APU IO port and byte value. Format: PP XX (Example: F4 0A)\n", .{});
+                db.print("\nEnter APU IO port and byte value. Format: PP XX (Example: F4 0A)\n", .{});
                 _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
                 const port_num = std.fmt.parseInt(u8, buffer[0..2], 16) catch 0x00;
@@ -441,32 +452,32 @@ pub fn main() !void {
 
                     emu.s_smp.receive_port_value(@intCast(port_num - 0xF4), v);
 
-                    std.debug.print("\x1B[34m", .{});
-                    std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive"});
-                    std.debug.print("[{X:0>4}]={X:0>2}->{X:0>2}", .{port_num, prev_port_val, v});
-                    std.debug.print("\x1B[0m\n", .{});
+                    db.print("\x1B[34m", .{});
+                    db.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive"});
+                    db.print("[{X:0>4}]={X:0>2}->{X:0>2}", .{port_num, prev_port_val, v});
+                    db.print("\x1B[0m\n", .{});
                 }
             },
             'x' => {
                 emu.s_smp.trigger_interrupt(null);
 
-                std.debug.print("\n\x1B[34m", .{});
-                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive interrupt"});
-                std.debug.print("\x1B[0m\n", .{});
+                db.print("\n\x1B[34m", .{});
+                db.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "receive interrupt"});
+                db.print("\x1B[0m\n", .{});
             },
             'q' => {
                 emu.enable_shadow_mode(.{.set_as_master = true});
 
-                std.debug.print("\n\x1B[34m", .{});
-                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "entering shadow mode"});
-                std.debug.print("\x1B[0m\n", .{});
+                db.print("\n\x1B[34m", .{});
+                db.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "entering shadow mode"});
+                db.print("\x1B[0m\n", .{});
             },
             'e' => {
                 emu.disable_shadow_execution(.{.force_exit = true});
 
-                std.debug.print("\n\x1B[34m", .{});
-                std.debug.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "exiting shadow execution"});
-                std.debug.print("\x1B[0m\n", .{});
+                db.print("\n\x1B[34m", .{});
+                db.print("[{d}]\t {s}: ", .{emu.s_dsp.last_processed_cycle, "exiting shadow execution"});
+                db.print("\x1B[0m\n", .{});
             },
             's' => {
                 cur_action = 's';
@@ -523,46 +534,46 @@ pub fn main() !void {
                 var logs = db.filter_access_logs(all_logs);
 
                 if (cur_mode == 'i') {
-                    std.debug.print("{s}", .{buffer_list.items});
+                    db.print("{s}", .{buffer_list.items});
                     try db.print_logs(&prev_state, logs[0..]);
 
                     db.print_spc_state(&emu);
-                    std.debug.print(" | ", .{});
+                    db.print(" | ", .{});
                     db.print_dsp_cycle(&emu);
-                    std.debug.print("\n", .{});
+                    db.print("\n", .{});
 
                     // Print timer logs after instruction log
-                    const all_timer_logs = emu.s_smp.get_timer_logs(.{});
-                    const timer_logs = db.filter_timer_logs(all_timer_logs);
+                    //const all_timer_logs = emu.s_smp.get_timer_logs(.{});
+                    //const timer_logs = db.filter_timer_logs(all_timer_logs);
 
                     emu.s_smp.clear_timer_logs();
 
-                    for (timer_logs) |log| {
-                        if (log == null) {
-                            break;
-                        }
-                        std.debug.print("\x1B[32m", .{});
-                        db.print_timer_log(&log.?, .{ .prefix =true });
-                        std.debug.print("\x1B[39m\n", .{});
-                    }
+                    //for (timer_logs) |log| {
+                    //    if (log == null) {
+                    //        break;
+                    //    }
+                    //    db.print("\x1B[32m", .{});
+                    //    //db.print_timer_log(&log.?, .{ .prefix =true });
+                    //    db.print("\x1B[39m\n", .{});
+                    //}
                 }
                 else if (cur_mode == 'v') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                 }
                 else if (cur_mode == 'r') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
-                    std.debug.print("\n", .{});
+                    db.print("\n", .{});
                     db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                 }
                 else if (cur_mode == 'b') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                 }
                 else if (cur_mode == '7') {
-                    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_script700_state(&emu);
                 }
             },
@@ -572,30 +583,34 @@ pub fn main() !void {
         }
 
         if (cur_action != 'c' or cur_mode != 'i') {
-            std.debug.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
+            //db.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
+            //db.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
+            db.flush(true);
         }
 
-        //std.debug.print("\n", .{});
+        //db.print("\n", .{});
     }
 
     emu.event_loop();
 
-    //std.debug.print("Hello, {d}!\n", .{emu.s_smp.?.boot_rom.len});
+    //db.print("Hello, {d}!\n", .{emu.s_smp.?.boot_rom.len});
 //
     //for (emu.s_smp.?.boot_rom) |item| {
-    //    std.debug.print("{X:0>2}\n", .{item});
+    //    db.print("{X:0>2}\n", .{item});
     //}
 //
-    //std.debug.print("Hello, {d}!\n", .{SDSP.gauss_table.len});
+    //db.print("Hello, {d}!\n", .{SDSP.gauss_table.len});
 //
     //for (SDSP.gauss_table) |item| {
-    //    std.debug.print("{X:0>4}\n", .{item});
+    //    db.print("{X:0>4}\n", .{item});
     //}
 }
 
 const samples = 1000;
 var buf: [samples * 4]u8 = [_]u8 {0} ** (samples * 4);
 var stream_start: u32 = 0;
+
+var last_time: i128 = 0;
 
 fn run_loop(emu: *Emu) !bool {
     const cycles = samples * 64;
@@ -662,6 +677,14 @@ fn run_loop(emu: *Emu) !bool {
     try stdout_writer.writeAll(&buf);
     stream_start = 0;
 
+    const expected_next_time = last_time + @as(i128, samples) * std.time.ns_per_s / 32000;
+
+    const now = std.time.nanoTimestamp();
+    const sleep_amt: u64 = @intCast(expected_next_time - now - 1 * std.time.ns_per_ms);
+
+    std.time.sleep(sleep_amt);
+    last_time = expected_next_time;
+
     const signal = break_signal.load(std.builtin.AtomicOrder.seq_cst);
     return !signal;
 }
@@ -694,16 +717,16 @@ fn break_listener() void {
                         'k' => {
                             const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
                             if (bp_hit) {
-                                //std.debug.print("\x1B[A\x1B[A\x1B[A", .{});
-                                //std.debug.print("                                                                                  \n", .{});
-                                //std.debug.print("                                                                                  \n", .{});
-                                //std.debug.print("                                                                                  \n", .{});
-                                //std.debug.print("\x1B[A\x1B[A", .{});
-                                //std.debug.print("\x1B[A\x1B[A", .{});
+                                //db.print("\x1B[A\x1B[A\x1B[A", .{});
+                                //db.print("                                                                                  \n", .{});
+                                //db.print("                                                                                  \n", .{});
+                                //db.print("                                                                                  \n", .{});
+                                //db.print("\x1B[A\x1B[A", .{});
+                                //db.print("\x1B[A\x1B[A", .{});
                             }
                             else {
-                                //std.debug.print("\x1B[A\x1B[A", .{});
-                                //std.debug.print("                                                                                  \n", .{});
+                                //db.print("\x1B[A\x1B[A", .{});
+                                //db.print("                                                                                  \n", .{});
                             }
 
                             break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
@@ -748,12 +771,12 @@ fn break_listener() void {
 }
 
 fn report_timeout() void {
-    std.debug.print("\n\x1B[38;2;250;125;25mScript700 timed out. Enter one of the following:\n", .{});
-    std.debug.print("----------------------------------------------------------------------------------\n", .{});
-    std.debug.print("   w = Attempt wait until Script700 finishes or yields execution \n", .{});
-    std.debug.print("   c = Disable Script700 and continue SPC execution \n", .{});
-    std.debug.print("   q = Quit program \n", .{});
-    std.debug.print("----------------------------------------------------------------------------------\x1B[39m\n", .{});
+    db.print("\n\x1B[38;2;250;125;25mScript700 timed out. Enter one of the following:\n", .{});
+    db.print("----------------------------------------------------------------------------------\n", .{});
+    db.print("   w = Attempt wait until Script700 finishes or yields execution \n", .{});
+    db.print("   c = Disable Script700 and continue SPC execution \n", .{});
+    db.print("   q = Quit program \n", .{});
+    db.print("----------------------------------------------------------------------------------\x1B[39m\n", .{});
 
     t_input_mode.store(1, std.builtin.AtomicOrder.seq_cst);
 
@@ -790,24 +813,24 @@ fn report_timeout() void {
 }
 
 fn report_error(err: anyerror, load: bool) void {
-    std.debug.print("\n\x1B[91mScript700 {s}: ", .{if (load) "load error" else "crashed"});
+    db.print("\n\x1B[91mScript700 {s}: ", .{if (load) "load error" else "crashed"});
 
     switch (err) {
         error.out_of_memory => {
-            std.debug.print("not enough memory to resize data area.", .{});
+            db.print("not enough memory to resize data area.", .{});
         },
         error.fetch_range => {
-            std.debug.print("script area fetch went out of bounds.", .{});
+            db.print("script area fetch went out of bounds.", .{});
         },
         error.bytecode_too_large => {
-            std.debug.print("script area bytecode is too large.", .{});
+            db.print("script area bytecode is too large.", .{});
         },
         else => {
-            std.debug.print("unknown error.", .{});
+            db.print("unknown error.", .{});
         }
     }
 
-    std.debug.print("\x1B[39m\n", .{});
+    db.print("\x1B[39m\n", .{});
 
     t_input_mode.store(0, std.builtin.AtomicOrder.seq_cst);
 }
