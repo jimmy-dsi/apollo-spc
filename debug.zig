@@ -1458,13 +1458,15 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
 }
 
 pub fn print_dsp_state(emu: *Emu, options: OptionStruct) void {
-    const s = &emu.s_dsp.state;
-
     // Print voice registers
     print_dsp_voices(emu, 0, options);
     print("\n", .{});
     print_dsp_voices(emu, 4, options);
     print("\n", .{});
+}
+
+pub fn print_dsp_state_2(emu: *Emu, _: OptionStruct) void {
+    const s = &emu.s_dsp.state;
 
     const kon =
           @as(u8, s.voice[0].keyon)      | @as(u8, s.voice[1].keyon) << 1
@@ -1733,13 +1735,13 @@ pub fn print_dsp_debug_state(emu: *Emu, options: OptionStruct) void {
     _ = s;
 }
 
-fn print_dsp_debug_voices(emu: *Emu, base: u3, options: OptionStruct) void {
-    print_dsp_voices(emu, base, options);
-    print("\n", .{});
+fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
+    //print_dsp_voices(emu, base, options);
+    //print("\n", .{});
 
     const s = emu.s_dsp.int();
 
-    print("\x1B[90m", .{});
+    //print("\x1B[90m", .{});
 
     // Print voice 0-3 states
     for (0..4) |i| {
@@ -1887,7 +1889,7 @@ pub inline fn set_cli_width(amt: u8) void {
     }
 }
 
-const max_lines: u32 = 47;
+const max_lines: u32 = 29;
 
 var print_canvas:  [max_lines * 256]u8 = [_]u8 {' '} ** (max_lines * 256);
 var canvas_line_lengths: [max_lines]u8 = [_]u8 {120} ** max_lines;
