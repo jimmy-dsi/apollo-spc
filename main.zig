@@ -21,7 +21,7 @@ var is_breakpoint  = Atomic(bool).init(false);
 var t_timeout_wait = Atomic(bool).init(false);
 var t_menu_mode    = Atomic(u8).init('i');
 var t_input_mode   = Atomic(u32).init(0);
-var t_other_menu   = Atomic(u8).init(0);
+var t_other_menu   = Atomic(u8).init('m');
 
 var m_expect_input = std.Thread.Mutex{};
 
@@ -80,7 +80,7 @@ pub fn main() !void {
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x7B8}); ix += 2;
     //emu.script700.label_addresses[0] = ix;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  64}); ix += 2;
+    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  2048000}); ix += 2;
     //emu.script700.label_addresses[1] = ix;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x3FFFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
@@ -282,8 +282,8 @@ pub fn main() !void {
                 is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
             }
             
+            //std.debug.print("\x1B[A\x1B[A\x1B[9C\x1B[9C\x1B[9C\x1B[8C", .{});
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
-            //db.print("\x1B[A\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
 
             if (std.ascii.toLower(buffer[0]) == 'c') {
                 //cur_mode = t_menu_mode.load(std.builtin.AtomicOrder.seq_cst);
@@ -300,6 +300,10 @@ pub fn main() !void {
         const prev_state = emu.s_smp.state;
 
         sw: switch (std.ascii.toLower(buffer[0])) {
+            'q' => {
+                stdout_file.close();
+                std.process.exit(1);
+            },
             'h' => {
                 show_help_menu();
                 t_other_menu.store('h', std.builtin.AtomicOrder.seq_cst);
@@ -428,7 +432,7 @@ pub fn main() !void {
             'i' => {
                 if (cur_mode != 'i') {
                     db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.flush(true);
+                    flush(null, true);
                 }
 
                 if (cur_action != 'c') {
@@ -527,6 +531,10 @@ pub fn main() !void {
                     emu.step_instruction() catch {
                         is_error = true;
                     };
+
+                    if (!is_error) {
+                        db.print("\x1B[2J\x1B[H", .{});
+                    }
                 }
 
                 if (s7en and emu.script700_error != null) {
@@ -597,7 +605,7 @@ pub fn main() !void {
         if ((cur_action != 'c' or cur_mode != 'i') and (std.ascii.toLower(buffer[0]) != 'm' and std.ascii.toLower(buffer[0]) != 'h')) {
             //db.print("Current DSP cycle: {d}\n", .{emu.s_dsp.cur_cycle()});
             //db.print("\x1B[A", .{}); // ANSI escape code for cursor up (may not work on Windows)
-            db.flush(true);
+            flush(null, true);
         }
 
         //db.print("\n", .{});
@@ -721,9 +729,10 @@ fn show_help_menu() void {
     db.print("Other: \n", .{});
     db.print("   h = Bring up this menu \n", .{});
     db.print("   m = View ID666 metadata \n", .{});
+    db.print("   q = Quit \n", .{});
     db.print("----------------------------------------------------------------------------------\n\n", .{});
     db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
-    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+    flush(null, false);
 }
 
 fn show_metadata() void {
@@ -731,7 +740,7 @@ fn show_metadata() void {
     const metastring: []const u8 = metadata.?.print(&print_buf) catch print_buf[0..];
     db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
     db.print("{s}\n", .{metastring});
-    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+    flush(null, false);
 }
 
 fn break_listener() void {
@@ -749,12 +758,17 @@ fn break_listener() void {
 
         if (m_expect_input.tryLock()) {
             buffer[0] = ' ';
+            //std.debug.print("\x1B[A\x1B[A\x1B[9C\x1B[9C\x1B[9C\x1B[8C", .{});
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
             switch (t_input_mode.load(std.builtin.AtomicOrder.seq_cst)) {
                 0 => {
                     var cur_mode = t_menu_mode.load(std.builtin.AtomicOrder.seq_cst);
                     sw: switch (buffer[0]) {
+                        'q' => {
+                            stdout_file.close();
+                            std.process.exit(1);
+                        },
                         'c' => {
                             
                         },
@@ -803,6 +817,9 @@ fn break_listener() void {
                 1 => {
                     sw: switch (std.ascii.toLower(buffer[0])) {
                         'w' => {
+                            db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                            db.print("\n\x1B[38;2;250;125;25mWaiting for Script700 to continue...\x1B[39m\n", .{});
+                            flush("Enter a command: ", true);
                             t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
                         },
                         'c' => {
@@ -831,12 +848,14 @@ fn break_listener() void {
 }
 
 fn report_timeout() void {
+    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
     db.print("\n\x1B[38;2;250;125;25mScript700 timed out. Enter one of the following:\n", .{});
     db.print("----------------------------------------------------------------------------------\n", .{});
     db.print("   w = Attempt wait until Script700 finishes or yields execution \n", .{});
     db.print("   c = Disable Script700 and continue SPC execution \n", .{});
     db.print("   q = Quit program \n", .{});
     db.print("----------------------------------------------------------------------------------\x1B[39m\n", .{});
+    flush("Enter a command: ", true);
 
     t_input_mode.store(1, std.builtin.AtomicOrder.seq_cst);
 
@@ -844,10 +863,14 @@ fn report_timeout() void {
     const stdin = std.io.getStdIn().reader();
 
     if (m_expect_input.tryLock()) {
+        //std.debug.print("\x1B[A\x1B[A\x1B[9C\x1B[9C\x1B[9C\x1B[8C", .{});
         _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
         
         sw: switch (std.ascii.toLower(buffer[0])) {
             'w' => {
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\n\x1B[38;2;250;125;25mWaiting for Script700 to continue...\x1B[39m\n", .{});
+                flush("Enter a command: ", true);
                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
             },
             'c' => {
@@ -893,4 +916,8 @@ fn report_error(err: anyerror, load: bool) void {
     db.print("\x1B[39m\n", .{});
 
     t_input_mode.store(0, std.builtin.AtomicOrder.seq_cst);
+}
+
+fn flush(msg: ?[]const u8, no_clear: bool) void {
+    db.flush(msg, no_clear);
 }

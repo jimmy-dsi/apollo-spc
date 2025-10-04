@@ -1889,7 +1889,7 @@ pub inline fn set_cli_width(amt: u8) void {
     }
 }
 
-const max_lines: u32 = 29;
+const max_lines: u32 = 30;
 
 var print_canvas:  [max_lines * 256]u8 = [_]u8 {' '} ** (max_lines * 256);
 var canvas_line_lengths: [max_lines]u8 = [_]u8 {120} ** max_lines;
@@ -1994,7 +1994,7 @@ pub inline fn print(comptime fmt: []const u8, args: anytype) void {
                             sub_index -= 2;
                             noprint_offset -= 2;
 
-                            flush(false);
+                            flush(null, false);
                             return;
                         }
                     }
@@ -2014,7 +2014,14 @@ pub inline fn print(comptime fmt: []const u8, args: anytype) void {
     }
 }
 
-pub inline fn flush(no_clear: bool) void {
+var _last_canvas_index: ?u32 = null;
+
+pub inline fn goto_last_line() void {
+    _last_canvas_index = canvas_index;
+    canvas_index = 256 * ((start_line + max_lines - 1) % max_lines);
+}
+
+pub inline fn flush(msg: ?[]const u8, no_clear: bool) void {
     var final_buffer: [max_lines * 257]u8 = undefined;
     var total_chars: u32 = 0;
 
@@ -2030,7 +2037,18 @@ pub inline fn flush(no_clear: bool) void {
         }
     }
 
-    std.debug.print("\x1B[H{s}\nEnter a command (h for help menu): ", .{final_buffer[0..total_chars]});
+    if (msg) |m| {
+        std.debug.print("\x1B[H{s}\r{s}\n> ", .{final_buffer[0 .. (total_chars - 1)], m});
+    }
+    else {
+        std.debug.print("\x1B[H{s}\r{s}\n> ", .{final_buffer[0 .. (total_chars - 1)], "Enter a command (h for help menu): "});
+    }
+
+    // Restore position if it was overridden.
+    if (_last_canvas_index != null) {
+        canvas_index = _last_canvas_index.?;
+        _last_canvas_index = null;
+    }
 
     if (!no_clear) {
         for (print_canvas, 0..) |_, i| {
