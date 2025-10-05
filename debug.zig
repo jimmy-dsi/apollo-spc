@@ -7,20 +7,18 @@ const SMPState = @import("smp_state.zig").SMPState;
 const SPC      = @import("spc.zig").SPC;
 const SPCState = @import("spc_state.zig").SPCState;
 
-pub fn print_pc(emu: *Emu, writer: anytype) !void {
-    const state = emu.s_smp.spc.state;
-    const pc = state.pc;
-    try writer.print("{X:0>4}", .{pc});
+pub fn print_pc(pc: u16) void {
+    print("{X:0>4}", .{pc});
 }
 
-pub fn print_spc_state(emu: *Emu) void {
-    const state = emu.s_smp.spc.state;
+pub fn print_spc_state(state: *const SPCState) void {
+    //const state = emu.s_smp.spc.state;
 
     const a  = state.a;
     const x  = state.x;
     const y  = state.y;
     const sp = state.sp;
-    const pc = state.pc;
+    //const pc = state.pc;
 
     const n: u8 = if (state.n() == 1) 'N' else 'n';
     const v: u8 = if (state.v() == 1) 'V' else 'v';
@@ -32,18 +30,20 @@ pub fn print_spc_state(emu: *Emu) void {
     const c: u8 = if (state.c() == 1) 'C' else 'c';
 
     print(
-        "A:{X:0>2} X:{X:0>2} Y:{X:0>2} SP:{X:0>2} PC:{X:0>4} {c}{c}{c}{c}{c}{c}{c}{c}",
+        "A:{X:0>2} X:{X:0>2} Y:{X:0>2} SP:{X:0>2} {c}{c}{c}{c}{c}{c}{c}{c}",
         .{
-            a, x, y, sp, pc,
+            a, x, y, sp, //pc,
             n, v, p, b, h, i, z, c
         }
     );
 }
 
-pub fn print_opcode(emu: *Emu, writer: anytype) !void {
+pub fn print_opcode(emu: *const Emu, pc: u16) void {
+    //@setEvalBranchQuota(4096);
+
     const s_smp = &emu.s_smp;
 
-    const pc = s_smp.spc.pc();
+    //const pc = s_smp.spc.pc();
 
     const opc =
         switch (emu.s_smp.spc.mode()) {
@@ -63,14 +63,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
     if (opc != null) {
         switch (opcode) {
             0x00 => {
-                try writer.print("nop              ", .{});
+                print("nop              ", .{});
             },
             0x01 => {
-                try writer.print("tcall 0          ", .{});
+                print("tcall 0          ", .{});
             },
             0x02 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.0       ", .{operand_1});
+                print("set1 ${X:0>2}.0       ", .{operand_1});
             },
             0x03 => {
                 operand_count = 2;
@@ -78,55 +78,55 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.0, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.0, ${X:0>4} ", .{operand_1, target_address});
             },
             0x04 => {
                 operand_count = 1;
-                try writer.print("or a, ${X:0>2}        ", .{operand_1});
+                print("or a, ${X:0>2}        ", .{operand_1});
             },
             0x05 => {
                 operand_count = 2;
-                try writer.print("or a, ${X:0>4}      ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("or a, ${X:0>4}      ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x06 => {
-                try writer.print("or a, (x)        ", .{});
+                print("or a, (x)        ", .{});
             },
             0x07 => {
                 operand_count = 1;
-                try writer.print("or a, [${X:0>2}+x]    ", .{operand_1});
+                print("or a, [${X:0>2}+x]    ", .{operand_1});
             },
             0x08 => {
                 operand_count = 1;
-                try writer.print("or a, #${X:0>2}       ", .{operand_1});
+                print("or a, #${X:0>2}       ", .{operand_1});
             },
             0x09 => {
                 operand_count = 2;
-                try writer.print("or ${X:0>2}, ${X:0>2}      ", .{operand_2, operand_1});
+                print("or ${X:0>2}, ${X:0>2}      ", .{operand_2, operand_1});
             },
             0x0A => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("or1 c, ${X:0>4}.{d}   ", .{addr & 0x1FFF, addr >> 13});
+                print("or1 c, ${X:0>4}.{d}   ", .{addr & 0x1FFF, addr >> 13});
             },
             0x0B => {
                 operand_count = 1;
-                try writer.print("asl ${X:0>2}          ", .{operand_1});
+                print("asl ${X:0>2}          ", .{operand_1});
             },
             0x0C => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("asl ${X:0>4}        ", .{addr});
+                print("asl ${X:0>4}        ", .{addr});
             },
             0x0D => {
-                try writer.print("push psw         ", .{});
+                print("push psw         ", .{});
             },
             0x0E => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("tset1 ${X:0>4}      ", .{addr});
+                print("tset1 ${X:0>4}      ", .{addr});
             },
             0x0F => {
-                try writer.print("brk              ", .{});
+                print("brk              ", .{});
             },
             0x10 => {
                 operand_count = 1;
@@ -134,14 +134,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bpl ${X:0>4}        ", .{target_address});
+                print("bpl ${X:0>4}        ", .{target_address});
             },
             0x11 => {
-                try writer.print("tcall 1          ", .{});
+                print("tcall 1          ", .{});
             },
             0x12 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.0       ", .{operand_1});
+                print("clr1 ${X:0>2}.0       ", .{operand_1});
             },
             0x13 => {
                 operand_count = 2;
@@ -149,62 +149,62 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.0, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.0, ${X:0>4} ", .{operand_1, target_address});
             },
             0x14 => {
                 operand_count = 1;
-                try writer.print("or a, ${X:0>2}+x      ", .{operand_1});
+                print("or a, ${X:0>2}+x      ", .{operand_1});
             },
             0x15 => {
                 operand_count = 2;
-                try writer.print("or a, ${X:0>4}+x    ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("or a, ${X:0>4}+x    ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x16 => {
                 operand_count = 2;
-                try writer.print("or a, ${X:0>4}+y    ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("or a, ${X:0>4}+y    ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x17 => {
                 operand_count = 1;
-                try writer.print("or a, [${X:0>2}]+y    ", .{operand_1});
+                print("or a, [${X:0>2}]+y    ", .{operand_1});
             },
             0x18 => {
                 operand_count = 2;
-                try writer.print("or ${X:0>2}, #${X:0>2}     ", .{operand_2, operand_1});
+                print("or ${X:0>2}, #${X:0>2}     ", .{operand_2, operand_1});
             },
             0x19 => {
-                try writer.print("or (x), (y)      ", .{});
+                print("or (x), (y)      ", .{});
             },
             0x1A => {
                 operand_count = 1;
-                try writer.print("decw ${X:0>2}         ", .{operand_1});
+                print("decw ${X:0>2}         ", .{operand_1});
             },
             0x1B => {
                 operand_count = 1;
-                try writer.print("asl ${X:0>2}+x        ", .{operand_1});
+                print("asl ${X:0>2}+x        ", .{operand_1});
             },
             0x1C => {
-                try writer.print("asl a            ", .{});
+                print("asl a            ", .{});
             },
             0x1D => {
-                try writer.print("dec x            ", .{});
+                print("dec x            ", .{});
             },
             0x1E => {
                 operand_count = 2;
-                try writer.print("cmp x, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("cmp x, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x1F => {
                 operand_count = 2;
-                try writer.print("jmp [${X:0>4}+x]    ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("jmp [${X:0>4}+x]    ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x20 => {
-                try writer.print("clrp             ", .{});
+                print("clrp             ", .{});
             },
             0x21 => {
-                try writer.print("tcall 2          ", .{});
+                print("tcall 2          ", .{});
             },
             0x22 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.1       ", .{operand_1});
+                print("set1 ${X:0>2}.1       ", .{operand_1});
             },
             0x23 => {
                 operand_count = 2;
@@ -212,47 +212,47 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.1, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.1, ${X:0>4} ", .{operand_1, target_address});
             },
             0x24 => {
                 operand_count = 1;
-                try writer.print("and a, ${X:0>2}       ", .{operand_1});
+                print("and a, ${X:0>2}       ", .{operand_1});
             },
             0x25 => {
                 operand_count = 2;
-                try writer.print("and a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("and a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x26 => {
-                try writer.print("and a, (x)       ", .{});
+                print("and a, (x)       ", .{});
             },
             0x27 => {
                 operand_count = 1;
-                try writer.print("and a, [${X:0>2}+x]   ", .{operand_1});
+                print("and a, [${X:0>2}+x]   ", .{operand_1});
             },
             0x28 => {
                 operand_count = 1;
-                try writer.print("and a, #${X:0>2}      ", .{operand_1});
+                print("and a, #${X:0>2}      ", .{operand_1});
             },
             0x29 => {
                 operand_count = 2;
-                try writer.print("and ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
+                print("and ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
             },
             0x2A => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("or1 c, /${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
+                print("or1 c, /${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
             },
             0x2B => {
                 operand_count = 1;
-                try writer.print("rol ${X:0>2}          ", .{operand_1});
+                print("rol ${X:0>2}          ", .{operand_1});
             },
             0x2C => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("rol ${X:0>4}        ", .{addr});
+                print("rol ${X:0>4}        ", .{addr});
             },
             0x2D => {
-                try writer.print("push a           ", .{});
+                print("push a           ", .{});
             },
             0x2E => {
                 operand_count = 2;
@@ -260,7 +260,7 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("cbne ${X:0>2}, ${X:0>4}  ", .{operand_1, target_address});
+                print("cbne ${X:0>2}, ${X:0>4}  ", .{operand_1, target_address});
             },
             0x2F => {
                 operand_count = 1;
@@ -268,7 +268,7 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bra ${X:0>4}        ", .{target_address});
+                print("bra ${X:0>4}        ", .{target_address});
             },
             0x30 => {
                 operand_count = 1;
@@ -276,14 +276,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bmi ${X:0>4}        ", .{target_address});
+                print("bmi ${X:0>4}        ", .{target_address});
             },
             0x31 => {
-                try writer.print("tcall 3          ", .{});
+                print("tcall 3          ", .{});
             },
             0x32 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.1       ", .{operand_1});
+                print("clr1 ${X:0>2}.1       ", .{operand_1});
             },
             0x33 => {
                 operand_count = 2;
@@ -291,62 +291,62 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.1, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.1, ${X:0>4} ", .{operand_1, target_address});
             },
             0x34 => {
                 operand_count = 1;
-                try writer.print("and a, ${X:0>2}+x     ", .{operand_1});
+                print("and a, ${X:0>2}+x     ", .{operand_1});
             },
             0x35 => {
                 operand_count = 2;
-                try writer.print("and a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("and a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x36 => {
                 operand_count = 2;
-                try writer.print("and a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("and a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x37 => {
                 operand_count = 1;
-                try writer.print("and a, [${X:0>2}]+y   ", .{operand_1});
+                print("and a, [${X:0>2}]+y   ", .{operand_1});
             },
             0x38 => {
                 operand_count = 2;
-                try writer.print("and ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+                print("and ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
             },
             0x39 => {
-                try writer.print("and (x), (y)     ", .{});
+                print("and (x), (y)     ", .{});
             },
             0x3A => {
                 operand_count = 1;
-                try writer.print("incw ${X:0>2}         ", .{operand_1});
+                print("incw ${X:0>2}         ", .{operand_1});
             },
             0x3B => {
                 operand_count = 1;
-                try writer.print("rol ${X:0>2}+x        ", .{operand_1});
+                print("rol ${X:0>2}+x        ", .{operand_1});
             },
             0x3C => {
-                try writer.print("rol a            ", .{});
+                print("rol a            ", .{});
             },
             0x3D => {
-                try writer.print("inc x            ", .{});
+                print("inc x            ", .{});
             },
             0x3E => {
                 operand_count = 1;
-                try writer.print("cmp x, ${X:0>2}       ", .{operand_1});
+                print("cmp x, ${X:0>2}       ", .{operand_1});
             },
             0x3F => {
                 operand_count = 2;
-                try writer.print("call ${X:0>4}       ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("call ${X:0>4}       ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x40 => {
-                try writer.print("setp             ", .{});
+                print("setp             ", .{});
             },
             0x41 => {
-                try writer.print("tcall 4          ", .{});
+                print("tcall 4          ", .{});
             },
             0x42 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.2       ", .{operand_1});
+                print("set1 ${X:0>2}.2       ", .{operand_1});
             },
             0x43 => {
                 operand_count = 2;
@@ -354,56 +354,56 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.2, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.2, ${X:0>4} ", .{operand_1, target_address});
             },
             0x44 => {
                 operand_count = 1;
-                try writer.print("eor a, ${X:0>2}       ", .{operand_1});
+                print("eor a, ${X:0>2}       ", .{operand_1});
             },
             0x45 => {
                 operand_count = 2;
-                try writer.print("eor a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("eor a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x46 => {
-                try writer.print("eor a, (x)       ", .{});
+                print("eor a, (x)       ", .{});
             },
             0x47 => {
                 operand_count = 1;
-                try writer.print("eor a, [${X:0>2}+x]   ", .{operand_1});
+                print("eor a, [${X:0>2}+x]   ", .{operand_1});
             },
             0x48 => {
                 operand_count = 1;
-                try writer.print("eor a, #${X:0>2}      ", .{operand_1});
+                print("eor a, #${X:0>2}      ", .{operand_1});
             },
             0x49 => {
                 operand_count = 2;
-                try writer.print("eor ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
+                print("eor ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
             },
             0x4A => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("and1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
+                print("and1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
             },
             0x4B => {
                 operand_count = 1;
-                try writer.print("lsr ${X:0>2}          ", .{operand_1});
+                print("lsr ${X:0>2}          ", .{operand_1});
             },
             0x4C => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("lsr ${X:0>4}        ", .{addr});
+                print("lsr ${X:0>4}        ", .{addr});
             },
             0x4D => {
-                try writer.print("push x           ", .{});
+                print("push x           ", .{});
             },
             0x4E => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("tclr1 ${X:0>4}      ", .{addr});
+                print("tclr1 ${X:0>4}      ", .{addr});
             },
             0x4F => {
                 operand_count = 1;
-                try writer.print("pcall ${X:0>2}        ", .{operand_1});
+                print("pcall ${X:0>2}        ", .{operand_1});
             },
             0x50 => {
                 operand_count = 1;
@@ -411,14 +411,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bvc ${X:0>4}        ", .{target_address});
+                print("bvc ${X:0>4}        ", .{target_address});
             },
             0x51 => {
-                try writer.print("tcall 5          ", .{});
+                print("tcall 5          ", .{});
             },
             0x52 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.2       ", .{operand_1});
+                print("clr1 ${X:0>2}.2       ", .{operand_1});
             },
             0x53 => {
                 operand_count = 2;
@@ -426,62 +426,62 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.2, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.2, ${X:0>4} ", .{operand_1, target_address});
             },
             0x54 => {
                 operand_count = 1;
-                try writer.print("eor a, ${X:0>2}+x     ", .{operand_1});
+                print("eor a, ${X:0>2}+x     ", .{operand_1});
             },
             0x55 => {
                 operand_count = 2;
-                try writer.print("eor a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("eor a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x56 => {
                 operand_count = 2;
-                try writer.print("eor a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("eor a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x57 => {
                 operand_count = 1;
-                try writer.print("eor a, [${X:0>2}]+y   ", .{operand_1});
+                print("eor a, [${X:0>2}]+y   ", .{operand_1});
             },
             0x58 => {
                 operand_count = 2;
-                try writer.print("eor ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+                print("eor ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
             },
             0x59 => {
-                try writer.print("eor (x), (y)     ", .{});
+                print("eor (x), (y)     ", .{});
             },
             0x5A => {
                 operand_count = 1;
-                try writer.print("cmpw ya, ${X:0>2}     ", .{operand_1});
+                print("cmpw ya, ${X:0>2}     ", .{operand_1});
             },
             0x5B => {
                 operand_count = 1;
-                try writer.print("lsr ${X:0>2}+x        ", .{operand_1});
+                print("lsr ${X:0>2}+x        ", .{operand_1});
             },
             0x5C => {
-                try writer.print("lsr a            ", .{});
+                print("lsr a            ", .{});
             },
             0x5D => {
-                try writer.print("mov x, a         ", .{});
+                print("mov x, a         ", .{});
             },
             0x5E => {
                 operand_count = 2;
-                try writer.print("cmp y, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("cmp y, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x5F => {
                 operand_count = 2;
-                try writer.print("jmp ${X:0>4}        ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("jmp ${X:0>4}        ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x60 => {
-                try writer.print("clrc             ", .{});
+                print("clrc             ", .{});
             },
             0x61 => {
-                try writer.print("tcall 6          ", .{});
+                print("tcall 6          ", .{});
             },
             0x62 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.3       ", .{operand_1});
+                print("set1 ${X:0>2}.3       ", .{operand_1});
             },
             0x63 => {
                 operand_count = 2;
@@ -489,47 +489,47 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.3, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.3, ${X:0>4} ", .{operand_1, target_address});
             },
             0x64 => {
                 operand_count = 1;
-                try writer.print("cmp a, ${X:0>2}       ", .{operand_1});
+                print("cmp a, ${X:0>2}       ", .{operand_1});
             },
             0x65 => {
                 operand_count = 2;
-                try writer.print("cmp a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("cmp a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x66 => {
-                try writer.print("cmp a, (x)       ", .{});
+                print("cmp a, (x)       ", .{});
             },
             0x67 => {
                 operand_count = 1;
-                try writer.print("cmp a, [${X:0>2}+x]   ", .{operand_1});
+                print("cmp a, [${X:0>2}+x]   ", .{operand_1});
             },
             0x68 => {
                 operand_count = 1;
-                try writer.print("cmp a, #${X:0>2}      ", .{operand_1});
+                print("cmp a, #${X:0>2}      ", .{operand_1});
             },
             0x69 => {
                 operand_count = 2;
-                try writer.print("cmp ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
+                print("cmp ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
             },
             0x6A => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("and1 c, /${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
+                print("and1 c, /${X:0>4}.{d} ", .{addr & 0x1FFF, addr >> 13});
             },
             0x6B => {
                 operand_count = 1;
-                try writer.print("ror ${X:0>2}          ", .{operand_1});
+                print("ror ${X:0>2}          ", .{operand_1});
             },
             0x6C => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("ror ${X:0>4}        ", .{addr});
+                print("ror ${X:0>4}        ", .{addr});
             },
             0x6D => {
-                try writer.print("push y           ", .{});
+                print("push y           ", .{});
             },
             0x6E => {
                 operand_count = 2;
@@ -537,10 +537,10 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("dbnz ${X:0>2}, ${X:0>4}  ", .{operand_1, target_address});
+                print("dbnz ${X:0>2}, ${X:0>4}  ", .{operand_1, target_address});
             },
             0x6F => {
-                try writer.print("ret              ", .{});
+                print("ret              ", .{});
             },
             0x70 => {
                 operand_count = 1;
@@ -548,14 +548,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bvc ${X:0>4}        ", .{target_address});
+                print("bvc ${X:0>4}        ", .{target_address});
             },
             0x71 => {
-                try writer.print("tcall 7          ", .{});
+                print("tcall 7          ", .{});
             },
             0x72 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.3       ", .{operand_1});
+                print("clr1 ${X:0>2}.3       ", .{operand_1});
             },
             0x73 => {
                 operand_count = 2;
@@ -563,61 +563,61 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.3, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.3, ${X:0>4} ", .{operand_1, target_address});
             },
             0x74 => {
                 operand_count = 1;
-                try writer.print("cmp a, ${X:0>2}+x     ", .{operand_1});
+                print("cmp a, ${X:0>2}+x     ", .{operand_1});
             },
             0x75 => {
                 operand_count = 2;
-                try writer.print("cmp a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("cmp a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x76 => {
                 operand_count = 2;
-                try writer.print("cmp a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("cmp a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x77 => {
                 operand_count = 1;
-                try writer.print("cmp a, [${X:0>2}]+y   ", .{operand_1});
+                print("cmp a, [${X:0>2}]+y   ", .{operand_1});
             },
             0x78 => {
                 operand_count = 2;
-                try writer.print("cmp ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+                print("cmp ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
             },
             0x79 => {
-                try writer.print("cmp (x), (y)     ", .{});
+                print("cmp (x), (y)     ", .{});
             },
             0x7A => {
                 operand_count = 1;
-                try writer.print("addw ya, ${X:0>2}     ", .{operand_1});
+                print("addw ya, ${X:0>2}     ", .{operand_1});
             },
             0x7B => {
                 operand_count = 1;
-                try writer.print("ror ${X:0>2}+x        ", .{operand_1});
+                print("ror ${X:0>2}+x        ", .{operand_1});
             },
             0x7C => {
-                try writer.print("ror a            ", .{});
+                print("ror a            ", .{});
             },
             0x7D => {
-                try writer.print("mov a, x         ", .{});
+                print("mov a, x         ", .{});
             },
             0x7E => {
                 operand_count = 1;
-                try writer.print("cmp y, ${X:0>2}       ", .{operand_1});
+                print("cmp y, ${X:0>2}       ", .{operand_1});
             },
             0x7F => {
-                try writer.print("reti             ", .{});
+                print("reti             ", .{});
             },
             0x80 => {
-                try writer.print("setc             ", .{});
+                print("setc             ", .{});
             },
             0x81 => {
-                try writer.print("tcall 6          ", .{});
+                print("tcall 6          ", .{});
             },
             0x82 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.4       ", .{operand_1});
+                print("set1 ${X:0>2}.4       ", .{operand_1});
             },
             0x83 => {
                 operand_count = 2;
@@ -625,55 +625,55 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.4, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.4, ${X:0>4} ", .{operand_1, target_address});
             },
             0x84 => {
                 operand_count = 1;
-                try writer.print("adc a, ${X:0>2}       ", .{operand_1});
+                print("adc a, ${X:0>2}       ", .{operand_1});
             },
             0x85 => {
                 operand_count = 2;
-                try writer.print("adc a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("adc a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x86 => {
-                try writer.print("adc a, (x)       ", .{});
+                print("adc a, (x)       ", .{});
             },
             0x87 => {
                 operand_count = 1;
-                try writer.print("adc a, [${X:0>2}+x]   ", .{operand_1});
+                print("adc a, [${X:0>2}+x]   ", .{operand_1});
             },
             0x88 => {
                 operand_count = 1;
-                try writer.print("adc a, #${X:0>2}      ", .{operand_1});
+                print("adc a, #${X:0>2}      ", .{operand_1});
             },
             0x89 => {
                 operand_count = 2;
-                try writer.print("adc ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
+                print("adc ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
             },
             0x8A => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("eor1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
+                print("eor1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
             },
             0x8B => {
                 operand_count = 1;
-                try writer.print("dec ${X:0>2}          ", .{operand_1});
+                print("dec ${X:0>2}          ", .{operand_1});
             },
             0x8C => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("dec ${X:0>4}        ", .{addr});
+                print("dec ${X:0>4}        ", .{addr});
             },
             0x8D => {
                 operand_count = 1;
-                try writer.print("mov y, #${X:0>2}      ", .{operand_1});
+                print("mov y, #${X:0>2}      ", .{operand_1});
             },
             0x8E => {
-                try writer.print("pop psw          ", .{});
+                print("pop psw          ", .{});
             },
             0x8F => {
                 operand_count = 2;
-                try writer.print("mov ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+                print("mov ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
             },
             0x90 => {
                 operand_count = 1;
@@ -681,14 +681,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bvc ${X:0>4}        ", .{target_address});
+                print("bvc ${X:0>4}        ", .{target_address});
             },
             0x91 => {
-                try writer.print("tcall 9          ", .{});
+                print("tcall 9          ", .{});
             },
             0x92 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.4       ", .{operand_1});
+                print("clr1 ${X:0>2}.4       ", .{operand_1});
             },
             0x93 => {
                 operand_count = 2;
@@ -696,60 +696,60 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.4, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.4, ${X:0>4} ", .{operand_1, target_address});
             },
             0x94 => {
                 operand_count = 1;
-                try writer.print("adc a, ${X:0>2}+x     ", .{operand_1});
+                print("adc a, ${X:0>2}+x     ", .{operand_1});
             },
             0x95 => {
                 operand_count = 2;
-                try writer.print("adc a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("adc a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x96 => {
                 operand_count = 2;
-                try writer.print("adc a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("adc a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0x97 => {
                 operand_count = 1;
-                try writer.print("adc a, [${X:0>2}]+y   ", .{operand_1});
+                print("adc a, [${X:0>2}]+y   ", .{operand_1});
             },
             0x98 => {
                 operand_count = 2;
-                try writer.print("adc ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+                print("adc ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
             },
             0x99 => {
-                try writer.print("adc (x), (y)     ", .{});
+                print("adc (x), (y)     ", .{});
             },
             0x9A => {
                 operand_count = 1;
-                try writer.print("subw ya, ${X:0>2}     ", .{operand_1});
+                print("subw ya, ${X:0>2}     ", .{operand_1});
             },
             0x9B => {
                 operand_count = 1;
-                try writer.print("dec ${X:0>2}+x        ", .{operand_1});
+                print("dec ${X:0>2}+x        ", .{operand_1});
             },
             0x9C => {
-                try writer.print("dec a            ", .{});
+                print("dec a            ", .{});
             },
             0x9D => {
-                try writer.print("mov x, sp        ", .{});
+                print("mov x, sp        ", .{});
             },
             0x9E => {
-                try writer.print("div ya, x        ", .{});
+                print("div ya, x        ", .{});
             },
             0x9F => {
-                try writer.print("xcn a            ", .{});
+                print("xcn a            ", .{});
             },
             0xA0 => {
-                try writer.print("ei               ", .{});
+                print("ei               ", .{});
             },
             0xA1 => {
-                try writer.print("tcall 10         ", .{});
+                print("tcall 10         ", .{});
             },
             0xA2 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.5       ", .{operand_1});
+                print("set1 ${X:0>2}.5       ", .{operand_1});
             },
             0xA3 => {
                 operand_count = 2;
@@ -757,54 +757,54 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.5, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.5, ${X:0>4} ", .{operand_1, target_address});
             },
             0xA4 => {
                 operand_count = 1;
-                try writer.print("sbc a, ${X:0>2}       ", .{operand_1});
+                print("sbc a, ${X:0>2}       ", .{operand_1});
             },
             0xA5 => {
                 operand_count = 2;
-                try writer.print("sbc a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("sbc a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xA6 => {
-                try writer.print("sbc a, (x)       ", .{});
+                print("sbc a, (x)       ", .{});
             },
             0xA7 => {
                 operand_count = 1;
-                try writer.print("sbc a, [${X:0>2}+x]   ", .{operand_1});
+                print("sbc a, [${X:0>2}+x]   ", .{operand_1});
             },
             0xA8 => {
                 operand_count = 1;
-                try writer.print("sbc a, #${X:0>2}      ", .{operand_1});
+                print("sbc a, #${X:0>2}      ", .{operand_1});
             },
             0xA9 => {
                 operand_count = 2;
-                try writer.print("sbc ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
+                print("sbc ${X:0>2}, ${X:0>2}     ", .{operand_2, operand_1});
             },
             0xAA => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("mov1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
+                print("mov1 c, ${X:0>4}.{d}  ", .{addr & 0x1FFF, addr >> 13});
             },
             0xAB => {
                 operand_count = 1;
-                try writer.print("inc ${X:0>2}          ", .{operand_1});
+                print("inc ${X:0>2}          ", .{operand_1});
             },
             0xAC => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("inc ${X:0>4}        ", .{addr});
+                print("inc ${X:0>4}        ", .{addr});
             },
             0xAD => {
                 operand_count = 1;
-                try writer.print("cmp y, #${X:0>2}      ", .{operand_1});
+                print("cmp y, #${X:0>2}      ", .{operand_1});
             },
             0xAE => {
-                try writer.print("pop a            ", .{});
+                print("pop a            ", .{});
             },
             0xAF => {
-                try writer.print("mov (x)+, a      ", .{});
+                print("mov (x)+, a      ", .{});
             },
             0xB0 => {
                 operand_count = 1;
@@ -812,14 +812,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bcs ${X:0>4}        ", .{target_address});
+                print("bcs ${X:0>4}        ", .{target_address});
             },
             0xB1 => {
-                try writer.print("tcall 11         ", .{});
+                print("tcall 11         ", .{});
             },
             0xB2 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.5       ", .{operand_1});
+                print("clr1 ${X:0>2}.5       ", .{operand_1});
             },
             0xB3 => {
                 operand_count = 2;
@@ -827,60 +827,60 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.5, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.5, ${X:0>4} ", .{operand_1, target_address});
             },
             0xB4 => {
                 operand_count = 1;
-                try writer.print("sbc a, ${X:0>2}+x     ", .{operand_1});
+                print("sbc a, ${X:0>2}+x     ", .{operand_1});
             },
             0xB5 => {
                 operand_count = 2;
-                try writer.print("sbc a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("sbc a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xB6 => {
                 operand_count = 2;
-                try writer.print("sbc a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("sbc a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xB7 => {
                 operand_count = 1;
-                try writer.print("sbc a, [${X:0>2}]+y   ", .{operand_1});
+                print("sbc a, [${X:0>2}]+y   ", .{operand_1});
             },
             0xB8 => {
                 operand_count = 2;
-                try writer.print("sbc ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+                print("sbc ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
             },
             0xB9 => {
-                try writer.print("sbc (x), (y)     ", .{});
+                print("sbc (x), (y)     ", .{});
             },
             0xBA => {
                 operand_count = 1;
-                try writer.print("movw ya, ${X:0>2}     ", .{operand_1});
+                print("movw ya, ${X:0>2}     ", .{operand_1});
             },
             0xBB => {
                 operand_count = 1;
-                try writer.print("inc ${X:0>2}+x        ", .{operand_1});
+                print("inc ${X:0>2}+x        ", .{operand_1});
             },
             0xBC => {
-                try writer.print("inc a            ", .{});
+                print("inc a            ", .{});
             },
             0xBD => {
-                try writer.print("mov sp, x        ", .{});
+                print("mov sp, x        ", .{});
             },
             0xBE => {
-                try writer.print("das a            ", .{});
+                print("das a            ", .{});
             },
             0xBF => {
-                try writer.print("mov a, (x)+      ", .{});
+                print("mov a, (x)+      ", .{});
             },
             0xC0 => {
-                try writer.print("di               ", .{});
+                print("di               ", .{});
             },
             0xC1 => {
-                try writer.print("tcall 12         ", .{});
+                print("tcall 12         ", .{});
             },
             0xC2 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.6       ", .{operand_1});
+                print("set1 ${X:0>2}.6       ", .{operand_1});
             },
             0xC3 => {
                 operand_count = 2;
@@ -888,53 +888,53 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.6, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.6, ${X:0>4} ", .{operand_1, target_address});
             },
             0xC4 => {
                 operand_count = 1;
-                try writer.print("mov ${X:0>2}, a       ", .{operand_1});
+                print("mov ${X:0>2}, a       ", .{operand_1});
             },
             0xC5 => {
                 operand_count = 2;
-                try writer.print("mov ${X:0>4}, a     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov ${X:0>4}, a     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xC6 => {
-                try writer.print("mov (x), a       ", .{});
+                print("mov (x), a       ", .{});
             },
             0xC7 => {
                 operand_count = 1;
-                try writer.print("mov [${X:0>2}+x], a   ", .{operand_1});
+                print("mov [${X:0>2}+x], a   ", .{operand_1});
             },
             0xC8 => {
                 operand_count = 1;
-                try writer.print("cmp x, #${X:0>2}      ", .{operand_1});
+                print("cmp x, #${X:0>2}      ", .{operand_1});
             },
             0xC9 => {
                 operand_count = 2;
-                try writer.print("mov ${X:0>4}, x     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov ${X:0>4}, x     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xCA => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("mov1 ${X:0>4}.{d}, c  ", .{addr & 0x1FFF, addr >> 13});
+                print("mov1 ${X:0>4}.{d}, c  ", .{addr & 0x1FFF, addr >> 13});
             },
             0xCB => {
                 operand_count = 1;
-                try writer.print("mov ${X:0>2}, y       ", .{operand_1});
+                print("mov ${X:0>2}, y       ", .{operand_1});
             },
             0xCC => {
                 operand_count = 2;
-                try writer.print("mov ${X:0>4}, y     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov ${X:0>4}, y     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xCD => {
                 operand_count = 1;
-                try writer.print("mov x, #${X:0>2}      ", .{operand_1});
+                print("mov x, #${X:0>2}      ", .{operand_1});
             },
             0xCE => {
-                try writer.print("pop x            ", .{});
+                print("pop x            ", .{});
             },
             0xCF => {
-                try writer.print("mul ya           ", .{});
+                print("mul ya           ", .{});
             },
             0xD0 => {
                 operand_count = 1;
@@ -942,14 +942,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("bne ${X:0>4}        ", .{target_address});
+                print("bne ${X:0>4}        ", .{target_address});
             },
             0xD1 => {
-                try writer.print("tcall 13         ", .{});
+                print("tcall 13         ", .{});
             },
             0xD2 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.6       ", .{operand_1});
+                print("clr1 ${X:0>2}.6       ", .{operand_1});
             },
             0xD3 => {
                 operand_count = 2;
@@ -957,45 +957,45 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.6, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.6, ${X:0>4} ", .{operand_1, target_address});
             },
             0xD4 => {
                 operand_count = 1;
-                try writer.print("mov ${X:0>2}+x, a     ", .{operand_1});
+                print("mov ${X:0>2}+x, a     ", .{operand_1});
             },
             0xD5 => {
                 operand_count = 2;
-                try writer.print("mov ${X:0>4}+x, a   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov ${X:0>4}+x, a   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xD6 => {
                 operand_count = 2;
-                try writer.print("mov ${X:0>4}+y, a   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov ${X:0>4}+y, a   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xD7 => {
                 operand_count = 1;
-                try writer.print("mov [${X:0>2}]+y, a   ", .{operand_1});
+                print("mov [${X:0>2}]+y, a   ", .{operand_1});
             },
             0xD8 => {
                 operand_count = 1;
-                try writer.print("mov ${X:0>2}, x       ", .{operand_1});
+                print("mov ${X:0>2}, x       ", .{operand_1});
             },
             0xD9 => {
                 operand_count = 1;
-                try writer.print("mov ${X:0>2}+y, x     ", .{operand_1});
+                print("mov ${X:0>2}+y, x     ", .{operand_1});
             },
             0xDA => {
                 operand_count = 1;
-                try writer.print("movw ${X:0>2}, ya     ", .{operand_1});
+                print("movw ${X:0>2}, ya     ", .{operand_1});
             },
             0xDB => {
                 operand_count = 1;
-                try writer.print("mov ${X:0>2}+x, y     ", .{operand_1});
+                print("mov ${X:0>2}+x, y     ", .{operand_1});
             },
             0xDC => {
-                try writer.print("dec y            ", .{});
+                print("dec y            ", .{});
             },
             0xDD => {
-                try writer.print("mov a, y         ", .{});
+                print("mov a, y         ", .{});
             },
             0xDE => {
                 operand_count = 2;
@@ -1003,20 +1003,20 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("cbne ${X:0>2}+x, ${X:0>4}", .{operand_1, target_address});
+                print("cbne ${X:0>2}+x, ${X:0>4}", .{operand_1, target_address});
             },
             0xDF => {
-                try writer.print("daa a            ", .{});
+                print("daa a            ", .{});
             },
             0xE0 => {
-                try writer.print("clrv             ", .{});
+                print("clrv             ", .{});
             },
             0xE1 => {
-                try writer.print("tcall 14         ", .{});
+                print("tcall 14         ", .{});
             },
             0xE2 => {
                 operand_count = 1;
-                try writer.print("set1 ${X:0>2}.7       ", .{operand_1});
+                print("set1 ${X:0>2}.7       ", .{operand_1});
             },
             0xE3 => {
                 operand_count = 2;
@@ -1024,52 +1024,52 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbs ${X:0>2}.7, ${X:0>4} ", .{operand_1, target_address});
+                print("bbs ${X:0>2}.7, ${X:0>4} ", .{operand_1, target_address});
             },
             0xE4 => {
                 operand_count = 1;
-                try writer.print("mov a, ${X:0>2}       ", .{operand_1});
+                print("mov a, ${X:0>2}       ", .{operand_1});
             },
             0xE5 => {
                 operand_count = 2;
-                try writer.print("mov a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov a, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xE6 => {
-                try writer.print("mov a, (x)       ", .{});
+                print("mov a, (x)       ", .{});
             },
             0xE7 => {
                 operand_count = 1;
-                try writer.print("mov a, [${X:0>2}+x]   ", .{operand_1});
+                print("mov a, [${X:0>2}+x]   ", .{operand_1});
             },
             0xE8 => {
                 operand_count = 1;
-                try writer.print("mov a, #${X:0>2}      ", .{operand_1});
+                print("mov a, #${X:0>2}      ", .{operand_1});
             },
             0xE9 => {
                 operand_count = 2;
-                try writer.print("mov x, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov x, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xEA => {
                 operand_count = 2;
                 const addr: u16 = operand_1 | @as(u16, operand_2) << 8;
-                try writer.print("not1 ${X:0>4}.{d}     ", .{addr & 0x1FFF, addr >> 13});
+                print("not1 ${X:0>4}.{d}     ", .{addr & 0x1FFF, addr >> 13});
             },
             0xEB => {
                 operand_count = 1;
-                try writer.print("mov y, ${X:0>2}       ", .{operand_1});
+                print("mov y, ${X:0>2}       ", .{operand_1});
             },
             0xEC => {
                 operand_count = 2;
-                try writer.print("mov y, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov y, ${X:0>4}     ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xED => {
-                try writer.print("notc             ", .{});
+                print("notc             ", .{});
             },
             0xEE => {
-                try writer.print("pop y            ", .{});
+                print("pop y            ", .{});
             },
             0xEF => {
-                try writer.print("sleep            ", .{});
+                print("sleep            ", .{});
             },
             0xF0 => {
                 operand_count = 1;
@@ -1077,14 +1077,14 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("beq ${X:0>4}        ", .{target_address});
+                print("beq ${X:0>4}        ", .{target_address});
             },
             0xF1 => {
-                try writer.print("tcall 15         ", .{});
+                print("tcall 15         ", .{});
             },
             0xF2 => {
                 operand_count = 1;
-                try writer.print("clr1 ${X:0>2}.7       ", .{operand_1});
+                print("clr1 ${X:0>2}.7       ", .{operand_1});
             },
             0xF3 => {
                 operand_count = 2;
@@ -1092,45 +1092,45 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 3;
-                try writer.print("bbc ${X:0>2}.7, ${X:0>4} ", .{operand_1, target_address});
+                print("bbc ${X:0>2}.7, ${X:0>4} ", .{operand_1, target_address});
             },
             0xF4 => {
                 operand_count = 1;
-                try writer.print("mov a, ${X:0>2}+x     ", .{operand_1});
+                print("mov a, ${X:0>2}+x     ", .{operand_1});
             },
             0xF5 => {
                 operand_count = 2;
-                try writer.print("mov a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov a, ${X:0>4}+x   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xF6 => {
                 operand_count = 2;
-                try writer.print("mov a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
+                print("mov a, ${X:0>4}+y   ", .{operand_1 | @as(u16, operand_2) << 8});
             },
             0xF7 => {
                 operand_count = 1;
-                try writer.print("mov a, [${X:0>2}]+y   ", .{operand_1});
+                print("mov a, [${X:0>2}]+y   ", .{operand_1});
             },
             0xF8 => {
                 operand_count = 1;
-                try writer.print("mov x, ${X:0>2}       ", .{operand_1});
+                print("mov x, ${X:0>2}       ", .{operand_1});
             },
             0xF9 => {
                 operand_count = 1;
-                try writer.print("mov x, ${X:0>2}+y     ", .{operand_1});
+                print("mov x, ${X:0>2}+y     ", .{operand_1});
             },
             0xFA => {
                 operand_count = 2;
-                try writer.print("mov ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
+                print("mov ${X:0>2}, #${X:0>2}    ", .{operand_2, operand_1});
             },
             0xFB => {
                 operand_count = 1;
-                try writer.print("mov y, ${X:0>2}+x     ", .{operand_1});
+                print("mov y, ${X:0>2}+x     ", .{operand_1});
             },
             0xFC => {
-                try writer.print("inc y            ", .{});
+                print("inc y            ", .{});
             },
             0xFD => {
-                try writer.print("mov y, a         ", .{});
+                print("mov y, a         ", .{});
             },
             0xFE => {
                 operand_count = 1;
@@ -1138,30 +1138,30 @@ pub fn print_opcode(emu: *Emu, writer: anytype) !void {
                 const offset_i16: i16 = @as(i16, offset);
                 const offset_u16: u16 = @bitCast(offset_i16);
                 const target_address: u16 = pc +% offset_u16 +% 2;
-                try writer.print("dbnz y, ${X:0>4}    ", .{target_address});
+                print("dbnz y, ${X:0>4}    ", .{target_address});
             },
             0xFF => {
-                try writer.print("stop             ", .{});
+                print("stop             ", .{});
             },
         }
     }
     else {
-        try writer.print("-----            ", .{});
+        print("-----            ", .{});
     }
 
     if (opc == null) {
-        try writer.print("   --      ", .{});
+        print("   --      ", .{});
     }
     else {
         switch (operand_count) {
             0 => {
-                try writer.print("   {X:0>2}      ", .{opcode});
+                print("   {X:0>2}      ", .{opcode});
             },
             1 => {
-                try writer.print("   {X:0>2} {X:0>2}   ", .{opcode, operand_1});
+                print("   {X:0>2} {X:0>2}   ", .{opcode, operand_1});
             },
             2 => {
-                try writer.print("   {X:0>2} {X:0>2} {X:0>2}", .{opcode, operand_1, operand_2});
+                print("   {X:0>2} {X:0>2} {X:0>2}", .{opcode, operand_1, operand_2});
             },
             else => unreachable
         }
@@ -1897,7 +1897,7 @@ var start_line: u32 = 0;
 var canvas_index: u32 = 0;
 var canvas_ansi: bool = false;
 
-pub inline fn print(comptime fmt: []const u8, args: anytype) void {
+pub fn print(comptime fmt: []const u8, args: anytype) void {
     var temp_buffer: [1024]u8 = [_]u8 {' '} ** 1024;
     const slice: ?[]const u8 = std.fmt.bufPrint(&temp_buffer, fmt, args) catch null;
 
@@ -2015,6 +2015,15 @@ pub inline fn print(comptime fmt: []const u8, args: anytype) void {
 }
 
 var _last_canvas_index: ?u32 = null;
+
+pub inline fn move_cursor_up() void {
+    const line_index = ((canvas_index / 256) + max_lines - 1) % max_lines;
+    canvas_line_lengths[line_index] = cli_width;
+    canvas_line_lengths[(line_index + 1) % max_lines] = cli_width;
+    canvas_index = line_index * 256;
+    const blank_index = line_index * 256 + cli_width - 1;
+    print_canvas[blank_index] = ' ';
+}
 
 pub inline fn goto_last_line() void {
     _last_canvas_index = canvas_index;

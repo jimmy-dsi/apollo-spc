@@ -314,7 +314,7 @@ pub const SongMetadata = struct {
         var fbs = std.io.fixedBufferStream(buf);
         var writer = fbs.writer();
 
-        try writer.print("----------------------------------------------------------------------------------\n", .{});
+        try writer.print("----------------------------------------------------------------------------------------------------------------------------------\n", .{});
         try print_str(writer, "Title:",       if (md_copy.title != null)    null_term(md_copy.title.?[0..])    else "\x1B[32m<none>\x1B[0m", padding, max_len);
         try print_str(writer, "Artist:",      if (md_copy.artist != null)   null_term(md_copy.artist.?[0..])   else "\x1B[32m<none>\x1B[0m", padding, max_len);
         try print_str(writer, "Game:",        if (md_copy.game != null)     null_term(md_copy.game.?[0..])     else "\x1B[32m<none>\x1B[0m", padding, max_len);
@@ -470,7 +470,7 @@ pub const SongMetadata = struct {
             try print_str(writer, "Mixing Level:", "\x1B[32m<none>\x1B[0m", padding, max_len);
         }
         
-        try writer.print("----------------------------------------------------------------------------------\n", .{});
+        try writer.print("----------------------------------------------------------------------------------------------------------------------------------\n", .{});
         try writer.print("\n", .{});
 
         const length = try fbs.getPos();

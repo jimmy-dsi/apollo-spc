@@ -102,6 +102,7 @@ pub const SSMP = struct {
     prev_exec_cycle: u64 = 0,
 
     spc: SPC,
+    prev_spc_state: SPCState = undefined,
 
     pub fn new(emu: *Emu, options: Options) SSMP {
         var s_smp = SSMP {
@@ -132,6 +133,7 @@ pub const SSMP = struct {
     pub fn reset(self: *SSMP) void {
         self.spc.reset();
         self.spc.state.pc = self.boot_rom[0x3E] | @as(u16, self.boot_rom[0x3F]) << 8;
+        self.prev_spc_state = self.spc.state;
     }
 
     pub fn update_interrupt_vector(self: *SSMP, address: u16) void {
@@ -169,6 +171,9 @@ pub const SSMP = struct {
 
     pub fn step(self: *SSMP) void {
         if (self.co.null_transition(.{})) {
+            if (self.instr_boundary) {
+                self.prev_spc_state = self.spc.state;
+            }
             self.instr_boundary = false;
         }
         
