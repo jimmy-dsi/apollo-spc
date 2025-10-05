@@ -1402,7 +1402,7 @@ const OptionStruct = struct {
 pub fn print_memory_page(emu: *Emu, page: u8, offset: u8, options: OptionStruct) void {
     const page_start: u16 = @as(u16, page) * 0x100 + offset;
 
-    for (0..16) |y| {
+    for (0..29) |y| {
         const yy: u16 = @intCast(y);
         const line_start: u16 = page_start +% 16 * yy;
         print("{X:0>4} | ", .{line_start});
@@ -1748,7 +1748,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
         const val: u4 = @bitCast(v._buffer_offset);
-        print("    buff. offset: {X:0>1}        ", .{val});
+        print("V{d}  buff. offset: {X:0>1}        ", .{idx, val});
     }
     print("\n", .{});
 

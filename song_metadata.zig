@@ -635,13 +635,13 @@ pub const SongMetadata = struct {
             label_str[i] = char;
         }
 
-        try writer.print("{s}", .{label_str});
+        try writer.print(" {s}", .{label_str});
 
         while (remainder > max_len) {
             if (start > 0) {
                 try writer.print("{s}", .{pad_str});
             }
-            try writer.print("{s}\n", .{str[start..(start + max_len)]});
+            try writer.print("{s}\n ", .{str[start..(start + max_len)]});
 
             remainder -= max_len;
             start     += max_len;

@@ -306,10 +306,12 @@ pub fn main() !void {
                 std.process.exit(1);
             },
             'h' => {
+                flush(null, false);
                 show_help_menu();
                 t_other_menu.store('h', std.builtin.AtomicOrder.seq_cst);
             },
             'm' => {
+                flush(null, false);
                 show_metadata();
                 t_other_menu.store('m', std.builtin.AtomicOrder.seq_cst);
             },
@@ -747,27 +749,27 @@ fn run_loop(emu: *Emu) !bool {
 }
 
 fn show_help_menu() void {
-    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+    //db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n", .{});
-    db.print("Mode commands: \n", .{});
-    db.print("   i = Instruction trace log viewer [default] \n", .{});
-    db.print("   v = Memory viewer \n", .{});
-    db.print("   r = DSP register viewer (1) \n", .{});
-    db.print("   e = DSP register viewer (2) \n", .{});
-    db.print("   b = DSP debug viewer \n", .{});
-    db.print("   7 = Script700 debug viewer \n", .{});
-    db.print("Action commands: \n", .{});
-    db.print("   s = Step instruction [default] \n", .{});
-    db.print("   c = Continue to next breakpoint \n", .{});
-    db.print("   k = Break execution \n", .{});
-    db.print("   p = View previous page \n", .{});
-    db.print("   n = View next page \n", .{});
-    db.print("   u = Shift memory view up one row \n", .{});
-    db.print("   d = Shift memory view down one row \n", .{});
-    db.print("Other: \n", .{});
-    db.print("   h = Bring up this menu \n", .{});
-    db.print("   m = View ID666 metadata \n", .{});
-    db.print("   q = Quit \n", .{});
+    db.print(" Mode commands: \n", .{});
+    db.print("    i = Instruction trace log viewer [default] \n", .{});
+    db.print("    v = Memory viewer \n", .{});
+    db.print("    r = DSP register viewer (1) \n", .{});
+    db.print("    e = DSP register viewer (2) \n", .{});
+    db.print("    b = DSP debug viewer \n", .{});
+    db.print("    7 = Script700 debug viewer \n", .{});
+    db.print(" Action commands: \n", .{});
+    db.print("    s = Step instruction [default] \n", .{});
+    db.print("    c = Continue to next breakpoint \n", .{});
+    db.print("    k = Break execution \n", .{});
+    db.print("    p = View previous page of ARAM \n", .{});
+    db.print("    n = View next page of ARAM \n", .{});
+    db.print("    u = Shift memory view up one row \n", .{});
+    db.print("    d = Shift memory view down one row \n", .{});
+    db.print(" Other: \n", .{});
+    db.print("    h = Bring up this menu \n", .{});
+    db.print("    m = View ID666 metadata \n", .{});
+    db.print("    q = Quit \n", .{});
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n\n", .{});
     db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
     flush(null, false);
@@ -776,7 +778,7 @@ fn show_help_menu() void {
 fn show_metadata() void {
     var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
     const metastring: []const u8 = metadata.?.print(&print_buf) catch print_buf[0..];
-    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+    //db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
     db.print("{s}\n", .{metastring});
     flush(null, false);
 }
