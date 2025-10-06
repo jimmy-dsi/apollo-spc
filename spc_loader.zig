@@ -98,6 +98,9 @@ pub fn load_spc(emu: *Emu, spc_file_data: []const u8) SPCLoadError! SongMetadata
         @memcpy(emu.s_dsp.audio_ram[0xFFC0..], extra_ram);
     }
 
+    // Set previous state to reflect loaded data
+    emu.s_smp.prev_spc_state = emu.s_smp.spc.state;
+
     return metadata;
 }
 

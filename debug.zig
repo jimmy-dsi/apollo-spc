@@ -1877,7 +1877,7 @@ pub fn print_script700_state(emu: *Emu) void {
     //print("Clk Offset  : {d}\n",                  .{s7s.clock_offset});
 }
 
-var cli_width: u8 = 120;
+pub var cli_width: u8 = 120;
 
 pub inline fn set_cli_width(amt: u8) void {
     cli_width = amt;
@@ -1889,7 +1889,7 @@ pub inline fn set_cli_width(amt: u8) void {
     }
 }
 
-const max_lines: u32 = 30;
+pub const max_lines: u32 = 30;
 
 var print_canvas:  [max_lines * 256]u8 = [_]u8 {' '} ** (max_lines * 256);
 var canvas_line_lengths: [max_lines]u8 = [_]u8 {120} ** max_lines;

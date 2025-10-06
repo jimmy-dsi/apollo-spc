@@ -79,14 +79,14 @@ pub fn main() !void {
     var sl: []u32 = undefined;
 
     //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x7B8}); ix += 2;
-    //emu.script700.label_addresses[0] = ix;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  2048000}); ix += 2;
-    //emu.script700.label_addresses[1] = ix;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x3FFFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "blt", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
+    emu.script700.label_addresses[0] = ix;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  20480000}); ix += 2;
+    emu.script700.label_addresses[1] = ix;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
+    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x3FFFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "blt", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
+    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
     sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
 
     //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
@@ -233,10 +233,12 @@ pub fn main() !void {
                 switch (m) {
                     'n' => {
                         cur_page +%= 1;
+                        cur_mode = 'v';
                         t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                     },
                     'p' => {
                         cur_page -%= 1;
+                        cur_mode = 'v';
                         t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                     },
                     'd' => {
@@ -244,6 +246,7 @@ pub fn main() !void {
                             cur_page +%= 1;
                         }
                         cur_offset +%= 0x10;
+                        cur_mode = 'v';
                         t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                     },
                     'u' => {
@@ -251,6 +254,7 @@ pub fn main() !void {
                             cur_page -%= 1;
                         }
                         cur_offset -%= 0x10;
+                        cur_mode = 'v';
                         t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                     },
                     else => {
@@ -303,7 +307,7 @@ pub fn main() !void {
         sw: switch (std.ascii.toLower(buffer[0])) {
             'q' => {
                 stdout_file.close();
-                std.process.exit(1);
+                quit();
             },
             'h' => {
                 flush(null, false);
@@ -318,10 +322,15 @@ pub fn main() !void {
             'n' => {
                 cur_action = 'n';
                 cur_page +%= 1;
-                if (cur_mode == 'v') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
-                }
+
+                cur_mode = 'v';
+                t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
+                
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                
+                flush(null, true);
             },
             'c' => {
                 t_started.store(true, std.builtin.AtomicOrder.seq_cst);
@@ -379,8 +388,8 @@ pub fn main() !void {
                     cur_action = 's';
 
                     if (cur_mode == 'i') {
-                        const prev_spc_state = emu.s_smp.prev_spc_state;
-                        print_instruction(&emu, &prev_spc_state);
+                        //const prev_spc_state = emu.s_smp.prev_spc_state;
+                        print_instruction(&emu, &emu.s_smp.spc.state);
                     }
                     else if (t_other_menu.load(std.builtin.AtomicOrder.seq_cst) == 'h') {
                         show_help_menu();
@@ -394,7 +403,7 @@ pub fn main() !void {
                 }
 
                 if (t_other_menu.load(std.builtin.AtomicOrder.seq_cst) == 0) {
-                    if (cur_mode == 'v') {
+                   if (cur_mode == 'v') {
                         db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                         db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
@@ -432,10 +441,15 @@ pub fn main() !void {
             'p' => {
                 cur_action = 'p';
                 cur_page -%= 1;
-                if (cur_mode == 'v') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
-                }
+                
+                cur_mode = 'v';
+                t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
+                
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                
+                flush(null, true);
             },
             'd' => {
                 cur_action = 'd';
@@ -443,10 +457,15 @@ pub fn main() !void {
                     cur_page +%= 1;
                 }
                 cur_offset +%= 0x10;
-                if (cur_mode == 'v') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
-                }
+                
+                cur_mode = 'v';
+                t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
+                
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                
+                flush(null, true);
             },
             'u' => {
                 cur_action = 'u';
@@ -454,10 +473,15 @@ pub fn main() !void {
                     cur_page -%= 1;
                 }
                 cur_offset -%= 0x10;
-                if (cur_mode == 'v') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-                    db.print_memory_page(&emu, cur_page, cur_offset, .{});
-                }
+                
+                cur_mode = 'v';
+                t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
+            
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print_memory_page(&emu, cur_page, cur_offset, .{});
+                
+                flush(null, true);
             },
             'i' => {
                 if (cur_mode != 'i') {
@@ -466,8 +490,8 @@ pub fn main() !void {
                 }
 
                 if (cur_action != 'c') {
-                    const prev_spc_state = emu.s_smp.prev_spc_state;
-                    print_instruction(&emu, &prev_spc_state);
+                    //const prev_spc_state = emu.s_smp.prev_spc_state;
+                    print_instruction(&emu, &emu.s_smp.spc.state);
 
                     cur_mode = 'i';
                     t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
@@ -533,26 +557,6 @@ pub fn main() !void {
                 cur_action = 's';
                 // Default behavior: Step instruction
 
-                if (cur_mode == 'i') {
-                    const prev_spc_state = emu.s_smp.prev_spc_state;
-
-                    const prev_logs = emu.s_smp.get_access_logs_range(last_cycle);
-                    var logs = db.filter_access_logs(prev_logs);
-
-                    db.move_cursor_up();
-                    
-                    db.print_pc(prev_spc_state.pc);
-                    db.print(" |  ", .{});
-                    db.print_opcode(&emu, prev_spc_state.pc);
-                    db.print("  ", .{});
-                    try db.print_logs(&prev_state, logs[0..]);
-
-                    db.print_spc_state(&prev_spc_state);
-                    db.print("\n", .{});
-
-                    print_instruction(&emu, &emu.s_smp.spc.state);
-                }
-
                 var s7en = emu.script700.enabled;
                 var attempts: u32 = 0;
 
@@ -594,6 +598,23 @@ pub fn main() !void {
                 //var logs = db.filter_access_logs(all_logs);
 
                 if (cur_mode == 'i') {
+                    const prev_spc_state = emu.s_smp.prev_spc_state;
+
+                    const prev_logs = emu.s_smp.get_access_logs_range(last_cycle);
+                    var logs = db.filter_access_logs(prev_logs);
+
+                    db.move_cursor_up();
+                    
+                    db.print_pc(prev_spc_state.pc);
+                    db.print(" |  ", .{});
+                    db.print_opcode(&emu, prev_spc_state.pc);
+                    db.print("  ", .{});
+                    try db.print_logs(&prev_state, logs[0..]);
+
+                    db.print_spc_state(&prev_spc_state);
+                    db.print("\n", .{});
+
+                    print_instruction(&emu, &emu.s_smp.spc.state);
                     //try db.print_logs(&prev_state, logs[0..]);
 
                     // Print timer logs after instruction log
@@ -807,7 +828,7 @@ fn break_listener() void {
                     sw: switch (buffer[0]) {
                         'q' => {
                             stdout_file.close();
-                            std.process.exit(1);
+                            quit();
                         },
                         'c' => {
                             
@@ -826,6 +847,7 @@ fn break_listener() void {
                         'v', 'r', 'e', 'b', '7', 'u', 'd', 'n', 'p' => {
                             cur_mode = buffer[0];
                             prev_input = buffer[0];
+
                             t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                         },
                         'k' => {
@@ -859,7 +881,7 @@ fn break_listener() void {
                         'w' => {
                             db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                             db.print("\n\x1B[38;2;250;125;25mWaiting for Script700 to continue...\x1B[39m\n", .{});
-                            flush("Enter a command: ", true);
+                            flush("Enter a command: ", false);
                             t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
                         },
                         'c' => {
@@ -867,7 +889,7 @@ fn break_listener() void {
                         },
                         'q' => {
                             stdout_file.close();
-                            std.process.exit(1);
+                            quit();
                         },
                         else => {
                             continue :sw 'w';
@@ -882,8 +904,8 @@ fn break_listener() void {
             m_expect_input.unlock();
         }
 
-        // Sleep for 200 ms to allow main thread time to block stdin waiting on this one
-        std.time.sleep(200 * std.time.ns_per_ms);
+        // Sleep for 20 ms to allow main thread time to block stdin waiting on this one
+        std.time.sleep(20 * std.time.ns_per_ms);
     }
 }
 
@@ -910,7 +932,7 @@ fn report_timeout() void {
             'w' => {
                 db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                 db.print("\n\x1B[38;2;250;125;25mWaiting for Script700 to continue...\x1B[39m\n", .{});
-                flush("Enter a command: ", true);
+                flush("Enter a command: ", false);
                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
             },
             'c' => {
@@ -918,7 +940,7 @@ fn report_timeout() void {
             },
             'q' => {
                 stdout_file.close();
-                std.process.exit(1);
+                quit();
             },
             else => {
                 continue :sw 'w';
@@ -977,4 +999,17 @@ fn print_instruction(emu: *const Emu, state: *const SPCState) void {
     db.print("\x1B[49m", .{}); // Reset color
 
     flush(null, true);
+}
+
+fn quit() void {
+    // Clear console and reset position
+    std.debug.print("\x1B[H", .{});
+    for (0..(db.max_lines + 2)) |_| {
+        for (0..(db.cli_width)) |_| {
+            std.debug.print(" ", .{});
+        }
+        std.debug.print("\n", .{});
+    }
+    std.debug.print("\x1B[H", .{});
+    std.process.exit(0);
 }
