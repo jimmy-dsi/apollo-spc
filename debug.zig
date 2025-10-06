@@ -2030,7 +2030,24 @@ pub inline fn goto_last_line() void {
     canvas_index = 256 * ((start_line + max_lines - 1) % max_lines);
 }
 
-pub inline fn flush(msg: ?[]const u8, no_clear: bool) void {
+pub var is_error:   bool = false;
+pub var cur_info_msg: u8 = 0;
+pub var cur_err_msg:  u8 = 0;
+
+var info_msgs: [10][]const u8 = [_][]const u8 {
+    "Enter h to see help menu",
+    "Breakpoint hit. Press enter",
+    "\x1B[91mScript700 timed out - see above",
+    "\x1B[38;2;250;125;25mWaiting for Script700 to continue...",
+    "Script700 load error",
+    "Script700 crashed",
+    "not enough memory to resize data area.",
+    "script area fetch went out of bounds.",
+    "script area bytecode is too large.",
+    "unknown error."
+};
+
+pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     var final_buffer: [max_lines * 257]u8 = undefined;
     var total_chars: u32 = 0;
 
@@ -2046,11 +2063,23 @@ pub inline fn flush(msg: ?[]const u8, no_clear: bool) void {
         }
     }
 
-    if (msg) |m| {
-        std.debug.print("\x1B[H{s}\r{s}\n> ", .{final_buffer[0 .. (total_chars - 1)], m});
+    if (is_error) {
+        std.debug.print("\x1B[H{s}\r\x1B[91m{s}: {s}\x1B[39m\n> ",
+            .{
+                final_buffer[0 .. (total_chars - 1)],
+                info_msgs[cur_info_msg],
+                info_msgs[cur_err_msg]
+            }
+        );
     }
     else {
-        std.debug.print("\x1B[H{s}\r{s}\n> ", .{final_buffer[0 .. (total_chars - 1)], "Enter a command (h for help menu): "});
+        std.debug.print(
+            "\x1B[H{s}\r\x1B[93m{s}\x1B[39m\n> ",
+            .{
+                final_buffer[0 .. (total_chars - 1)],
+                info_msgs[cur_info_msg]
+            }
+        );
     }
 
     // Restore position if it was overridden.

@@ -173,6 +173,9 @@ pub const SSMP = struct {
         if (self.co.null_transition(.{})) {
             if (self.instr_boundary) {
                 self.prev_spc_state = self.spc.state;
+                if (self.emu.script700.state.has_breakpoint(self.spc.pc())) {
+                    self.emu.break_exec = true;
+                }
             }
             self.instr_boundary = false;
         }

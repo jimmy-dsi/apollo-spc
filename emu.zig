@@ -362,11 +362,6 @@ pub const Emu = struct {
             self.s_dsp.inc_cycle(); // Increment clock counter by 1 DSP cycle.
         }
 
-        // Breakpoints should continue to be checked even if the script700 script has ended
-        if (self.s_smp.instr_boundary and self.script700.state.has_breakpoint(self.s_smp.spc.pc())) {
-            self.break_exec = true;
-        }
-
         // Attempt Script700 processing on every DSP cycle
         if (self.script700.enabled and cycle.* > self.script700.state.last_cycle) {
             self.run_script700();
