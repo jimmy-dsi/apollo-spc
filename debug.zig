@@ -1898,7 +1898,7 @@ var canvas_index: u32 = 0;
 var canvas_ansi: bool = false;
 
 pub fn print(comptime fmt: []const u8, args: anytype) void {
-    var temp_buffer: [1024]u8 = [_]u8 {' '} ** 1024;
+    var temp_buffer: [2048]u8 = [_]u8 {' '} ** 2048;
     const slice: ?[]const u8 = std.fmt.bufPrint(&temp_buffer, fmt, args) catch null;
 
     if (slice) |slc| {

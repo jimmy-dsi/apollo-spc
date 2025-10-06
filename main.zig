@@ -77,65 +77,9 @@ pub fn main() !void {
     var ix: u32 = 0;
     
     var sl: []u32 = undefined;
-
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x171F}); ix += 2;
-    emu.script700.label_addresses[0] = ix;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  =  64}); ix += 2;
-    //for (0..96) |_| {
-    //    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "nop",   .{}); ix += 1;
-    //}
-    emu.script700.label_addresses[1] = ix;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =   0}); ix += 2;
-    sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0x3FFFFFF, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "blt", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
-    sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
-
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "q", .{}); ix += 1;
-
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value = 6000, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "r0",  .{}); ix += 1;
-    //emu.script700.label_addresses[0] = ix;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 2048}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "s",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  =    0, .oper_2_prefix =  "w", .oper_2_value  =  0}); ix += 2;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bne", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value = 2, .oper_2_prefix =  "i", .oper_2_value =   1}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 4096000}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value = 0x2B, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 4096000}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value = 0x00, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 4096000}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value = 0x2B, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "#",   .oper_1_value  = 4096000}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#",   .oper_1_value = 0x2A, .oper_2_prefix =  "i", .oper_2_value =   0}); ix += 2;
-
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   1, .oper_2_prefix =  "w", .oper_2_value =   0}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "#", .oper_1_value =   0, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
-    //emu.script700.label_addresses[0] = ix;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "db?", .oper_2_prefix =  "w", .oper_2_value  =    2}); ix += 1;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "#",   .oper_1_value  = 0xFF, .oper_2_prefix =  "w", .oper_2_value =   2}); ix += 2;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bne", .{.oper_1_prefix =   "",   .oper_1_value  =    1}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "dd?", .oper_2_prefix =  "w", .oper_2_value  =    1}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
-    //emu.script700.label_addresses[1] = ix;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "db?", .oper_2_prefix =  "w", .oper_2_value  =    3}); ix += 1;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .oper_2_prefix =  "w", .oper_2_value =   1}); ix += 2;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "c",   .{.oper_1_prefix =  "w",   .oper_1_value  =    1, .oper_2_prefix = "#?"}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "dd?", .oper_2_prefix =  "w", .oper_2_value  =    4}); ix += 1;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "a",   .{.oper_1_prefix =  "#",   .oper_1_value  =    4, .oper_2_prefix =  "w", .oper_2_value  =   1}); ix += 2;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    3, .oper_2_prefix =   "", .oper_2_value  =   1}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    2, .oper_2_prefix =   "", .oper_2_value  =   2}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "m",   .{.oper_1_prefix =  "w",   .oper_1_value  =    0, .oper_2_prefix =   "", .oper_2_value  =   0}); ix += 1;
-    //sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "n",   .{.oper_1_prefix =  "#",   .oper_1_value  =    1, .operator      =  '^', .oper_2_prefix = "w", .oper_2_value = 0}); ix += 2;
-    ////sl = sb[ix..(ix+2)]; try Script700.compile_instruction(sl, "bp",  .{.oper_1_prefix =  "",    .oper_1_value  = 0x35}); ix += 2;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "w",   .{.oper_1_prefix =  "w",   .oper_1_value  =    4}); ix += 1;
-    //sl = sb[ix..(ix+1)]; try Script700.compile_instruction(sl, "bra", .{.oper_1_prefix =   "",   .oper_1_value  =    0}); ix += 1;
+    ix = 0;
+    sl = undefined;
+    sb[0] = 0x8000_0000;
 
     var data = blk: {
         const embed_u8 = @embedFile("data/c700-test.bin");
@@ -150,16 +94,18 @@ pub fn main() !void {
     
         break :blk table_u8;
     };
+    data[0] = 0;
 
     var script700_load_error: ?anyerror = null;
+    script700_load_error = null;
 
-    emu.script700.load_bytecode(sb[0..]) catch |e| {
-        script700_load_error = e;
-    };
-    if (script700_load_error == null) {
-        emu.script700.load_data(data[0..]);
-        try emu.script700.run(.{});
-    }
+    //emu.script700.load_bytecode(sb[0..]) catch |e| {
+    //    script700_load_error = e;
+    //};
+    //if (script700_load_error == null) {
+    //    emu.script700.load_data(data[0..]);
+    //    try emu.script700.run(.{});
+    //}
 
     var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
     defer t_break_listener.join();
@@ -449,7 +395,7 @@ pub fn main() !void {
                         db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
-                    else if (cur_mode == '7') {
+                    else if (cur_mode == '8') {
                         db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                         db.print_script700_state(&emu);
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
@@ -574,8 +520,8 @@ pub fn main() !void {
                 set_msg(0, 0, false);
                 flush(null, true);
             },
-            '7' => {
-                cur_mode = '7';
+            '8' => {
+                cur_mode = '8';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                 db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
@@ -712,7 +658,7 @@ pub fn main() !void {
                     flush(null, true);
                     set_msg(0, 0, false);
                 }
-                else if (cur_mode == '7') {
+                else if (cur_mode == '8') {
                     db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     db.print_script700_state(&emu);
                     flush(null, true);
@@ -833,7 +779,7 @@ fn show_help_menu() void {
     db.print("    r = DSP register viewer (1) \n", .{});
     db.print("    e = DSP register viewer (2) \n", .{});
     db.print("    b = DSP debug viewer \n", .{});
-    db.print("    7 = Script700 debug viewer \n", .{});
+    db.print("    8 = Script700 debug viewer \n", .{});
     db.print(" Action commands: \n", .{});
     db.print("    s = Step instruction [default] \n", .{});
     db.print("    c = Continue to next breakpoint \n", .{});
@@ -853,9 +799,15 @@ fn show_help_menu() void {
 
 fn show_metadata() void {
     var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
-    const metastring: []const u8 = metadata.?.print(&print_buf) catch print_buf[0..];
-    //db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
-    db.print("{s}\n", .{metastring});
+    const result = metadata.?.print(&print_buf);
+
+    if (result) |metastring| {
+        db.print("{s}\n", .{metastring});
+    }
+    else |_| {
+        db.print("{s}\n", .{print_buf[0..]});
+    }
+
     flush(null, false);
 }
 
@@ -908,7 +860,7 @@ fn break_listener() void {
                                 prev_input = buffer[0];
                                 set_msg(0, 0, false);
                             },
-                            'v', 'r', 'e', 'b', '7', 'u', 'd', 'n', 'p' => {
+                            'v', 'r', 'e', 'b', '8', 'u', 'd', 'n', 'p' => {
                                 cur_mode = buffer[0];
                                 prev_input = buffer[0];
 
