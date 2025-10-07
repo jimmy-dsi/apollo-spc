@@ -1791,6 +1791,13 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
+        print("    pitch mod on: {X:0>1}        ", .{v.__pitch_mod_on});
+    }
+    print("\n", .{});
+
+    for (0..4) |i| {
+        const idx = i + base;
+        const v = &s._voice[idx];
         const res = 
             switch (v._env_mode) {
                 .attack  => "attck",
@@ -1846,12 +1853,6 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
     print("\n", .{});
-
-    if (base >= 4) {
-        print("\n", .{});
-        print("noise lfsr:  {X:0>4}", .{emu.s_dsp.int()._noise_lfsr});
-        print("\n", .{});
-    }
 
     print("\x1B[0m", .{});
 }

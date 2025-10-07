@@ -166,9 +166,21 @@ pub const DSPStateInternal = struct {
             // Seems that instead of being a simple addition with the output, it also factors in the current pitch as a multiplier as well
             // The math appears to work out so that the perceived change in frequency from the previous output is the same regardless of the current pitch
             // (So for example, the maximum positive output seems to always offset the pitch 1 octave higher, regardless of register)
-            const p: i16 = @intCast(self._pitch);
+            const p: i16 = @bitCast(@as(u16, self._pitch));
             const o: i16 = @intCast(self._output >> 5);
-            self._pitch += @intCast(o * p >> 10);
+            var   x: i32 = @intCast(@as(i32, o) * @as(i32, p) >> 10);
+
+            if (x >= 0) {
+                const y: u32 = @bitCast(x);
+                const z: u15 = @intCast(y & 0x7FFF);
+                self._pitch +%= z;
+            }
+            else {
+                x = -x;
+                const y: u32 = @bitCast(x);
+                const z: u15 = @intCast(y & 0x7FFF);
+                self._pitch -%= z;
+            }
         }
 
         if (v._key_on_delay > 0) {
@@ -207,7 +219,7 @@ pub const DSPStateInternal = struct {
                 @bitCast(@as(u16, self._noise_lfsr) << 1); // Output is set to noise LFSR output instead, if noise is enabled for this voice
 
         // Apply envelope
-        self._output = @intCast(@as(i32, output) * @as(i32, v._env_level) >> 11);
+        self._output = @intCast(@as(i32, output) * @as(i32, v._env_level) >> 11 & ~@as(i32, 1));
         envx.* = @intCast(v._env_level >> 4); // Set ENVX to top 7 bits of envelope level
 
         // Immediately silence the voice if reset FLG bit has been set, or if we've reached the non-looped end block of a BRR sample
