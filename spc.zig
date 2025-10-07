@@ -1502,7 +1502,7 @@ pub const SPC = struct {
 
     pub inline fn mov_x_ind_from_a(self: *SPC, substate: u32) !void {
         switch (substate) {
-            0, 1 => {  try self.fetch(substate);                             }, // Fetch
+            0, 1 => {  try self.dummy_read(self.pc(), substate);             }, // Dummy read PC
             2, 3 => {  try self.dummy_read_dp(self.x(), substate - 2);       }, // DP dummy read
             4, 5 => {  try self.write_dp(self.x(), self.a(), substate - 4);  }, // DP write
             6    => {  self.finish(0);                                       }, // End
