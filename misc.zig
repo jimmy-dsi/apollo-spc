@@ -45,7 +45,7 @@ pub inline fn step_d(s: *DSPStateInternal, koff: u8, noise_freq: u5) void {
 
     // Update noise
     if (counter.poll(s, noise_freq)) {
-        const feedback: i32 = @as(i32, s._noise_lfsr) << 13 ^ @as(i32, s._noise_lfsr) << 14;
+        const feedback: u32 = @as(u32, s._noise_lfsr) << 13 ^ @as(u32, s._noise_lfsr) << 14;
         var new_lfsr: u15 = @intCast(feedback & 0x4000);
         new_lfsr |= s._noise_lfsr >> 1;
         s._noise_lfsr = new_lfsr;

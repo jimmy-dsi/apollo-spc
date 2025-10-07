@@ -85,6 +85,7 @@ pub const SDSP = struct {
         self.state.mute  = 1;
         self.state.echo.readonly = 1;
         self.state.noise_rate = 0x00;
+        self.state._internal = .{};
     }
 
     pub fn step(self: *SDSP) void {
