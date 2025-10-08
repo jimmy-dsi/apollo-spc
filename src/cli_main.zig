@@ -4,14 +4,14 @@ const Atomic = std.atomic.Value;
 
 const db = @import("debug.zig");
 
-const Emu          = @import("emu.zig").Emu;
-const SDSP         = @import("s_dsp.zig").SDSP;
-const SSMP         = @import("s_smp.zig").SSMP;
-const SPCState     = @import("spc_state.zig").SPCState;
-const Script700    = @import("script700.zig").Script700;
-const SongMetadata = @import("song_metadata.zig").SongMetadata;
+const Emu          = @import("core/emu.zig").Emu;
+const SDSP         = @import("core/s_dsp.zig").SDSP;
+const SSMP         = @import("core/s_smp.zig").SSMP;
+const SPCState     = @import("core/spc_state.zig").SPCState;
+const Script700    = @import("core/script700.zig").Script700;
+const SongMetadata = @import("core/song_metadata.zig").SongMetadata;
 
-const spc_loader = @import("spc_loader.zig");
+const spc_loader = @import("core/spc_loader.zig");
 
 const max_consecutive_timeouts: u32 = 90;
 const busyloop_relief_ms:       u32 = 20;
@@ -82,7 +82,7 @@ pub fn main() !void {
     sb[0] = 0x8000_0000;
 
     var data = blk: {
-        const embed_u8 = @embedFile("data/c700-test.bin");
+        const embed_u8 = @embedFile("core/data/c700-test.bin");
         var table_u8: [embed_u8.len] u8 = undefined;
     
         @setEvalBranchQuota(embed_u8.len);

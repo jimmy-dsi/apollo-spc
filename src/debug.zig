@@ -1,11 +1,11 @@
 const std = @import("std");
 
-const Emu      = @import("emu.zig").Emu;
-const SDSP     = @import("s_dsp.zig").SDSP;
-const SSMP     = @import("s_smp.zig").SSMP;
-const SMPState = @import("smp_state.zig").SMPState;
-const SPC      = @import("spc.zig").SPC;
-const SPCState = @import("spc_state.zig").SPCState;
+const Emu      = @import("core/emu.zig").Emu;
+const SDSP     = @import("core/s_dsp.zig").SDSP;
+const SSMP     = @import("core/s_smp.zig").SSMP;
+const SMPState = @import("core/smp_state.zig").SMPState;
+const SPC      = @import("core/spc.zig").SPC;
+const SPCState = @import("core/spc_state.zig").SPCState;
 
 pub fn print_pc(pc: u16) void {
     print("{X:0>4}", .{pc});

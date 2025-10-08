@@ -1,9 +1,9 @@
 zig-out/
-data/*
+src/core/data/*
 test/*
 doc/*
-!data/bootrom.bin
-!data/gauss.bin
+!src/core/data/bootrom.bin
+!src/core/data/gauss.bin
 apollo
 apollo-spc-program
 *.o

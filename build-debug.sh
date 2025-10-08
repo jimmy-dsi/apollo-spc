@@ -1,2 +1,2 @@
 #!/bin/bash
-zig build-exe main.zig -femit-bin=apollo-spc-program
+zig build-exe src/cli_main.zig -femit-bin=apollo-spc-program

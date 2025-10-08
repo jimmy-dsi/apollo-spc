@@ -3,8 +3,6 @@ const std = @import("std");
 const State = @import("script700_state.zig").Script700State;
 const Emu   = @import("emu.zig").Emu;
 
-const db = @import("debug.zig");
-
 pub const Script700 = struct {
     pub const RunOptions = struct {
         max_steps: u32 = 10_000
