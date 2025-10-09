@@ -1,1 +1,0 @@
-zig build-exe src\cli_main.zig -O ReleaseFast -femit-bin=apollo-spc-program.exe

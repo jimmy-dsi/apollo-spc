@@ -12,6 +12,7 @@ doc/*
 apollo
 apollo-spc-program
 /play
+/bin/*
 *.o
 *.exe
 *.obj
