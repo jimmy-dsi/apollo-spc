@@ -3,7 +3,7 @@
 using System.Diagnostics;
 using Jimbl;
 
-const bool VERIFY_HASH = false; // TODO: Set to true once hash generation is implemented
+const bool VERIFY_HASH = true;
 
 string[] audioConsumers   = ["paplay", "aplay", "ffplay"];
 string   selectedConsumer = audioConsumers[0]; // Default to paplay if it exists
@@ -61,18 +61,18 @@ Shell.ExecPipe(
 return;
 
 bool verifyHash(string programPath) {
-	var actualHash = Crypto.HashFileSHA256(programPath);
+	var actualHash = Crypto.HashFileSHA256(programPath).ToLower();
 	
 	// First, check to see if the hash is in the additional hashes set
 	foreach (var hash in AdditionalHashes.Set) {
-		if (hash == actualHash) {
+		if (hash.ToLower() == actualHash) {
 			return true;
 		}
 	}
 	
 	// If not, check to see if the hash is in the known hashes set
 	foreach (var hash in KnownHashes.Set) {
-		if (hash == actualHash) {
+		if (hash.ToLower() == actualHash) {
 			return true;
 		}
 	}
