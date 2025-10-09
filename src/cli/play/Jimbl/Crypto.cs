@@ -8,7 +8,7 @@ public static class Crypto {
 		using var sha256     = SHA256.Create();
 		using var fileStream = File.OpenRead(filePath);
 		
-		// Computer hash of file stream
+		// Compute hash of file stream
 		var hashBytes = sha256.ComputeHash(fileStream);
 		
 		// Convert resulting byte array to hex string

@@ -1,7 +1,6 @@
-using System.Diagnostics;
-
 namespace Play;
 
+using System.Diagnostics;
 using Jimbl;
 
 public static class KnownHashes {
