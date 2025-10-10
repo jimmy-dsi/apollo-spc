@@ -4,56 +4,55 @@ using System.ComponentModel;
 using System.Diagnostics;
 
 public static class Shell {
-	public static void Exec(string command, params string[] args) {
-		var fullCommand = getFullCommand(command, args);
-		var process = createProcess(fullCommand);
-		process.Start();
-		process.WaitForExit();
+	public class CommandNotFoundError: Exception { }
+	
+	public static bool Exec(string command, params string[] args) {
+		var fullCommand = GetFullCommand(command, args);
+		tryRun(fullCommand);
+		return true;
+	}
+	
+	public static string ExecGetStdout(string command, params string[] args) {
+		var fullCommand = GetFullCommand(command, args);
+		return tryRunGetStdout(fullCommand);
+	}
+	
+	public static bool ExecInBG(string command, params string[] args) {
+		var fullCommand = $"{GetFullCommand(command, args)}";
+		tryRun(fullCommand, runInBG: true);
+		return true;
 	}
 	
 	/// <summary>
 	/// Spawns two commands: One producer and one consumer. The producer's stdout is piped into the consumer's stdin.
 	/// </summary>
-	public static void ExecPipe(string producerCommand, string[] producerArgs,
+	public static bool ExecPipe(string producerCommand, string[] producerArgs,
 	                            string consumerCommand, string[] consumerArgs) {
 		
-		var producerFullCommand = getFullCommand(producerCommand, producerArgs);
-		var consumerFullCommand = getFullCommand(consumerCommand, consumerArgs);
+		var producerFullCommand = GetFullCommand(producerCommand, producerArgs);
+		var consumerFullCommand = GetFullCommand(consumerCommand, consumerArgs);
 		
-		var process = createProcess($"{producerFullCommand} | {consumerFullCommand}");
-		process.Start();
-		process.WaitForExit();
+		string fullCommand;
+		if (OS.Get() == OS.Windows) {
+			fullCommand = $"{producerFullCommand} 2>CON | {consumerFullCommand}";
+		}
+		else if (OS.Get() == OS.Linux) {
+			fullCommand = $"{producerFullCommand} | {consumerFullCommand}";
+		}
+		else {
+			throw new UnreachableException();
+		}
+		
+		tryRun(fullCommand);
+		return true;
 	}
 	
 	public static bool CommandExists(string command) {
-		ProcessStartInfo psi = new() {
-			FileName               = command,
-			Arguments              = "",
-			UseShellExecute        = false,
-			RedirectStandardOutput = true,
-			RedirectStandardError  = true
-		};
-		
-		switch (OS.Get()) {
-			case OS.Windows: {
-				try {
-					using var p = Process.Start(psi);
-					p.WaitForExit();
-					return p.ExitCode != 9009; // Not recognized as an internal or external command
-				}
-				catch (Win32Exception ex) when (ex.NativeErrorCode is 2 or 13) { // Not found / found but not executable
-					return false;
-				}
-			}
-			case OS.Linux: {
-				using var p = Process.Start(psi);
-				p.WaitForExit();
-				return p.ExitCode is not 127 and not 126; // Not found / not executable
-			}
-			default: {
-				throw new UnreachableException();
-			}
-		}
+		return Env.Which(command) is not null;
+	}
+	
+	public static string GetFullCommand(string command, string[] args) {
+		return $"{Escape(command)} {string.Join(' ', args.Select(Escape))}";
 	}
 	
 	public static string Escape(string value) {
@@ -63,7 +62,8 @@ public static class Shell {
 				// '!' is not handled. I don't think delayed expansion enabling is possible here, so this most likely does not need special handling
 				return $"\"{value.Replace("^", "")
 				                 .Replace("%",  "")
-				                 .Replace("\"", "")}\"";
+				                 .Replace("\"", "%")
+				                 .Replace("%",  "\"\"")}\"";
 			}
 			case OS.Linux: {
 				// Assuming bash shell
@@ -78,39 +78,104 @@ public static class Shell {
 		}
 	}
 	
-	static string getFullCommand(string command, string[] args) {
-		return $"{Escape(command)} {string.Join(' ', args.Select(Escape))}";
+	static void tryRun(string fullCommand, bool runInBG = false) {
+		var process = createProcess(fullCommand);
+		
+		try {
+			process.Start();
+			
+			if (runInBG) {
+				return;
+			}
+			else {
+				process.WaitForExit();
+			}
+			
+			if (OS.Get() == OS.Windows) {
+				if (process.ExitCode == 9009) { // Not recognized as an internal or external command
+					throw new CommandNotFoundError();
+				}
+			}
+			else if (OS.Get() == OS.Linux) {
+				if (process.ExitCode is 127 or 126) { // Not found / not executable
+					throw new CommandNotFoundError();
+				}
+			}
+			else {
+				throw new UnreachableException();
+			}
+		}
+		catch (Win32Exception ex) when (ex.NativeErrorCode is 2 or 13) {
+			throw new CommandNotFoundError();
+		}
 	}
 	
-	static Process createProcess(string fullCommand) {
+	static string tryRunGetStdout(string fullCommand) {
+		var process = createProcess(fullCommand, true);
+		
+		string output;
+		
+		try {
+			process.Start();
+			output = process.StandardOutput.ReadToEnd();
+			process.WaitForExit();
+			
+			if (OS.Get() == OS.Windows) {
+				if (process.ExitCode == 9009) { // Not recognized as an internal or external command
+					throw new CommandNotFoundError();
+				}
+			}
+			else if (OS.Get() == OS.Linux) {
+				if (process.ExitCode is 127 or 126) { // Not found / not executable
+					throw new CommandNotFoundError();
+				}
+			}
+			else {
+				throw new UnreachableException();
+			}
+		}
+		catch (Win32Exception ex) when (ex.NativeErrorCode is 2 or 13) {
+			throw new CommandNotFoundError();
+		}
+		
+		return output;
+	}
+	
+	static Process createProcess(string fullCommand, bool redirectStandardOutput = false) {
+		ProcessStartInfo psi;
+		
 		switch (OS.Get()) {
 			case OS.Windows: {
-				return new() {
-					StartInfo = new() {
-						FileName               = "cmd.exe",
-						Arguments              = $"/c {fullCommand}",
-						RedirectStandardOutput = false,
-						RedirectStandardError  = false,
-						UseShellExecute        = false,
-						CreateNoWindow         = true,
-					}
+				psi = new() {
+					FileName               = "cmd.exe",
+					Arguments              = $"/d /s /c \"{fullCommand}\"",
+					RedirectStandardOutput = redirectStandardOutput,
+					RedirectStandardError  = false,
+					UseShellExecute        = false,
+					CreateNoWindow         = false,
 				};
+				break;
 			}
 			case OS.Linux: {
-				return new() {
-					StartInfo = new() {
-						FileName               = "/bin/bash",
-						Arguments              = $"-c {Escape(fullCommand)}",
-						RedirectStandardOutput = false,
-						RedirectStandardError  = false,
-						UseShellExecute        = false,
-						CreateNoWindow         = true,
-					}
+				psi = new() {
+					FileName               = "/bin/bash",
+					Arguments              = $"-c {Escape(fullCommand)}",
+					RedirectStandardOutput = redirectStandardOutput,
+					RedirectStandardError  = false,
+					UseShellExecute        = false,
+					CreateNoWindow         = true,
 				};
+				break;
 			}
 			default: {
 				throw new UnreachableException();
 			}
 		}
+		
+		Process proc = new() {
+			StartInfo = psi
+		};
+		
+		return proc;
 	}
 }
