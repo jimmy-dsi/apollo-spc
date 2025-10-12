@@ -18,6 +18,69 @@ public static class Env {
 	public static string WorkingDirectory => Directory.GetCurrentDirectory();
 	
 	public static VarFront Var = new();
+			
+	static Dictionary<string, string> recognizedTerminals = new() {
+		["gnome-terminal-server"] = "gnome-terminal",
+		["konsole"]               = "konsole",
+		["xterm"]                 = "xterm",
+		["lxterminal"]            = "lxterminal"
+	};
+	
+	static string? parentTerminal = null;
+	
+	public static string? ParentTerminal {
+		get {
+			if (parentTerminal is not null) {
+				return parentTerminal;
+			}
+			
+			if (OS.Get() == OS.Linux) {
+				// First, try the immediate parent of the current C# app's process
+				parentTerminal = Shell.ExecUnsafeGetStdout(
+					"cur_ppid=$PPID; " +
+					"ps -aux | grep $(ps -o ppid= -p \"$cur_ppid\") | awk 'NR==1{print $11}' | xargs basename"
+				).Trim();
+				
+				if (recognizedTerminals.TryGetValue(parentTerminal, out parentTerminal)) {
+					return parentTerminal;
+				}
+				
+				// If that's not a recognized terminal, try checking the parent of the immediate parent
+				parentTerminal = Shell.ExecUnsafeGetStdout(
+					"cur_ppid=$PPID; " +
+					"cur_ppid=$(ps -o ppid= -p \"$cur_ppid\"); " +
+					"ps -aux | grep $(ps -o ppid= -p \"$cur_ppid\") | awk 'NR==1{print $11}' | xargs basename"
+				).Trim();
+			
+				if (recognizedTerminals.TryGetValue(parentTerminal, out parentTerminal)) {
+					return parentTerminal;
+				}
+				
+				return null;
+			}
+			else if (OS.Get() == OS.Windows) {
+				throw new NotImplementedException();
+			}
+			else {
+				throw new UnreachableException();
+			}
+		}
+	}
+	
+	public static (int, int) WindowSize {
+		get {
+			if (OS.Get() == OS.Linux) {
+				var size   = Shell.ExecGetStdout("stty", "size").Split();
+				var height = int.Parse(size[0]);
+				var width  = int.Parse(size[1]);
+				
+				return (width, height);
+			}
+			else {
+				return (Console.WindowWidth, Console.WindowHeight);
+			}
+		}
+	}
 	
 	public static string[] Path {
 		get {

@@ -6,10 +6,31 @@ using System.Diagnostics;
 public static class Shell {
 	public class CommandNotFoundError: Exception { }
 	
+	/// <summary>
+	/// Executes a raw, un-escaped shell command.
+	/// Warning: Do NOT allow arbitrary user input to be passed into this method, as unsafe code could be executed.
+	/// </summary>
+	/// <param name="fullCommand">The full un-escaped shell command</param>
+	/// <returns></returns>
+	public static bool ExecUnsafe(string fullCommand) {
+		tryRun(fullCommand);
+		return true;
+	}
+	
 	public static bool Exec(string command, params string[] args) {
 		var fullCommand = GetFullCommand(command, args);
 		tryRun(fullCommand);
 		return true;
+	}
+	
+	/// <summary>
+	/// Executes a raw, un-escaped shell command and returns the text printed to stdout.
+	/// Warning: Do NOT allow arbitrary user input to be passed into this method, as unsafe code could be executed.
+	/// </summary>
+	/// <param name="fullCommand">The full un-escaped shell command</param>
+	/// <returns></returns>
+	public static string ExecUnsafeGetStdout(string fullCommand) {
+		return tryRunGetStdout(fullCommand);
 	}
 	
 	public static string ExecGetStdout(string command, params string[] args) {
@@ -159,12 +180,13 @@ public static class Shell {
 			case OS.Linux: {
 				psi = new() {
 					FileName               = "/bin/bash",
-					Arguments              = $"-c {Escape(fullCommand)}",
 					RedirectStandardOutput = redirectStandardOutput,
 					RedirectStandardError  = false,
 					UseShellExecute        = false,
 					CreateNoWindow         = true,
 				};
+				psi.ArgumentList.Add("-c");
+				psi.ArgumentList.Add(fullCommand);
 				break;
 			}
 			default: {

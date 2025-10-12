@@ -1,6 +1,7 @@
 zig-out/
 src/core/data/*
 src/cli/play/.idea/*
+src/cli/play/*.user
 src/cli/play/Play/bin/*
 src/cli/play/Play/obj/*
 src/cli/play/Jimbl/bin/*
