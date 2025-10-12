@@ -163,6 +163,9 @@ if (!autoResizeable && !forceNoResize) {
 				return;
 			}
 			else if (selectedTerminal == "lxterminal") {
+				Shell.ExecInBG(selectedTerminal,
+				               $"--geometry={WIDTH}x{HEIGHT}",
+				               "-e", $"{fullCmd}");
 				return;
 			}
 			else {
