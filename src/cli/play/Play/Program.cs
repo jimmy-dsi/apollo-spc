@@ -13,7 +13,18 @@ if (OS.Get() == OS.Windows) {
 	autoResizeable = false;
 }
 else if (OS.Get() == OS.Linux && Shell.CommandExists("resize") && Env.ParentTerminal != "konsole") {
-	autoResizeable = true;
+	var success = Try.Catch(
+		() => Shell.Exec("resize", "-s", $"{HEIGHT}", $"{WIDTH}"),
+		(Shell.CommandNotFoundError _) => false
+	);
+	
+	if (success) {
+		var (newWidth, newHeight) = Env.WindowSize;
+		autoResizeable            = newWidth >= WIDTH || newHeight >= HEIGHT;
+	}
+	else {
+		autoResizeable = false;
+	}
 }
 
 var fwdArgs       = args.Where(x => x != "--force-no-resize").ToArray();
@@ -146,6 +157,9 @@ if (!autoResizeable && !forceNoResize) {
 				return;
 			}
 			else if (selectedTerminal == "xterm") {
+				Shell.ExecInBG(selectedTerminal,
+				               $"-geometry", $"{WIDTH}x{HEIGHT}",
+				               "-e", $"{fullCmd}");
 				return;
 			}
 			else if (selectedTerminal == "lxterminal") {
@@ -217,10 +231,7 @@ Console.CancelKeyPress += (_, args) => {
 	Environment.Exit(0);
 };
 
-if (OS.Get() == OS.Linux && autoResizeable && !forceNoResize) {
-	Shell.Exec("resize", "-s", $"{HEIGHT}", $"{WIDTH}");
-}
-else if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
+if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
 	Console.SetWindowSize(WIDTH, HEIGHT);
 }
 

@@ -67,6 +67,9 @@ public static class Env {
 		}
 	}
 	
+	/// <summary>
+	/// Returns a 2-tuple (width, height) of the current terminal window's size in columns and rows.
+	/// </summary>
 	public static (int, int) WindowSize {
 		get {
 			if (OS.Get() == OS.Linux) {
