@@ -32,7 +32,6 @@ var metadata: ?SongMetadata = null;
 
 pub fn main() !void {
     db.set_cli_width(131);
-    std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
 
     const stdout = std.io.getStdOut();
     stdout_file = stdout;
@@ -85,7 +84,11 @@ pub fn main() !void {
 
     // Load SPC file from path if present
     if (spc_file_path) |path| {
-        var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
+        var file = std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch {
+            std.debug.print("error: The SPC file '{s}' was not found or could not be loaded\n", .{path});
+            std.process.exit(1);
+        };
+
         defer file.close();
 
         const file_size = try file.getEndPos();
@@ -95,8 +98,14 @@ pub fn main() !void {
         //defer allocator.free(buffer); // The entire app appears to just die after exiting scope if this is uncommented. No idea why
 
         _ = try file.readAll(buffer);
-        metadata = try spc_loader.load_spc(&emu, buffer);
+        metadata = spc_loader.load_spc(&emu, buffer) catch null;
 
+        if (metadata == null) {
+            std.debug.print("error: An unknown error occurred while attempting to process SPC metadata\n", .{});
+            std.process.exit(1);
+        }
+
+        std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
         db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
 
         show_metadata();
@@ -108,6 +117,11 @@ pub fn main() !void {
         if (!debug_mode) {
             cur_action = 'c';
         }
+    }
+
+    if (metadata == null) {
+        std.debug.print("error: SPC file not provided\n", .{});
+        std.process.exit(1);
     }
 
     const stdin = std.io.getStdIn().reader();

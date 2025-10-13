@@ -8,11 +8,26 @@ const bool VERIFY_HASH = true;
 const int WIDTH  = 133;
 const int HEIGHT = 33;
 
+var fwdArgs       = args.Where(x => x != "--force-no-resize").ToArray();
+var forceNoResize = args.  Any(x => x == "--force-no-resize");
+var fileError     = false;
+
+if (fwdArgs.Length == 0 || fwdArgs[0].StartsWith("--")) {
+	forceNoResize = true;
+	fileError     = true;
+}
+else if (!File.Exists(fwdArgs[0])) {
+	// Attempt to open first argument as file - If fails, mark as error
+	forceNoResize = true;
+	fileError     = true;
+}
+
 bool autoResizeable = false;
+
 if (OS.Get() == OS.Windows) {
 	autoResizeable = false;
 }
-else if (OS.Get() == OS.Linux && Shell.CommandExists("resize") && Env.ParentTerminal != "konsole") {
+else if (OS.Get() == OS.Linux && !forceNoResize && Shell.CommandExists("resize") && Env.ParentTerminal != "konsole") {
 	var success = Try.Catch(
 		() => Shell.Exec("resize", "-s", $"{HEIGHT}", $"{WIDTH}"),
 		(Shell.CommandNotFoundError _) => false
@@ -27,12 +42,9 @@ else if (OS.Get() == OS.Linux && Shell.CommandExists("resize") && Env.ParentTerm
 	}
 }
 
-var fwdArgs       = args.Where(x => x != "--force-no-resize").ToArray();
-var forceNoResize = args.  Any(x => x == "--force-no-resize");
-
 var (widthPx, heightPx) = (0, 0);
 
-if (forceNoResize) {
+if (forceNoResize && fwdArgs.Length != args.Length) {
 	var idx = Array.IndexOf(args, "--force-no-resize");
 	
 	if (args.Length > idx + 1) {
@@ -245,7 +257,9 @@ Shell.ExecPipe(
 	consumerArgs:    consumerArgs
 );
 
-Console.Clear();
+if (!fileError) {
+	Console.Clear();
+}
 
 return;
 
