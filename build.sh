@@ -31,6 +31,9 @@ if [[ "$telemetry_off" != 1 ]]; then
     fi
 fi
 
+# Make sure bin directory exists before attempting to store files there
+mkdir -p bin
+
 # Build zig app
 src/zig-build.sh
 rm -f bin/*.o 2> /dev/null || :

@@ -35,6 +35,9 @@ if ($telemetry_off -ne 1) {
     }
 }
 
+# Make sure bin directory exists before attempting to store files there
+New-Item -Path "bin" -ItemType Directory -Force
+
 # Build zig app
 try {
     src/zig-build.bat
