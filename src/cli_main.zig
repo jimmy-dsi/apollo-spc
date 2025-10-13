@@ -72,40 +72,8 @@ pub fn main() !void {
     );
     defer emu.script700.deinit();
 
-    // Load and run Script700 test script
-    var sb: [100]u32 = [_]u32 {0x8000_0000} ** 99 ++ [_]u32 {0x80FF_FFFF}; // Pre-fill with all NOPs and a QUIT instruction at the end.
-    var ix: u32 = 0;
-    
-    var sl: []u32 = undefined;
-    ix = 0;
-    sl = undefined;
-    sb[0] = 0x8000_0000;
-
-    var data = blk: {
-        const embed_u8 = @embedFile("core/data/c700-test.bin");
-        var table_u8: [embed_u8.len] u8 = undefined;
-    
-        @setEvalBranchQuota(embed_u8.len);
-    
-        for (0..embed_u8.len) |idx| {
-            const b = embed_u8[idx];
-            table_u8[idx] = b;
-        }
-    
-        break :blk table_u8;
-    };
-    data[0] = 0;
-
     var script700_load_error: ?anyerror = null;
     script700_load_error = null;
-
-    //emu.script700.load_bytecode(sb[0..]) catch |e| {
-    //    script700_load_error = e;
-    //};
-    //if (script700_load_error == null) {
-    //    emu.script700.load_data(data[0..]);
-    //    try emu.script700.run(.{});
-    //}
 
     var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
     defer t_break_listener.join();
@@ -138,12 +106,6 @@ pub fn main() !void {
         }
     
         if (!debug_mode) {
-            // Output 1.25 second of blank audio first, to compensate for ffplay nobuffer option
-            //for (0..40) |_| {
-            //    var stdout_writer = stdout_file.writer();
-            //    try stdout_writer.writeAll(&buf);
-            //}
-            
             cur_action = 'c';
         }
     }
@@ -156,21 +118,6 @@ pub fn main() !void {
     emu.s_smp.clear_access_logs();
     emu.s_smp.clear_timer_logs();
 
-    const shadow_routine: [23]u8 = [23]u8 {
-        0x20,             //    clrp
-        0xE5, 0x00, 0x02, //    mov a, $0200
-        0xBC,             //    inc a
-        0xC5, 0x00, 0x02, //    mov $0200, a
-        0x8F, 0x01, 0x00, //    mov $FC, #$01 (Set timer 2 period to 1)
-        0x8F, 0x84, 0x00, //    mov $F1, #$84 (Enable timer 2)
-        0x8D, 0x03,       //    mov y, #$10
-        0x3F, 0x8A, 0x15, //    call $158A
-        0xFE, 0xFE,       // -: dbnz y, -
-        0x7F,             //    reti
-        0xC5,             //    mov ----, a
-    };
-    
-    emu.s_smp.spc.upload_shadow_code(0x0200, shadow_routine[0..]);
     last_time = std.time.nanoTimestamp();
 
     while (true) {
@@ -237,12 +184,10 @@ pub fn main() !void {
                 t_started.store(false, std.builtin.AtomicOrder.seq_cst);
             }
             
-            //std.debug.print("\x1B[A\x1B[A\x1B[9C\x1B[9C\x1B[9C\x1B[8C", .{});
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
             if (std.ascii.toLower(buffer[0]) == 'c') {
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
-                //cur_mode = t_menu_mode.load(std.builtin.AtomicOrder.seq_cst);
 
                 set_msg(0, 0, false);
                 if (cur_mode == 'i') {
@@ -282,7 +227,7 @@ pub fn main() !void {
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                 
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
 
                 set_msg(0, 0, false);
@@ -346,11 +291,9 @@ pub fn main() !void {
 
                 if (!res.?) {
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
-                    //db.print("Breakpoint hit. Press enter\n", .{});
                     cur_action = 's';
 
                     if (cur_mode == 'i') {
-                        //const prev_spc_state = emu.s_smp.prev_spc_state;
                         print_instruction(&emu, &emu.s_smp.spc.state);
                     }
                     else if (t_other_menu.load(std.builtin.AtomicOrder.seq_cst) == 'h') {
@@ -368,12 +311,12 @@ pub fn main() !void {
                     t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
 
                    if (cur_mode == 'v') {
-                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
                     else if (cur_mode == 'r') {
-                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
 
                         db.print("\n", .{});
@@ -382,7 +325,7 @@ pub fn main() !void {
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
                     else if (cur_mode == 'e') {
-                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
 
                         db.print("\n", .{});
@@ -391,12 +334,12 @@ pub fn main() !void {
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
                     else if (cur_mode == 'b') {
-                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
                     else if (cur_mode == '8') {
-                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_script700_state(&emu);
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
@@ -415,7 +358,7 @@ pub fn main() !void {
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                 
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
 
                 set_msg(0, 0, false);
@@ -432,7 +375,7 @@ pub fn main() !void {
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                 
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
 
                 set_msg(0, 0, false);
@@ -449,7 +392,7 @@ pub fn main() !void {
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
             
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
 
                 set_msg(0, 0, false);
@@ -457,7 +400,7 @@ pub fn main() !void {
             },
             'i' => {
                 if (cur_mode != 'i') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     set_msg(0, 0, false);
                     flush(null, true);
                 }
@@ -478,7 +421,7 @@ pub fn main() !void {
                 cur_mode = 'v';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
 
                 set_msg(0, 0, false);
@@ -488,7 +431,7 @@ pub fn main() !void {
                 cur_mode = 'r';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_dsp_map(&emu, .{.is_dsp = true});
 
                 db.print("\n", .{});
@@ -501,7 +444,7 @@ pub fn main() !void {
                 cur_mode = 'e';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_dsp_map(&emu, .{.is_dsp = true});
 
                 db.print("\n", .{});
@@ -514,7 +457,7 @@ pub fn main() !void {
                 cur_mode = 'b';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_dsp_debug_state(&emu, .{.is_dsp = true});
 
                 set_msg(0, 0, false);
@@ -524,7 +467,7 @@ pub fn main() !void {
                 cur_mode = '8';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
-                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                 db.print_script700_state(&emu);
 
                 set_msg(0, 0, false);
@@ -579,11 +522,9 @@ pub fn main() !void {
                 }
                 else if (db.cur_info_msg == 2 or db.cur_info_msg == 3) {
                     set_msg(0, 0, false);
-                    //flush(null, true);
                 }
 
                 const all_logs = emu.s_smp.get_access_logs_range(last_cycle);
-                //var logs = db.filter_access_logs(all_logs);
 
                 _ = emu.break_check(); // Consume the breakpoint if we hit one while in step mode
 
@@ -608,31 +549,17 @@ pub fn main() !void {
                     db.print("\n", .{});
 
                     print_instruction(&emu, &emu.s_smp.spc.state);
-                    //try db.print_logs(&prev_state, logs[0..]);
-
-                    // Print timer logs after instruction log
-                    //const all_timer_logs = emu.s_smp.get_timer_logs(.{});
-                    //const timer_logs = db.filter_timer_logs(all_timer_logs);
 
                     emu.s_smp.clear_timer_logs();
-
-                    //for (timer_logs) |log| {
-                    //    if (log == null) {
-                    //        break;
-                    //    }
-                    //    db.print("\x1B[32m", .{});
-                    //    //db.print_timer_log(&log.?, .{ .prefix =true });
-                    //    db.print("\x1B[39m\n", .{});
-                    //}
                 }
                 else if (cur_mode == 'v') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     db.print_memory_page(&emu, cur_page, cur_offset, .{.prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                     flush(null, true);
                     set_msg(0, 0, false);
                 }
                 else if (cur_mode == 'r') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
                     db.print("\n", .{});
@@ -642,7 +569,7 @@ pub fn main() !void {
                     set_msg(0, 0, false);
                 }
                 else if (cur_mode == 'e') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
                     db.print("\n", .{});
@@ -652,14 +579,14 @@ pub fn main() !void {
                     set_msg(0, 0, false);
                 }
                 else if (cur_mode == 'b') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
                     //set_msg(0, 0, false);
                     flush(null, true);
                     set_msg(0, 0, false);
                 }
                 else if (cur_mode == '8') {
-                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     db.print_script700_state(&emu);
                     flush(null, true);
                     set_msg(0, 0, false);
@@ -771,7 +698,6 @@ fn run_loop(emu: *Emu) !bool {
 }
 
 fn show_help_menu() void {
-    //db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n", .{});
     db.print(" Mode commands: \n", .{});
     db.print("    i = Instruction trace log viewer [default] \n", .{});
@@ -826,7 +752,6 @@ fn break_listener() void {
 
         if (m_expect_input.tryLock()) {
             buffer[0] = ' ';
-            //std.debug.print("\x1B[A\x1B[A\x1B[9C\x1B[9C\x1B[9C\x1B[8C", .{});
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
             if (is_breakpoint.load(std.builtin.AtomicOrder.seq_cst)) {
@@ -869,7 +794,6 @@ fn break_listener() void {
                                 set_msg(0, 0, false);
                             },
                             'k' => {
-                                //const bp_hit = is_breakpoint.load(std.builtin.AtomicOrder.seq_cst);
                                 break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
                                 prev_input = buffer[0];
                                 
@@ -917,7 +841,7 @@ fn break_listener() void {
 }
 
 fn report_timeout() void {
-    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
     db.print("\n\x1B[38;2;250;125;25mScript700 timed out. Enter one of the following:\n", .{});
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n", .{});
     db.print("   w = Attempt wait until Script700 finishes or yields execution \n", .{});
@@ -933,7 +857,6 @@ fn report_timeout() void {
     const stdin = std.io.getStdIn().reader();
 
     if (m_expect_input.tryLock()) {
-        //std.debug.print("\x1B[A\x1B[A\x1B[9C\x1B[9C\x1B[9C\x1B[8C", .{});
         _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
         
         sw: switch (std.ascii.toLower(buffer[0])) {
