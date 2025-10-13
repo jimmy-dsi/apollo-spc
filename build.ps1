@@ -1,3 +1,40 @@
+# First, ensure that dotnet telemetry is disabled
+$telemetry_off = 0
+if (Test-Path env:DOTNET_CLI_TELEMETRY_OPTOUT) {
+    if ($env:DOTNET_CLI_TELEMETRY_OPTOUT -eq 1) {
+        $telemetry_off = 1
+    }
+}
+
+$telemetry_verified_off = 0
+if ($telemetry_off -ne 1) {
+    Write-Host "$([char]27)[1;93mwarning: it appears that you have not yet disabled telemetry in dotnet$([char]27)[0m"
+    Write-Host "Disabling..."
+    [Environment]::SetEnvironmentVariable('DOTNET_CLI_TELEMETRY_OPTOUT', 1, 'User')
+    try {
+        [Environment]::SetEnvironmentVariable('DOTNET_CLI_TELEMETRY_OPTOUT', 1, 'Machine')
+    }
+    catch {
+
+    }
+
+    $env:DOTNET_CLI_TELEMETRY_OPTOUT = 1 # Reflect updated value for the rest of the current session, in addition to new sessions
+
+    if (Test-Path env:DOTNET_CLI_TELEMETRY_OPTOUT) {
+        if ($env:DOTNET_CLI_TELEMETRY_OPTOUT -eq 1) {
+            $telemetry_verified_off = 1
+            Write-Host "$([char]27)[1;32mDisabling of dotnet telemetry succeeded $([Char]::ConvertFromUtf32(0x1F4CE))$([char]27)[0m"
+        }
+    }
+
+    if ($telemetry_verified_off -ne 1) {
+        Write-Host "$([char]27)[1;91merror: unable to disable dotnet telemetry$([char]27)[0m"
+        Write-Host "Please set the DOTNET_CLI_TELEMETRY_OPTOUT environment variable equal to 1 and then re-run this script"
+        Write-Host "(https://learn.microsoft.com/en-us/dotnet/core/tools/telemetry#how-to-opt-out)"
+        exit 1
+    }
+}
+
 # Build zig app
 try {
     src/zig-build.bat
