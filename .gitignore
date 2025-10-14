@@ -7,7 +7,7 @@ src/cli/play/Play/obj/*
 src/cli/play/Jimbl/bin/*
 src/cli/play/Jimbl/obj/*
 test/*
-doc/*
+doc/*.txt
 !src/core/data/bootrom.bin
 !src/core/data/gauss.bin
 apollo
