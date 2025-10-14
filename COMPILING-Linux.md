@@ -1,5 +1,5 @@
 # Compiling
-This section details the build process for the **apollo-spc-program** and **play** apps on Linux.
+This section details the build process on Linux for both the **apollo-spc-program** and **play** apps from this repo.
 
 ## Required
 - Zig 0.14.1 — **Later versions will not work!**
@@ -68,7 +68,7 @@ bin/play "<path-to-your-spc-file.spc>"
 ```
 
 ## Building the CLI App Only
-If you do not wish to install the dotnet SDK onto your machine, you can choose to build just the Zig CLI app: **apollo-spc-program**. This is the actual program which interprets your SPC file.
+If you do not wish to install the dotnet SDK onto your machine, you can choose to build **apollo-spc-program** only (the Zig CLI app). This is the actual program which interprets your SPC file.
 
 You can build the CLI app using the following command:
 
