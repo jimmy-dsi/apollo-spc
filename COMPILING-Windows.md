@@ -32,7 +32,7 @@ If you see `0.14.1` as your output, you are good to continue on to the next step
 ## Dotnet Installation
 Note: The below steps are technically optional. If you wish to see how to build and run the app without dotnet or Visual Studio, see the [Building the CLI App Only](#building-the-cli-app-only) section below.
 
-Firstly, before doing anything, you will want to create a new persistent environment variable named `DOTNET_CLI_TELEMETRY_OPTOUT` and set its value to `1`. This will prevent further data collection by Microsoft while using the dotnet toolchain (https://learn.microsoft.com/en-us/dotnet/core/tools/telemetry#how-to-opt-out).
+Firstly, before doing anything, you'll want to create a new persistent environment variable called `DOTNET_CLI_TELEMETRY_OPTOUT` with a value of `1`. This will prevent further data collection by Microsoft while using the dotnet toolchain (https://learn.microsoft.com/en-us/dotnet/core/tools/telemetry#how-to-opt-out).
 
 ```powershell
 [Environment]::SetEnvironmentVariable('DOTNET_CLI_TELEMETRY_OPTOUT', 1, 'User')
