@@ -2,7 +2,7 @@
 This section details the build process for the **apollo-spc-program** and **play** apps on Linux.
 
 ## Required
-- Zig 0.14.1 -- **Later versions will not work!**
+- Zig 0.14.1 — **Later versions will not work!**
 
 ## Optional
 The items in the list below are only needed if you wish to compile the **play** launcher utility. If you only want **apollo-spc-program**, these can be skipped:
@@ -19,7 +19,7 @@ echo 'export PATH="/path/to/folder/with/zig/binary:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-Check to make sure Zig is installed correctly with the following command:
+Check to make sure Zig is installed correctly:
 
 ```bash
 zig version
@@ -44,14 +44,14 @@ chmod +x ./dotnet-install.sh
 ./dotnet-install.sh --version latest
 ```
 
-The **play** app utilizes dotnet's Ahead-Of-Time (AOT) compilation features. In order to build projects which use these features, you will need to install several dependencies--namely the clang compiler, and a few others. Installation command for Ubuntu or Debian based distros:
+The **play** app utilizes dotnet's Ahead-Of-Time (AOT) compilation features. In order to build projects which use these features, you will need to install several dependencies—namely the clang compiler, among a few others. Installation command for Ubuntu or Debian based distros:
 
 ```bash
 sudo apt update
 sudo apt install -y clang lld libc6-dev libicu-dev libssl-dev zlib1g-dev
 ```
 
-Once these are complete, you are ready to move on to the next build steps!
+Once these are complete, you are ready to move on to the next build steps.
 
 ## Building
 To build the project in full, simply navigate to the root folder of your cloned git repo and type:
@@ -62,7 +62,7 @@ To build the project in full, simply navigate to the root folder of your cloned 
 
 This will build the entire project as whole. This includes the Zig CLI app **apollo-spc-program**, as well as the dotnet launcher app **play**.
 
-If the build is successful--and assuming you have already met the prerequisites for running the app itself--you can now run the freshly built app from the `bin/` folder by entering:
+If the build is successful—and assuming you have already met the prerequisites for running the app itself—you can now run the freshly built app from the `bin/` folder by entering:
 ```bash
 bin/play "<path-to-your-spc-file.spc>"
 ```
@@ -76,6 +76,6 @@ You can build the CLI app using the following command:
 src/zig-build.sh
 ```
 
-Please be aware that without the **play** app, there are a few differences in how you will launch it (more details in the section on running in README.md), as well as some possible visual glitching upon starting and exiting the app. 
+Please be aware that without the **play** app, there will be a few differences regarding the launch command (more details in the section on running in README.md), and you may experience some visual glitching upon starting and exiting the app. 
 
-Apart from these, the app should function pretty much the same.
+Apart from these minor differences, the app should function pretty much the same.

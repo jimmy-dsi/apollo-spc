@@ -2,7 +2,7 @@
 This section details the build process for the **apollo-spc-program** and **play** apps on Windows 10/11.
 
 ## Required
-- Zig 0.14.1 -- **Later versions will not work!**
+- Zig 0.14.1 — **Later versions will not work!**
 
 ## Optional
 The items in the list below are only needed if you wish to compile the **play** launcher utility. If you only want **apollo-spc-program**, these can be skipped:
@@ -21,7 +21,7 @@ $newPath = $zigPath + ";" + [System.Environment]::GetEnvironmentVariable("PATH",
 [System.Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
 ```
 
-Check to make sure Zig is installed correctly with the following command:
+Check to make sure Zig is installed correctly:
 
 ```bash
 zig version
@@ -39,14 +39,14 @@ Firstly, before doing anything, you will want to create a new persistent environ
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = 1
 ```
 
-Now you're ready to install the dotnet SDK for Windows. First, download from the official dotnet SDK link:
+Now you're ready to install the dotnet SDK for Windows. Download from the official dotnet SDK link:
 https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.305/dotnet-sdk-9.0.305-win-x64.exe
 
 Open the setup exe and follow the prompts until the installation is complete.
 
 ## Installing the Visual Studio C++ Workload
 
-The **play** app utilizes dotnet's Ahead-Of-Time (AOT) compilation features. In order to build projects which use these features, you will first need to download and install Visual Studio 2022 if you haven't already.
+The **play** app utilizes dotnet's Ahead-Of-Time (AOT) compilation features. In order to build projects using these features, you will first need to download and install Visual Studio 2022 if you haven't already.
 
 If you already have Visual Studio 2022, create or open up any project, go to the "Tools" menu in the top menu bar and click on "Get Tools and Features..." (This should be the very first item in the drop-down menu).
 
@@ -55,7 +55,7 @@ You should see a menu like the one below. Enable the checkbox in the highlighted
 
 Click on the Modify button in the bottom-right corner (or Install if it's a fresh Visual Studio installation), then wait for the feature to finish downloading and installing.
 
-Once that is complete, you are ready to move on to the next build steps!
+Once that is complete, you are ready to move on to the next build steps.
 
 ## Building
 To build the project in full, simply navigate to the root folder of your cloned git repo in a Powershell window and type:
@@ -66,7 +66,7 @@ To build the project in full, simply navigate to the root folder of your cloned 
 
 This will build the entire project as whole. This includes the Zig CLI app **apollo-spc-program**, as well as the dotnet launcher app **play**.
 
-If the build is successful--and assuming you have already met the prerequisites for running the app itself--you can now run the freshly built app from the `bin\` folder by entering:
+If the build is successful—and assuming you have already met the prerequisites for running the app itself—you can now run the freshly built app from the `bin\` folder by entering:
 ```bash
 bin\play.exe "<path-to-your-spc-file.spc>"
 ```
@@ -80,6 +80,6 @@ You can build the CLI app using the following command (in either cmd or Powershe
 src\zig-build.bat
 ```
 
-Please be aware that without the **play** app, there are a few differences in how you will launch it (more details in the section on running in README.md), as well as some possible visual glitching upon starting and exiting the app. 
+Please be aware that without the **play** app, there will be a few differences regarding the launch command (more details in the section on running in README.md), and you may experience some visual glitching upon starting and exiting the app. 
 
-Apart from these, the app should function pretty much the same.
+Apart from these minor differences, the app should function pretty much the same.
