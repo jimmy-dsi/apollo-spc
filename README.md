@@ -120,7 +120,7 @@ Note: This must be triggered using `cmd.exe /c` on older Powershell profile vers
 
 ### Exporting Raw PCM
 
-Because the player sends the generated audio data to standard output directly, you can use this generate raw PCM file using output redirection:
+Because the player sends the generated audio data to standard output directly, you can use this to generate raw PCM file by using output redirection:
 
 ```bash
 ./apollo-spc-program "<path-to-your-spc-file.spc>" > your-pcm-file.raw
@@ -130,7 +130,7 @@ Please use caution while using output redirection, however. The SPC player does 
 
 Because of this, it is recommended that you stop the process via CTRL+C after a few seconds. Do not let it run endlessly or else it will continuously use up disk space.
 
-This raw file can be imported into tools such as Audacity or ffmpeg and converted to .wav, or any other supported audio format—Just be sure to set the format to 16-bit stereo at 32kHz (little endian).
+This raw file can be imported into tools such as Audacity or ffmpeg and converted to .wav, or any other supported audio format—Just be sure to set the imported raw format to 16-bit stereo at 32kHz (little endian).
 
 ## Licensing
 
