@@ -76,6 +76,6 @@ You can build the CLI app using the following command:
 src/zig-build.sh
 ```
 
-Please be aware that without the **play** app, there will be a few differences regarding the launch command (more details in the section on running in README.md), and you may experience some visual glitching upon starting and exiting the app. 
+Please be aware that without the **play** app, there will be a few differences regarding the launch command (more details in the README's [Advanced Usage](README.md#advanced-usage) section), and you may experience some visual glitching upon starting and exiting the app. 
 
 Apart from these minor differences, the app should function pretty much the same.

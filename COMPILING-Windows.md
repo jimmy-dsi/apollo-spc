@@ -23,7 +23,7 @@ $newPath = $zigPath + ";" + [System.Environment]::GetEnvironmentVariable("PATH",
 
 Check to make sure Zig is installed correctly:
 
-```bash
+```powershell
 zig version
 ```
 
@@ -60,14 +60,20 @@ Once that is complete, you are ready to move on to the next build steps.
 ## Building
 To build the project in full, simply navigate to the root folder of your cloned git repo in a Powershell window and type:
 
-```bash
+```powershell
 .\build.ps1
 ```
 
 This will build the entire project as whole. This includes the Zig CLI app **apollo-spc-program**, as well as the dotnet launcher app **play**.
 
+Note: If this is the first time running a Powershell script on your system, you may get an error message about the script execution being blocked due to the execution policy. If this occurs, update the execution policy to "RemoteSigned":
+
+```powershell
+Set-ExecutionPolicy RemoteSigned
+```
+
 If the build is successful—and assuming you have already met the prerequisites for running the app itself—you can now run the freshly built app from the `bin\` folder by entering:
-```bash
+```powershell
 bin\play.exe "<path-to-your-spc-file.spc>"
 ```
 
@@ -76,10 +82,10 @@ If you do not wish to install the dotnet SDK onto your machine, you can choose t
 
 You can build this using the following command (in either cmd or Powershell):
 
-```bash
+```powershell
 src\zig-build.bat
 ```
 
-Please be aware that without the **play** app, there will be a few differences regarding the launch command (more details in the section on running in README.md), and you may experience some visual glitching upon starting and exiting the app. 
+Please be aware that without the **play** app, there will be a few differences regarding the launch command (more details in the README's [Advanced Usage](README.md#advanced-usage) section), and you may experience some visual glitching upon starting and exiting the app. 
 
 Apart from these minor differences, the app should function pretty much the same.
