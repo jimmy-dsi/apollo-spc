@@ -29,11 +29,11 @@ if (OS.Get() == OS.Windows) {
 }
 else if (OS.Get() == OS.Linux && !forceNoResize && Shell.CommandExists("resize") && Env.ParentTerminal != "konsole") {
 	var success = Try.Catch(
-		() => Shell.Exec("resize", "-s", $"{HEIGHT}", $"{WIDTH}"),
-		(Shell.CommandNotFoundError _) => false
+		() => (string?) Shell.ExecGetStdout("resize", "-s", $"{HEIGHT}", $"{WIDTH}"), // Capture stdout so that the console doesn't display it
+		(Shell.CommandNotFoundError _) => null
 	);
 	
-	if (success) {
+	if (success != null) {
 		var (newWidth, newHeight) = Env.WindowSize;
 		autoResizeable            = newWidth >= WIDTH || newHeight >= HEIGHT;
 	}
@@ -192,13 +192,31 @@ if (!autoResizeable && !forceNoResize) {
 }
 
 string[] audioConsumers   = ["paplay", "aplay", "ffplay"];
-string   selectedConsumer = audioConsumers[0]; // Default to paplay if it exists
+string?  selectedConsumer = null;
 
 foreach (var consumer in audioConsumers) {
 	if (Shell.CommandExists(consumer)) { // Find the first command which exists
 		selectedConsumer = consumer;
 		break;
 	}
+}
+
+if (selectedConsumer is null) {
+	Console.ForegroundColor = ConsoleColor.Red;
+	
+	Console.Error.WriteLine("Error: no suitable audio consumer found.");
+	if (OS.Get() == OS.Windows) {
+		Console.Error.WriteLine("Please install ffplay (included in ffmpeg-git-full.7z from the link below)");
+		Console.Error.WriteLine("https://www.ffmpeg.org/download.html");
+	}
+	else if (OS.Get() == OS.Linux) {
+		Console.Error.WriteLine("Please install paplay, aplay, or ffplay through your distro's package manager");
+	}
+	
+	Console.ResetColor();
+	
+	Thread.Sleep(5000);
+	Environment.Exit(1);
 }
 
 string[] consumerArgs;
@@ -213,8 +231,14 @@ else if (selectedConsumer == "aplay") {
 	];
 }
 else if (selectedConsumer == "ffplay") {
-	consumerArgs = [
-		"-f", "s16le", "-ar", "32000", "-ac", "2",
+	string[] consumerArgs1 = [
+		"-f", "s16le", "-ar", "32000", "-ch_layout", "stereo" // Newer ffplay versions only accept `-ch_layout stereo`
+	];
+	string[] consumerArgs2 = [
+		"-f", "s16le", "-ar", "32000", "-ac", "2" // Older ffplay versions only accept `-ac 2`
+	];
+	
+	string[] consumerArgs3 = [
 		"-i", "pipe:0",
 		"-loglevel", "quiet",
 		"-fflags", "nobuffer",
@@ -224,6 +248,22 @@ else if (selectedConsumer == "ffplay") {
 		"-nodisp", "-framedrop",
 		"-autoexit"
 	];
+	
+	// Query ffplay to determine which argument format should be used (old vs newer versions)
+	var success = Try.Catch(() => Shell.ExecPipe(
+		producerCommand: "echo",
+		producerArgs:    ["000000000000000"],
+		consumerCommand: "ffplay",
+		consumerArgs:    consumerArgs1.Concat(consumerArgs3).ToArray()
+	), (Shell.CommandNotFoundError _) => false);
+	
+	// If the above fails, then fall back to the old style - otherwise, proceed with new style
+	if (success && Shell.LastExitCode == 0) {
+		consumerArgs = consumerArgs1.Concat(consumerArgs3).ToArray(); // Use new style
+	}
+	else {
+		consumerArgs = consumerArgs2.Concat(consumerArgs3).ToArray(); // Use old style
+	}
 }
 else {
 	throw new UnreachableException();
@@ -257,7 +297,7 @@ Shell.ExecPipe(
 	consumerArgs:    consumerArgs
 );
 
-if (!fileError) {
+if (!fileError && Shell.LastExitCode == 0) {
 	Console.Clear();
 }
 

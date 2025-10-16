@@ -14,7 +14,7 @@ The latest stable version is available from the [releases on GitHub](https://git
 
 It is **highly** recommended that you install either the [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/install) or [msys2](https://www.msys2.org/) if you haven't already. The **cmd** or **Windows Powershell** apps will ***not*** display this app correctly. (Essentially, you need a terminal emulator which supports coloring and cursor re-positioning via ANSI codes)
 
-You will also need to download a copy of [ffplay](https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v4.4.1/ffplay-4.4.1-win-64.zip) ([main download page](https://ffbinaries.com/downloads)) and add it to your system PATH variable. You can do this via a sequence of Powershell commands:
+You will also need to download a copy of **ffplay** (available [here](https://www.ffmpeg.org/download.html)—file name is `ffmpeg-git-full.7z`) and add it to your system PATH variable. You can do this via a sequence of Powershell commands:
 
 ```powershell
 $ffplayPath = "C:\path\to\your\ffplay\folder"
@@ -99,22 +99,23 @@ For **aplay**:
 For **ffplay**:
 ```bash
 ./apollo-spc-program "<path-to-your-spc-file.spc>" | \
-    ffplay -f s16le -ar 32000 -ac 2 -i pipe:0 -loglevel quiet \
+    ffplay -f s16le -ar 32000 -ch_layout stereo -i pipe:0 -loglevel quiet \
     -fflags nobuffer -flags low_delay -analyzeduration 0 \
     -probesize 32 -nodisp -framedrop -autoexit
 ```
+Note: Some older versions of `ffplay` require `-ac 2` instead of `-ch_layout stereo`
 
 **Windows (Powershell 6+)**:
 ```powershell
 .\apollo-spc-program.exe "<path-to-your-spc-file.spc>" | `
-    ffplay -f s16le -ar 32000 -ac 2 -i pipe:0 -loglevel quiet `
+    ffplay -f s16le -ar 32000 -ch_layout stereo -i pipe:0 -loglevel quiet `
     -fflags nobuffer -flags low_delay -analyzeduration 0 `
     -probesize 32 -nodisp -framedrop -autoexit
 ```
 
 **Windows (Older Powershell versions / cmd)**:
 ```powershell
-cmd.exe /c ".\apollo-spc-program.exe ""<path-to-your-spc-file.spc>"" | ffplay -f s16le -ar 32000 -ac 2 -i pipe:0 -loglevel quiet -fflags nobuffer -flags low_delay -analyzeduration 0 -probesize 32 -nodisp -framedrop -autoexit"
+cmd.exe /c ".\apollo-spc-program.exe ""<path-to-your-spc-file.spc>"" | ffplay -f s16le -ar 32000 -ch_layout stereo -i pipe:0 -loglevel quiet -fflags nobuffer -flags low_delay -analyzeduration 0 -probesize 32 -nodisp -framedrop -autoexit"
 ```
 Note: This must be triggered using `cmd.exe /c` on older Powershell profile versions, as those do not handle piping correctly.
 
