@@ -14,7 +14,7 @@ The latest stable version is available from the [releases on GitHub](https://git
 
 It is **highly** recommended that you install either the [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/install) or [msys2](https://www.msys2.org/) if you haven't already. The **cmd** or **Windows Powershell** apps will ***not*** display this app correctly. (Essentially, you need a terminal emulator which supports coloring and cursor re-positioning via ANSI codes)
 
-You will also need to download a copy of ffplay (available [here](https://www.ffmpeg.org/download.html)—file name is `ffmpeg-git-full.7z`) and add it to your system PATH variable. You can do this via a sequence of Powershell commands:
+You will also need to download a copy of **ffplay** (available [here](https://www.ffmpeg.org/download.html)—file name is `ffmpeg-git-full.7z`) and add it to your system PATH variable. You can do this via a sequence of Powershell commands:
 
 ```powershell
 $ffplayPath = "C:\path\to\your\ffplay\folder"
