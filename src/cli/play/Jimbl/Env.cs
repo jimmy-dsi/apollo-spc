@@ -56,6 +56,18 @@ public static class Env {
 					return parentTerminal;
 				}
 				
+				// Once more
+				parentTerminal = Shell.ExecUnsafeGetStdout(
+					"cur_ppid=$PPID; " +
+					"cur_ppid=$(ps -o ppid= -p \"$cur_ppid\"); " +
+					"cur_ppid=$(ps -o ppid= -p \"$cur_ppid\"); " +
+					"ps -aux | grep $(ps -o ppid= -p \"$cur_ppid\") | awk 'NR==1{print $11}' | xargs basename"
+				).Trim();
+			
+				if (recognizedTerminals.TryGetValue(parentTerminal, out parentTerminal)) {
+					return parentTerminal;
+				}
+				
 				return null;
 			}
 			else if (OS.Get() == OS.Windows) {
