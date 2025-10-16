@@ -103,6 +103,7 @@ For **ffplay**:
     -fflags nobuffer -flags low_delay -analyzeduration 0 \
     -probesize 32 -nodisp -framedrop -autoexit
 ```
+Note: Some older versions of `ffplay` require `-ac 2` instead of `-ch_layout stereo`
 
 **Windows (Powershell 6+)**:
 ```powershell
@@ -116,9 +117,7 @@ For **ffplay**:
 ```powershell
 cmd.exe /c ".\apollo-spc-program.exe ""<path-to-your-spc-file.spc>"" | ffplay -f s16le -ar 32000 -ch_layout stereo -i pipe:0 -loglevel quiet -fflags nobuffer -flags low_delay -analyzeduration 0 -probesize 32 -nodisp -framedrop -autoexit"
 ```
-Note<sup>1</sup>: This must be triggered using `cmd.exe /c` on older Powershell profile versions, as those do not handle piping correctly.
-
-Note<sup>2</sup>: Some older versions of `ffplay` require `-ac 2` instead of `-ch_layout stereo`
+Note: This must be triggered using `cmd.exe /c` on older Powershell profile versions, as those do not handle piping correctly.
 
 ### Exporting Raw PCM
 
