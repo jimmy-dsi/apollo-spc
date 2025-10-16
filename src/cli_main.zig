@@ -692,6 +692,7 @@ fn run_loop(emu: *Emu) !bool {
     stdout_writer.writeAll(&buf) catch {
         std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
         std.debug.print("\x1B[91mError writing to stdout (broken pipe?)\x1B[39m\n", .{});
+        std.time.sleep(2 * std.time.ns_per_s);
         std.process.exit(1);
     };
     stream_start = 0;

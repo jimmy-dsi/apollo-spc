@@ -192,13 +192,31 @@ if (!autoResizeable && !forceNoResize) {
 }
 
 string[] audioConsumers   = ["paplay", "aplay", "ffplay"];
-string   selectedConsumer = audioConsumers[0]; // Default to paplay if it exists
+string?  selectedConsumer = null;
 
 foreach (var consumer in audioConsumers) {
 	if (Shell.CommandExists(consumer)) { // Find the first command which exists
 		selectedConsumer = consumer;
 		break;
 	}
+}
+
+if (selectedConsumer is null) {
+	Console.ForegroundColor = ConsoleColor.Red;
+	
+	Console.Error.WriteLine("Error: no suitable audio consumer found.");
+	if (OS.Get() == OS.Windows) {
+		Console.Error.WriteLine("Please install ffplay (included in ffmpeg-git-full.7z from the link below)");
+		Console.Error.WriteLine("https://www.ffmpeg.org/download.html");
+	}
+	else if (OS.Get() == OS.Linux) {
+		Console.Error.WriteLine("Please install paplay, aplay, or ffplay through your distro's package manager");
+	}
+	
+	Console.ResetColor();
+	
+	Thread.Sleep(5000);
+	Environment.Exit(1);
 }
 
 string[] consumerArgs;
