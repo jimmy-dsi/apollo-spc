@@ -689,7 +689,11 @@ fn run_loop(emu: *Emu) !bool {
 
     var stdout_writer = stdout_file.writer();
 
-    try stdout_writer.writeAll(&buf);
+    stdout_writer.writeAll(&buf) catch {
+        std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
+        std.debug.print("Error writing to stdout (broken pipe?)\n", .{});
+        std.process.exit(1);
+    };
     stream_start = 0;
 
     const expected_next_time = last_time + @as(i128, samples) * std.time.ns_per_s / 32000;
