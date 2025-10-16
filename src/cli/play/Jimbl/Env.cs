@@ -35,24 +35,24 @@ public static class Env {
 			}
 			
 			if (OS.Get() == OS.Linux) {
-				// First, try the immediate parent of the current C# app's process
-				parentTerminal = Shell.ExecUnsafeGetStdout(
-					"cur_ppid=$PPID; " +
-					"ps -aux | grep $(ps -o ppid= -p \"$cur_ppid\") | awk 'NR==1{print $11}' | xargs basename"
-				).Trim();
-				
-				if (recognizedTerminals.TryGetValue(parentTerminal, out parentTerminal)) {
+				if (Var["KONSOLE_VERSION"] is not null && Shell.ExecGetStdout("which", "konsole").Trim() != "") {
+					parentTerminal = "konsole";
 					return parentTerminal;
 				}
 				
-				// If that's not a recognized terminal, try checking the parent of the immediate parent
-				parentTerminal = Shell.ExecUnsafeGetStdout(
-					"cur_ppid=$PPID; " +
-					"cur_ppid=$(ps -o ppid= -p \"$cur_ppid\"); " +
-					"ps -aux | grep $(ps -o ppid= -p \"$cur_ppid\") | awk 'NR==1{print $11}' | xargs basename"
-				).Trim();
-			
-				if (recognizedTerminals.TryGetValue(parentTerminal, out parentTerminal)) {
+				if (Var["XTERM_VERSION"] is not null) {
+					if (Var["VTE_VERSION"] is not null && Shell.ExecGetStdout("which", "lxterminal").Trim() != "") {
+						parentTerminal = "lxterminal";
+						return parentTerminal;
+					}
+					else if (Shell.ExecGetStdout("which", "xterm").Trim() != "") {
+						parentTerminal = "xterm";
+						return parentTerminal;
+					}
+				}
+				
+				if (Shell.ExecGetStdout("which", "gnome-terminal").Trim() != "") {
+					parentTerminal = "gnome-terminal";
 					return parentTerminal;
 				}
 				

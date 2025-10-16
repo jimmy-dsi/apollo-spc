@@ -6,6 +6,8 @@ using System.Diagnostics;
 public static class Shell {
 	public class CommandNotFoundError: Exception { }
 	
+	public static int LastExitCode { get; private set; }
+	
 	/// <summary>
 	/// Executes a raw, un-escaped shell command.
 	/// Warning: Do NOT allow arbitrary user input to be passed into this method, as unsafe code could be executed.
@@ -73,7 +75,21 @@ public static class Shell {
 	}
 	
 	public static string GetFullCommand(string command, string[] args) {
-		return $"{Escape(command)} {string.Join(' ', args.Select(Escape))}";
+		return $"{EscapeCommand(command)} {string.Join(' ', args.Select(Escape))}";
+	}
+	
+	public static string EscapeCommand(string command) {
+		if (OS.Get() == OS.Windows) {
+			if (command.All(c => char.ToLower(c) is >= '0' and <= '9' or >= 'a' and <= 'z')) {
+				return command;
+			}
+			else {
+				return Escape(command);
+			}
+		}
+		else {
+			return Escape(command);
+		}
 	}
 	
 	public static string Escape(string value) {
@@ -128,6 +144,10 @@ public static class Shell {
 		}
 		catch (Win32Exception ex) when (ex.NativeErrorCode is 2 or 13) {
 			throw new CommandNotFoundError();
+		}
+		
+		if (!runInBG) {
+			LastExitCode = process.ExitCode;
 		}
 	}
 	
