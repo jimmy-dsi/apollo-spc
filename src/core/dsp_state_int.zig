@@ -198,18 +198,15 @@ pub const DSPStateInternal = struct {
             v.__env_level = 0;
 
             // Disable BRR decoding until the last 3 samples
-            if (v._key_on_delay == 4 or v._key_on_delay == 2) {
+            v._gaussian_offset = 0;
+            v._key_on_delay -= 1;
+            if (v._key_on_delay & 3 != 0) {
                 // Begin gaussian offset 4 samples after BRR decoding position in ring buffer
                 v._gaussian_offset = 0x4000;
-            }
-            else {
-                v._gaussian_offset = 0;
             }
 
             // Internal pitch latch is reset to zero during KON and does not advance gaussian offset
             self._pitch = 0;
-
-            v._key_on_delay -= 1;
         }
 
         const output: i16 =
