@@ -1,5 +1,7 @@
 namespace Jimbl;
 
+using Range = Jimbl.DataStructs.Range;
+
 public static class Exts {
 	public static bool Truthy(this object? obj) {
 		if (obj is bool b) {
@@ -38,6 +40,15 @@ public static class Exts {
 			ex = default;
 		}
 		return result;
+	}
+	
+	// Range
+	public static Range Enum(this System.Range range, int step = 1) {
+		if (range.Start.IsFromEnd || range.End.IsFromEnd) {
+			throw new ArgumentException("Ranges with indexes specified from end cannot be enumerated");
+		}
+		
+		return new(range.Start.Value, range.End.Value, step);
 	}
 	
 	// Enumerable Extension Methods
