@@ -52,8 +52,8 @@ public static class Exts {
 	}
 	
 	// Enumerable Extension Methods
-	public static IEnumerable<(long, T)> Enum<T>(this IEnumerable<T> iterable) {
-		long index = 0;
+	public static IEnumerable<(int, T)> Enum<T>(this IEnumerable<T> iterable) {
+		var index = 0;
 		foreach (var item in iterable) {
 			yield return (index, item);
 			index++;

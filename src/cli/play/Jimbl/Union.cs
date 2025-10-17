@@ -34,6 +34,17 @@ public class union<T1, T2> {
 		return value is T2 t ? t : defaultValue;
 	}
 	
+	public bool Is<T>(out T v) {
+		if (value is T t) {
+			v = t;
+			return true;
+		}
+		else {
+			v = default(T);
+			return false;
+		}
+	}
+	
 	public R Match<R>(Func<T1, R> resultIfT1, Func<T2, R> resultIfT2) {
 		return value switch {
 			T1 v1 => resultIfT1(v1),
@@ -148,6 +159,17 @@ public class union<T1, T2, T3> {
 	
 	public T3? As(T3? defaultValue) {
 		return value is T3 t ? t : defaultValue;
+	}
+	
+	public bool Is<T>(out T v) {
+		if (value is T t) {
+			v = t;
+			return true;
+		}
+		else {
+			v = default(T);
+			return false;
+		}
 	}
 	
 	public R Match<R>(Func<T1, R> resultIfT1, Func<T2, R> resultIfT2, Func<T3, R> resultIfT3) {
