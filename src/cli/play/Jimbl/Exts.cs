@@ -42,6 +42,17 @@ public static class Exts {
 		return result;
 	}
 	
+	public class Null { }
+	
+	public static Type Type(this object? obj) {
+		if (obj is Union un) {
+			return un.GetType();
+		}
+		else {
+			return obj?.GetType() ?? typeof(Null);
+		}
+	}
+	
 	// Range
 	public static Range Enum(this System.Range range, int step = 1) {
 		if (range.Start.IsFromEnd || range.End.IsFromEnd) {

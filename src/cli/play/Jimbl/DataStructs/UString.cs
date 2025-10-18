@@ -3,8 +3,8 @@ namespace Jimbl.DataStructs;
 using System.Diagnostics;
 using System.Collections;
 
-using VarArray = union<Byte[],     UInt16[],     UInt32[]    >;
-using VarList  = union<List<Byte>, List<UInt16>, List<UInt32>>;
+using VarArray = ArrayUnion<Byte, UInt16, UInt32>;
+using VarList  =  ListUnion<Byte, UInt16, UInt32>;
 
 public class UString: IEnumerable<UChar> {
 	VarArray data;
@@ -49,30 +49,19 @@ public class UString: IEnumerable<UChar> {
 		
 		if (typeof(T) == typeof(UInt16)) {
 			List<UInt16> buffer2 = new();
-			var buf = buffer.As(default(List<Byte>))!;
 			
-			foreach (var b in buf) {
-				buffer2.Add(b);
+			foreach (var b in buffer) {
+				buffer2.Add(b.As<Byte>());
 			}
 			
 			newBuffer = buffer2;
 		}
 		else if (typeof(T) == typeof(UInt32)) {
 			List<UInt32> buffer2 = new();
-		
-			buffer.Switch (
-				b => {
-					foreach (var x in b) {
-						buffer2.Add(x);
-					}
-				},
-				b => {
-					foreach (var x in b) {
-						buffer2.Add(x);
-					}
-				},
-				_ => throw new UnreachableException()
-			);
+			
+			foreach (var b in buffer) {
+				buffer2.Add(b.Match(x => x, x => x, x => x));
+			}
 			
 			newBuffer = buffer2;
 		}
@@ -84,14 +73,6 @@ public class UString: IEnumerable<UChar> {
 	}
 	
 	static void append(VarList buffer, UChar value) {
-		buffer.Switch(d => {
-			d.Add((Byte) value);
-		},
-		d => {
-			d.Add((UInt16) value);
-		},
-		d => {
-			d.Add(value);
-		});
+		buffer.Add(value);
 	}
 }
