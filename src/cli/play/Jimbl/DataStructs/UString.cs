@@ -30,6 +30,8 @@ public class UString: IEnumerable<UChar> {
 			b => b.ToArray(),
 			b => b.ToArray()
 		);
+		
+		Length = data.Length;
 	}
 	
 	public UChar this[int index] => data.Match(d => d[index],

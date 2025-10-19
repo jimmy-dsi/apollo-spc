@@ -17,6 +17,8 @@ public static class Env {
 	public static string ProgramDirectory => AppContext.BaseDirectory;
 	public static string WorkingDirectory => Directory.GetCurrentDirectory();
 	
+	public static string NewLine => Environment.NewLine;
+	
 	public static VarFront Var = new();
 			
 	static Dictionary<string, string> recognizedTerminals = new() {
