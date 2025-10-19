@@ -1,5 +1,6 @@
 namespace Jimbl.DataStructs;
 
+using System.Globalization;
 using System.Numerics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -9,6 +10,8 @@ public abstract class AnyChar {
 	public abstract int Value { get; }
 	
 	// Abstracts - Must be overridden
+	public abstract UnicodeCategory GetUnicodeCategory();
+	
 	public abstract bool IsAscii();
 	public abstract bool IsAsciiDigit();
 	public abstract bool IsAsciiHexDigit();
@@ -23,6 +26,9 @@ public abstract class AnyChar {
 	public abstract bool IsSymbol();
 	public abstract bool IsUpper();
 	public abstract bool IsWhiteSpace();
+	
+	public abstract AnyChar ToLower();
+	public abstract AnyChar ToUpper();
 	
 	public abstract AnyString ToAnyString();
 	[return: NotNull]
@@ -51,6 +57,8 @@ class AnyChar<T>: AnyChar where T: struct, INumber<T> {
 		innerValue = value;
 	}
 	
+	public override UnicodeCategory GetUnicodeCategory() => ((char) Value).GetUnicodeCategory();
+	
 	public override bool IsAscii()         => ((char) Value).IsAscii();
 	public override bool IsAsciiDigit()    => ((char) Value).IsAsciiDigit();
 	public override bool IsAsciiHexDigit() => ((char) Value).IsAsciiHexDigit();
@@ -65,6 +73,9 @@ class AnyChar<T>: AnyChar where T: struct, INumber<T> {
 	public override bool IsSymbol()        => ((char) Value).IsSymbol();
 	public override bool IsUpper()         => ((char) Value).IsUpper();
 	public override bool IsWhiteSpace()    => ((char) Value).IsWhiteSpace();
+	
+	public override AnyChar ToLower() => ((char) Value).ToLower();
+	public override AnyChar ToUpper() => ((char) Value).ToUpper();
 	
 	public override string    ToString()    => innerValue.ToString()!;
 	public override AnyString ToAnyString() => ToString();

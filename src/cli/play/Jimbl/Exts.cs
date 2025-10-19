@@ -1,6 +1,6 @@
-using System.Globalization;
-
 namespace Jimbl;
+
+using System.Globalization;
 
 using  Range = Jimbl.DataStructs.Range;
 using SRange = System.Range;
