@@ -56,6 +56,18 @@ public static class Exts {
 		}
 	}
 	
+	/// <summary>
+	/// Checks whether an object of a built-in C# type can be converted to another built-in C# type.
+	/// Does not work for user-defined conversions.
+	/// </summary>
+	public static bool ConvertsTo(this object obj, Type targetType) {
+		return Try.Catch(() => {
+			_ = Convert.ChangeType(obj, targetType);
+			return true;
+		},
+		(InvalidCastException _) => false);
+	}
+	
 	// Range/Index
 	public static int Normalize(this Index index, int length) {
 		if (index.IsFromEnd) {

@@ -36,7 +36,7 @@ public abstract class AnyString:
 	public abstract int                    CompareTo(AnyString? strB);
 	public abstract bool                   Contains(AnyString value, StringComparison comparisonType);
 	public abstract bool                   EndsWith(AnyString value, StringComparison comparisonType);
-	public abstract StringRuneEnumerator   EnumerateRunes();
+	public abstract IEnumerable<Rune>      EnumerateRunes();
 	public abstract bool                   Equals(AnyString? strB, StringComparison comparisonType);
 	public abstract int                    GetHashCode(StringComparison comparisonType);
 	public abstract int                    IndexOf(AnyString value, Int32 startIndex, Int32 count, StringComparison comparisonType);
@@ -59,6 +59,22 @@ public abstract class AnyString:
 	public abstract AnyString              ToUpper();
 	public abstract AnyString              TrimEnd(params AnyChar[]? trimChars);
 	public abstract AnyString              TrimStart(params AnyChar[]? trimChars);
+	
+	public static AnyString operator + (AnyString lhs, AnyString rhs) {
+		return lhs.Concat(rhs);
+	}
+	
+	public static AnyString operator + (AnyString lhs, string rhs) {
+		return lhs.Concat(rhs);
+	}
+	
+	public static AnyString operator + (string lhs, AnyString rhs) {
+		return rhs.ConcatFrom(lhs);
+	}
+	
+	protected internal abstract AnyString Concat    (AnyString other);
+	protected internal abstract AnyString Concat    (string    other);
+	protected internal abstract AnyString ConcatFrom(string    other);
 	
 	protected abstract IEnumerable Enumerable();
 	
@@ -137,6 +153,8 @@ public abstract class AnyString:
 	
 	public virtual AnyString ReplaceLineEndings() => ReplaceLineEndings(Env.NewLine);
 	
+	protected internal virtual AnyString ConcatFrom(AnyString other) => other.Concat(this);
+	
 	public virtual IEnumerable<AnyString> Split(params AnyChar[] separator) {
 		if (separator.Length == 0) {
 			return Split(new AnyChar[] {' ', '\t', '\r', '\n'}, Int32.MaxValue, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -204,13 +222,15 @@ class AnyString_string: AnyString {
 		get => innerValue[index];
 	}
 	
+	public static explicit operator string (AnyString_string str) => str.ToString();
+	
 	public override int CompareTo(AnyString? strB) =>
 		innerValue.CompareTo(strB);
 	public override bool Contains(AnyString value, StringComparison comparisonType) =>
 		innerValue.Contains(value.ToString(), comparisonType);
 	public override bool EndsWith(AnyString value, StringComparison comparisonType) =>
 		innerValue.EndsWith(value.ToString(), comparisonType);
-	public override StringRuneEnumerator EnumerateRunes() =>
+	public override IEnumerable<Rune> EnumerateRunes() =>
 		innerValue.EnumerateRunes();
 	public override bool Equals(AnyString? strB, StringComparison comparisonType) =>
 		innerValue.Equals(strB?.ToString(), comparisonType);
@@ -303,6 +323,21 @@ class AnyString_string: AnyString {
 		innerValue.TrimEnd();
 	public override AnyString TrimStart(params AnyChar[]? trimChars) =>
 		innerValue.TrimStart();
+	
+	[return: NotNull]
+	public override string ToString() => innerValue;
+	
+	protected internal override AnyString Concat(AnyString other) {
+		return other.ConcatFrom(innerValue);
+	}
+	
+	protected internal override AnyString_string Concat(string other) {
+		return new(innerValue + other);
+	}
+	
+	protected internal override AnyString_string ConcatFrom(string other) {
+		return new(other + innerValue);
+	}
 	
 	protected override IEnumerable Enumerable() {
 		foreach (var value in innerValue) {

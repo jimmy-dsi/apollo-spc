@@ -31,7 +31,6 @@ public abstract class AnyChar {
 	public abstract AnyChar ToUpper();
 	
 	public abstract AnyString ToAnyString();
-	[return: NotNull]
 	
 	// Virtuals - Optionally overrideable
 	public virtual bool IsAsciiHexDigitLower() => IsAsciiHexDigit() && IsLower();
@@ -45,6 +44,7 @@ public abstract class AnyChar {
 		return Value >= min.Value && Value <= max.Value;
 	}
 	
+	[return: NotNull]
 	public override string ToString() => throw new NotImplementedException();
 }
 

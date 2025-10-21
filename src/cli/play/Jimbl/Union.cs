@@ -230,6 +230,17 @@ public class union<T1, T2>: Union<T1, T2> {
 	public static explicit operator T1 (union<T1, T2> value) => (T1) value.value;
 	public static explicit operator T2 (union<T1, T2> value) => (T2) value.value;
 	
+	public static explicit operator   Byte (union<T1, T2> value) => (  Byte) Convert.ChangeType(value.value, typeof(  Byte))!;
+	public static explicit operator  SByte (union<T1, T2> value) => ( SByte) Convert.ChangeType(value.value, typeof( SByte))!;
+	public static explicit operator UInt16 (union<T1, T2> value) => (UInt16) Convert.ChangeType(value.value, typeof(UInt16))!;
+	public static explicit operator  Int16 (union<T1, T2> value) => ( Int16) Convert.ChangeType(value.value, typeof( Int16))!;
+	public static explicit operator UInt32 (union<T1, T2> value) => (UInt32) Convert.ChangeType(value.value, typeof(UInt32))!;
+	public static explicit operator  Int32 (union<T1, T2> value) => ( Int32) Convert.ChangeType(value.value, typeof( Int32))!;
+	public static explicit operator UInt64 (union<T1, T2> value) => (UInt64) Convert.ChangeType(value.value, typeof(UInt64))!;
+	public static explicit operator  Int64 (union<T1, T2> value) => ( Int64) Convert.ChangeType(value.value, typeof( Int64))!;
+	public static explicit operator Single (union<T1, T2> value) => (Single) Convert.ChangeType(value.value, typeof(Single))!;
+	public static explicit operator Double (union<T1, T2> value) => (Double) Convert.ChangeType(value.value, typeof(Double))!;
+	
 	public T? As<T>() => ((Union<T1, T2>) this).As<T>();
 	
 	public T1? As(T1? defaultValue) => ((Union<T1, T2>) this).As(defaultValue);
