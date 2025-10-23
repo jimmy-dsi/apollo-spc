@@ -340,7 +340,7 @@ pub const SPC = struct {
 
                 const sign_l = lhs.* >> 7;
                 const sign_r = r     >> 7;
-                const sign_v = @intFromBool(res < 0);
+                const sign_v = @intFromBool(res_u8 & 0x80 != 0);
 
                 self.state.set_z(@intFromBool(res_u8 == 0));
                 self.state.set_n(@intFromBool(res_u8 & 0x80 != 0));

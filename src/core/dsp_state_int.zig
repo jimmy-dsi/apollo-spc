@@ -53,7 +53,16 @@ pub const DSPStateInternal = struct {
         _address:        u16 = 0,
         _offset:         u16 = 0, // Current offset from ESA into echo buffer
         _length:         u16 = 0, // Length in bytes of echo buffer
-        _history_offset: u3  = 0
+        _history_offset: u3  = 0,
+
+        // Debug stuff
+        __fir_coefs_processed: u3 = 0,
+
+        __calc_history_left:  [8]i17 = [_]i17{0x00} ** 8,
+        __calc_history_right: [8]i17 = [_]i17{0x00} ** 8,
+
+        __calc_final_left:  i17 = 0,
+        __calc_final_right: i17 = 0,
     };
 
     // Output

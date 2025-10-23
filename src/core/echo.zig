@@ -1,4 +1,5 @@
 const DSPStateInternal = @import("dsp_state_int.zig").DSPStateInternal;
+const std = @import("std");
 
 fn calc_fir(s: *DSPStateInternal, comptime channel: u1, fir_idx: u3, fir_coef: i8) i17 {
     const e = &s._echo;
@@ -82,6 +83,14 @@ fn clamp_i16(input: i17) i17 {
 pub fn step_a(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, fir_0: i8) void {
     var e = &s._echo;
 
+    for (0..8) |i| {
+        e.__calc_history_left[i]  = 0;
+        e.__calc_history_right[i] = 0;
+    }
+
+    e.__calc_final_left  = 0;
+    e.__calc_final_right = 0;
+
     // History
     e._history_offset +%= 1;
 
@@ -92,6 +101,9 @@ pub fn step_a(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, fir_
     const left:  i17 = calc_fir(s, 0, 0, fir_0);
     const right: i17 = calc_fir(s, 1, 0, fir_0);
 
+    e.__calc_history_left [0] = left;
+    e.__calc_history_right[0] = right;
+
     e._input_left  = left;
     e._input_right = right;
 }
@@ -100,11 +112,20 @@ pub fn step_b(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, fir_
     var e = &s._echo;
 
     // FIR - Coefficients 1, 2
-    const left:  i17 = calc_fir(s, 0, 1, fir_1) +% calc_fir(s, 0, 2, fir_2);
-    const right: i17 = calc_fir(s, 1, 1, fir_1) +% calc_fir(s, 1, 2, fir_2);
+    var left:  i17 = calc_fir(s, 0, 1, fir_1); 
+    var right: i17 = calc_fir(s, 1, 1, fir_1); 
+
+    e.__calc_history_left [1] = e._input_left  +% left;
+    e.__calc_history_right[1] = e._input_right +% right;
+
+    left  +%= calc_fir(s, 0, 2, fir_2);
+    right +%= calc_fir(s, 1, 2, fir_2);
 
     e._input_left  +%= left;
     e._input_right +%= right;
+
+    e.__calc_history_left [2] = e._input_left;
+    e.__calc_history_right[2] = e._input_right;
 
     read(s, 1, aram_echo_0, aram_echo_1);
 }
@@ -113,11 +134,26 @@ pub fn step_c(s: *DSPStateInternal, fir_3: i8, fir_4: i8, fir_5: i8) void {
     var e = &s._echo;
 
     // FIR - Coefficients 3, 4, 5
-    const left:  i17 = calc_fir(s, 0, 3, fir_3) +% calc_fir(s, 0, 4, fir_4) +% calc_fir(s, 0, 5, fir_5);
-    const right: i17 = calc_fir(s, 1, 3, fir_3) +% calc_fir(s, 1, 4, fir_4) +% calc_fir(s, 1, 5, fir_5);
+    var left:  i17 = calc_fir(s, 0, 3, fir_3);
+    var right: i17 = calc_fir(s, 1, 3, fir_3);
+
+    e.__calc_history_left [3] = e._input_left  +% left;
+    e.__calc_history_right[3] = e._input_right +% right;
+
+    left  +%= calc_fir(s, 0, 4, fir_4);
+    right +%= calc_fir(s, 1, 4, fir_4);
+
+    e.__calc_history_left [4] = e._input_left  +% left;
+    e.__calc_history_right[4] = e._input_right +% right;
+
+    left  +%= calc_fir(s, 0, 5, fir_5);
+    right +%= calc_fir(s, 1, 5, fir_5);
 
     e._input_left  +%= left;
     e._input_right +%= right;
+
+    e.__calc_history_left [5] = e._input_left;
+    e.__calc_history_right[5] = e._input_right;
 }
 
 pub fn step_d(s: *DSPStateInternal, fir_6: i8, fir_7: i8) void {
@@ -126,6 +162,9 @@ pub fn step_d(s: *DSPStateInternal, fir_6: i8, fir_7: i8) void {
     // FIR - Coefficients 6, 7
     var left:  i17 = e._input_left  +% calc_fir(s, 0, 6, fir_6);
     var right: i17 = e._input_right +% calc_fir(s, 1, 6, fir_6);
+
+    e.__calc_history_left [6] = left;
+    e.__calc_history_right[6] = right;
 
     const left_i16:  i16 = @truncate(left);
     const right_i16: i16 = @truncate(right);
@@ -136,9 +175,15 @@ pub fn step_d(s: *DSPStateInternal, fir_6: i8, fir_7: i8) void {
     left  = @as(i17,  left_i16) +% @as(i17, fir7_l_i16);
     right = @as(i17, right_i16) +% @as(i17, fir7_r_i16);
 
+    e.__calc_history_left [7] = left;
+    e.__calc_history_right[7] = right;
+
     // Clamp final result from FIR calculations
     e._input_left  = clamp_i16(left)  & ~@as(i17, 1);
     e._input_right = clamp_i16(right) & ~@as(i17, 1);
+
+    e.__calc_final_left  = e._input_left;
+    e.__calc_final_right = e._input_right;
 }
 
 pub fn step_e(s: *DSPStateInternal, mvoll: i8, evoll: i8, efb: i8) void {

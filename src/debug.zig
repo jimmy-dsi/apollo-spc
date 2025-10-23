@@ -1820,7 +1820,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         print("    buffer:                ", .{});
     }
     print("\n", .{});
-
+    
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
@@ -1831,7 +1831,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
     print("\n", .{});
-
+    
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
@@ -1842,7 +1842,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
     print("\n", .{});
-
+    
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
@@ -1853,6 +1853,67 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
     print("\n", .{});
+
+    //if (base == 4) {
+    //    print("\n", .{});
+    //    print("echo history:\n", .{});
+    //
+    //    var h_left:  [8]u16 = undefined;
+    //    var h_right: [8]u16 = undefined;
+    //
+    //    for (0..8) |i| {
+    //        h_left[i]  = @bitCast(s._echo._history_left[i]);
+    //        h_right[i] = @bitCast(s._echo._history_right[i]);
+    //    }
+    //
+    //    print("      left:  {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4}\n", .{
+    //        h_left[0], h_left[1], h_left[2], h_left[3],
+    //        h_left[4], h_left[5], h_left[6], h_left[7]
+    //    });
+    //    print("      right: {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4}\n", .{
+    //        h_right[0], h_right[1], h_right[2], h_right[3],
+    //        h_right[4], h_right[5], h_right[6], h_right[7]
+    //    });
+    //
+    //    const ss = emu.s_dsp.state;
+    //
+    //    const fir = [8]u8 {
+    //        @bitCast(ss.echo.fir[0]), @bitCast(ss.echo.fir[1]),
+    //        @bitCast(ss.echo.fir[2]), @bitCast(ss.echo.fir[3]),
+    //        @bitCast(ss.echo.fir[4]), @bitCast(ss.echo.fir[5]),
+    //        @bitCast(ss.echo.fir[6]), @bitCast(ss.echo.fir[7])
+    //    };
+    //
+    //    print("\n", .{});
+    //    print("history index: {X:0>1}           fir: {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n", .{
+    //        s._echo._history_offset,
+    //        fir[0], fir[1], fir[2], fir[3],
+    //        fir[4], fir[5], fir[6], fir[7],
+    //    });
+    //
+    //    print("\n", .{});
+    //    print("intermediate fir calculations:\n", .{});
+    //
+    //    var c_hist_left:  [8]u17 = undefined;
+    //    var c_hist_right: [8]u17 = undefined;
+    //
+    //    for (0..8) |i| {
+    //        c_hist_left[i]  = @bitCast(s._echo.__calc_history_left[i]);
+    //        c_hist_right[i] = @bitCast(s._echo.__calc_history_right[i]);
+    //    }
+    //
+    //    const c_final_left:  u17 = @bitCast(s._echo.__calc_final_left);
+    //    const c_final_right: u17 = @bitCast(s._echo.__calc_final_right);
+    //
+    //    print("      left:  {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} | {X:0>5}\n", .{
+    //        c_hist_left[0], c_hist_left[1], c_hist_left[2], c_hist_left[3],
+    //        c_hist_left[4], c_hist_left[5], c_hist_left[6], c_hist_left[7], c_final_left
+    //    });
+    //    print("      right: {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} | {X:0>5}\n", .{
+    //        c_hist_right[0], c_hist_right[1], c_hist_right[2], c_hist_right[3],
+    //        c_hist_right[4], c_hist_right[5], c_hist_right[6], c_hist_right[7], c_final_right
+    //    });
+    //}
 
     print("\x1B[0m", .{});
 }
