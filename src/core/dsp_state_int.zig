@@ -62,6 +62,12 @@ pub const DSPStateInternal = struct {
     _echo_out_left:  i17 = 0,
     _echo_out_right: i17 = 0,
 
+    __echo_out_left: i17 = 0, // Temporary/intermediate storage for left echo output level
+
+    // Final DAC output
+    _dac_left:  i17 = 0,
+    _dac_right: i17 = 0,
+
     // Misc. Internal state
     _brr:        BRR  = .{},
     _echo:       Echo = .{},

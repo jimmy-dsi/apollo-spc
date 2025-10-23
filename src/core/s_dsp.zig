@@ -403,7 +403,7 @@ pub const SDSP = struct {
             22 => {
                 self.proc_t22(
                     // RAM access
-                    aram_ref_0, aram_ref_1, // Used for echo
+                    aram_ref_0, aram_ref_0, // Used for echo
                     // Register array
                     @intCast(v[0].pitch >> 8), s.echo.fir[0],
                     // Extras
@@ -414,7 +414,7 @@ pub const SDSP = struct {
             23 => {
                 self.proc_t23(
                     // RAM access
-                    aram_ref_0, aram_ref_1, // Used for echo
+                    aram_ref_0, aram_ref_0, // Used for echo
                     // Register array
                     v[7].envx, s.echo.fir[1], s.echo.fir[2],
                     // Extras
@@ -491,7 +491,7 @@ pub const SDSP = struct {
             29 => {
                 self.proc_t29(
                     // RAM access
-                    aram_ref_0, aram_ref_1, // Used for echo
+                    aram_ref_0, aram_ref_0, // Used for echo
                     // Register array
                     s.echo.delay, s.echo.esa_page,
                     // Extras
@@ -508,7 +508,7 @@ pub const SDSP = struct {
 
                 self.proc_t30(
                     // RAM access
-                    aram_ref_0, aram_ref_1, // Used for echo
+                    aram_ref_0, aram_ref_0, // Used for echo
                     // Register array
                     &v[0].envx, v[0].adsr_1, koff, s.noise_rate,
                                 v[0].gain,
@@ -975,8 +975,8 @@ pub const SDSP = struct {
         echo.step_f(s.int(), mvolr, evolr, mute_flg);
         // Output to DAC
         s.emu.queue_dac_sample(
-            @intCast(s.int()._main_out_left),
-            @intCast(s.int()._main_out_right),
+            @intCast(s.int()._dac_left),
+            @intCast(s.int()._dac_right),
         );
         // Clear output for next sample
         s.int()._main_out_left  = 0;
@@ -993,7 +993,7 @@ pub const SDSP = struct {
 
     inline fn proc_t29(s: *SDSP,
                        aram_echo_0: [*]u8, aram_echo_1: [*]u8,
-                       edl: u8, esa: u8,
+                       edl: u4, esa: u8,
                        echo_readonly_flg: u1) void
     {
         misc.step_c(s.int());
