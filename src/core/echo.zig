@@ -152,6 +152,12 @@ pub fn step_d(s: *DSPStateInternal, fir_6: i8, fir_7: i8) void {
 
 pub fn step_e(s: *DSPStateInternal, mvoll: i8, evoll: i8, efb: i8) void {
     const e = &s._echo;
+    const p2 = s.pipeline_2;
+
+    p2.mvol_left = mvoll;
+    p2.evol_left = evoll;
+    // TODO: Set feedback
+
     // Store echo left output for next clock tick
     s.__echo_out_left = output(s, 0, mvoll, evoll);
 
@@ -168,6 +174,11 @@ pub fn step_e(s: *DSPStateInternal, mvoll: i8, evoll: i8, efb: i8) void {
 }
 
 pub fn step_f(s: *DSPStateInternal, mvolr: i8, evolr: i8, mute_flg: u1) void {
+    const p2 = s.pipeline_2;
+
+    p2.mvol_right = mvolr;
+    p2.evol_right = evolr;
+
     var left:  i17 = s.__echo_out_left;
     var right: i17 = output(s, 1, mvolr, evolr);
 

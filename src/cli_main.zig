@@ -23,6 +23,7 @@ var t_timeout_wait = Atomic(bool).init(false);
 var t_menu_mode    = Atomic(u8).init('i');
 var t_input_mode   = Atomic(u32).init(0);
 var t_other_menu   = Atomic(u8).init('m');
+var t_voice_toggle = Atomic(u8).init(8);
 
 var m_expect_input = std.Thread.Mutex{};
 
@@ -687,6 +688,12 @@ fn run_loop(emu: *Emu) !bool {
         }
     }
 
+    const v_idx = t_voice_toggle.load(std.builtin.AtomicOrder.seq_cst);
+    if (v_idx < 8) {
+        emu.pipeline_2.toggle_voice(@intCast(v_idx));
+        t_voice_toggle.store(8, std.builtin.AtomicOrder.seq_cst);
+    }
+
     var stdout_writer = stdout_file.writer();
 
     stdout_writer.writeAll(&buf) catch {
@@ -719,24 +726,25 @@ fn run_loop(emu: *Emu) !bool {
 fn show_help_menu() void {
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n", .{});
     db.print(" Mode commands: \n", .{});
-    db.print("    i = Instruction trace log viewer [default] \n", .{});
-    db.print("    v = Memory viewer \n", .{});
-    db.print("    r = DSP register viewer (1) \n", .{});
-    db.print("    e = DSP register viewer (2) \n", .{});
-    db.print("    b = DSP debug viewer \n", .{});
-    db.print("    8 = Script700 debug viewer \n", .{});
+    db.print("    i  = Instruction trace log viewer [default] \n", .{});
+    db.print("    v  = Memory viewer \n", .{});
+    db.print("    r  = DSP register viewer (1) \n", .{});
+    db.print("    e  = DSP register viewer (2) \n", .{});
+    db.print("    b  = DSP debug viewer \n", .{});
+    db.print("    8  = Script700 debug viewer \n", .{});
     db.print(" Action commands: \n", .{});
-    db.print("    s = Step instruction [default] \n", .{});
-    db.print("    c = Continue to next breakpoint \n", .{});
-    db.print("    k = Break execution \n", .{});
-    db.print("    p = View previous page of ARAM \n", .{});
-    db.print("    n = View next page of ARAM \n", .{});
-    db.print("    u = Shift memory view up one row \n", .{});
-    db.print("    d = Shift memory view down one row \n", .{});
+    db.print("    s  = Step instruction [default] \n", .{});
+    db.print("    c  = Continue to next breakpoint \n", .{});
+    db.print("    k  = Break execution \n", .{});
+    db.print("    p  = View previous page of ARAM \n", .{});
+    db.print("    n  = View next page of ARAM \n", .{});
+    db.print("    u  = Shift memory view up one row \n", .{});
+    db.print("    d  = Shift memory view down one row \n", .{});
     db.print(" Other: \n", .{});
-    db.print("    h = Bring up this menu \n", .{});
-    db.print("    m = View ID666 metadata \n", .{});
-    db.print("    q = Quit \n", .{});
+    db.print("   0-7 = Toggle channel # output \n", .{});
+    db.print("    h  = Bring up this menu \n", .{});
+    db.print("    m  = View ID666 metadata \n", .{});
+    db.print("    q  = Quit \n", .{});
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n\n", .{});
     db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
     flush(null, false);
@@ -803,6 +811,10 @@ fn break_listener() void {
                             'i' => {
                                 prev_input = buffer[0];
                                 set_msg(0, 0, false);
+                            },
+                            '0', '1', '2', '3', '4', '5', '6', '7' => {
+                                t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
+                                set_msg(0, 0, false); // TODO: Display message on bottom about channel toggle
                             },
                             'v', 'r', 'e', 'b', '8', 'u', 'd', 'n', 'p' => {
                                 cur_mode = buffer[0];

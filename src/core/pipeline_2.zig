@@ -88,6 +88,15 @@ pub const Pipeline2 = struct {
     dac_left:  [3]f64 = [_]f64{0} ** 3,
     dac_right: [3]f64 = [_]f64{0} ** 3,
 
+    pub fn toggle_voice(self: *Pipeline2, index: u3) void {
+        if (self.settings.channels_enabled[index]) {
+            self.disable_voice(index);
+        }
+        else {
+            self.enable_voice(index);
+        }
+    }
+
     pub fn disable_voice(self: *Pipeline2, index: u3) void {
         self.enabled = true;
         self.settings.channels_enabled[index] = false;
@@ -96,6 +105,7 @@ pub const Pipeline2 = struct {
     pub fn enable_voice(self: *Pipeline2, index: u3) void {
         self.enabled = true;
         self.settings.channels_enabled[index] = true;
+        self.check_settings();
     }
 
     pub inline fn voice_output(self: *Pipeline2, index: u3, out: []const i16, vol: i8, comptime channel: u1) void {
@@ -139,6 +149,9 @@ pub const Pipeline2 = struct {
                 }
             }
 
+            sum_left  = trunc_i16(i32, sum_left  * self.mvol_left  >> 7);
+            sum_right = trunc_i16(i32, sum_right * self.mvol_right >> 7);
+
             self.dac_left[i]  = i16_to_f64(@intCast(sum_left));
             self.dac_right[i] = i16_to_f64(@intCast(sum_right));
         }
@@ -149,6 +162,16 @@ pub const Pipeline2 = struct {
             f64_to_i16(self.dac_left[index]),
             f64_to_i16(self.dac_right[index])
         };
+    }
+
+    fn check_settings(self: *Pipeline2) void {
+        for (0..8) |c| {
+            if (!self.settings.channels_enabled[c]) {
+                return;
+            }
+        }
+
+        self.enabled = false;
     }
 
     fn f64_to_i16(n: f64) i16 {
@@ -170,5 +193,10 @@ pub const Pipeline2 = struct {
         else {
             return n;
         }
+    }
+
+    fn trunc_i16(comptime T: type, n: T) T {
+        const n_i16: i16 = @truncate(n);
+        return @as(T, n_i16);
     }
 };
