@@ -2,6 +2,8 @@ const gauss    = @import("gauss.zig");
 const envelope = @import("envelope.zig");
 const brr      = @import("brr.zig");
 
+const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
+
 pub const DSPStateInternal = struct {
     pub const EnvMode = enum {
         key_off, attack, decay, release
@@ -65,6 +67,8 @@ pub const DSPStateInternal = struct {
         __calc_final_right: i17 = 0,
     };
 
+    pipeline_2: *Pipeline2,
+
     // Output
     _main_out_left:  i17 = 0,
     _main_out_right: i17 = 0,
@@ -103,6 +107,9 @@ pub const DSPStateInternal = struct {
         const echo_out: *i17 =
             if (channel == 0) &self._echo_out_left
             else              &self._echo_out_right;
+
+        const out = [3]i16{self._output, 0, 0};
+        self.pipeline_2.voice_output(v_idx, out[0..], vol, channel);
 
         // Apply left/right volume
         const amp: i17 = @intCast(@as(i24, self._output) * @as(i24, vol) >> 7);

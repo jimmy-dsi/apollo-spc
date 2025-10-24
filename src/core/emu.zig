@@ -2,6 +2,7 @@ const std = @import("std");
 
 const SDSP      = @import("s_dsp.zig").SDSP;
 const SSMP      = @import("s_smp.zig").SSMP;
+const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
 const Script700 = @import("script700.zig").Script700;
 
 pub const Emu = struct {
@@ -24,6 +25,8 @@ pub const Emu = struct {
 
     s_dsp: SDSP,
     s_smp: SSMP,
+
+    pipeline_2: Pipeline2 = .{}, // Second audio rendering pipeline
 
     script700: Script700,
 
@@ -70,6 +73,8 @@ pub const Emu = struct {
         self.s_smp          = s_smp;
         self.script700      = script700;
         self.cur_debug_mode = DebugMode.none;
+
+        //self.pipeline_2.disable_voice(0);
     }
 
     pub fn set_default_vector(self: *Emu, vector: u16) void {

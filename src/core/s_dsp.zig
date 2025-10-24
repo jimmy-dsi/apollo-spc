@@ -85,7 +85,7 @@ pub const SDSP = struct {
         self.state.mute  = 1;
         self.state.echo.readonly = 1;
         self.state.noise_rate = 0x00;
-        self.state._internal = .{};
+        self.state._internal = .{ .pipeline_2 = &self.emu.pipeline_2 };
     }
 
     pub fn step(self: *SDSP) void {
@@ -973,11 +973,28 @@ pub const SDSP = struct {
     {
         misc.step_a(s.int(), pmon);
         echo.step_f(s.int(), mvolr, evolr, mute_flg);
-        // Output to DAC
+
+        var p2 = s.int().pipeline_2;
+
+        // Calculate Pipeline 2 Output
+        p2.output();
+
+        // Multiplex output from S-DSP DAC or Pipeline 2
+        const left: i17, const right: i17 =
+            sw: switch (p2.enabled) {
+                false => .{ s.int()._dac_left, s.int()._dac_right },
+                true  => {
+                    const ll, const rr = p2.get_output_i16(0);
+                    break :sw .{ @intCast(ll), @intCast(rr) };
+                }
+            };
+
+        // Send to emulator's audio buffer
         s.emu.queue_dac_sample(
-            @intCast(s.int()._dac_left),
-            @intCast(s.int()._dac_right),
+            @intCast(left),
+            @intCast(right),
         );
+
         // Clear output for next sample
         s.int()._main_out_left  = 0;
         s.int()._main_out_right = 0;
