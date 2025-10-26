@@ -24,6 +24,7 @@ var t_menu_mode    = Atomic(u8).init('i');
 var t_input_mode   = Atomic(u32).init(0);
 var t_other_menu   = Atomic(u8).init('m');
 var t_voice_toggle = Atomic(u8).init(9);
+var t_main_only    = Atomic(bool).init(false);
 
 var m_expect_input = std.Thread.Mutex{};
 
@@ -698,8 +699,16 @@ fn run_loop(emu: *Emu) !bool {
     }
     else if (v_idx <= 8) {
         const c = v_idx - 1;
+        if (t_main_only.load(std.builtin.AtomicOrder.seq_cst)) {
+            emu.pipeline_2.toggle_main_voice(@intCast(c));
+            if (emu.pipeline_2.settings.channels_enabled[c]) {
+                emu.pipeline_2.enable_voice(@intCast(c));
+            }
+        }
+        else {
+            emu.pipeline_2.toggle_voice(@intCast(c));
+        }
 
-        emu.pipeline_2.toggle_voice(@intCast(c));
         t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
 
         if (emu.pipeline_2.settings.channels_enabled[c]) {
@@ -711,7 +720,6 @@ fn run_loop(emu: *Emu) !bool {
     }
     else if (v_idx == 10) {
         t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
-        emu.pipeline_2.toggle_main();
     }
 
     var stdout_writer = stdout_file.writer();
@@ -840,7 +848,8 @@ fn break_listener() void {
                                 t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
                             },
                             'f' => {
-                                t_voice_toggle.store(10, std.builtin.AtomicOrder.seq_cst);
+                                const main_only = t_main_only.load(std.builtin.AtomicOrder.seq_cst);
+                                t_main_only.store(!main_only, std.builtin.AtomicOrder.seq_cst);
                             },
                             'v', 'r', 'e', 'b', '9', 'u', 'd', 'n', 'p' => {
                                 cur_mode = buffer[0];

@@ -25,8 +25,9 @@ pub const Pipeline2 = struct {
 
         speed_sync_env: bool = false,
 
-        channels_enabled: [8]bool = [_]bool {true} ** 8,
-        channel_mixer:    [8]f32  = [_]f32  {1.0}  ** 8,
+        channels_enabled:   [8]bool = [_]bool {true} ** 8, // For main
+        e_channels_enabled: [8]bool = [_]bool {true} ** 8, // For echo
+        channel_mixer:      [8]f32  = [_]f32  {1.0}  ** 8,
 
         master_vol: f32 = 1.0,
         main_vol:   f32 = 1.0,
@@ -123,22 +124,55 @@ pub const Pipeline2 = struct {
 
     pub fn disable_voice(self: *Pipeline2, index: u3) void {
         self.enabled = true;
-        self.settings.channels_enabled[index] = false;
+        self.settings.channels_enabled[index]   = false;
+        self.settings.e_channels_enabled[index] = false;
     }
 
     pub fn enable_voice(self: *Pipeline2, index: u3) void {
+        self.enabled = true;
+        self.settings.channels_enabled[index]   = true;
+        self.settings.e_channels_enabled[index] = true;
+        self.check_settings();
+    }
+
+    pub fn toggle_main_voice(self: *Pipeline2, index: u3) void {
+        if (self.settings.channels_enabled[index]) {
+            self.disable_main_voice(index);
+        }
+        else {
+            self.enable_main_voice(index);
+        }
+    }
+
+    pub fn disable_main_voice(self: *Pipeline2, index: u3) void {
+        self.enabled = true;
+        self.settings.channels_enabled[index] = false;
+    }
+
+    pub fn enable_main_voice(self: *Pipeline2, index: u3) void {
         self.enabled = true;
         self.settings.channels_enabled[index] = true;
         self.check_settings();
     }
 
-    pub fn toggle_main(self: *Pipeline2) void {
-        if (self.settings.disable_main) {
-            self.enable_main();
+    pub fn toggle_echo_voice(self: *Pipeline2, index: u3) void {
+        if (self.settings.e_channels_enabled[index]) {
+            self.disable_echo_voice(index);
         }
         else {
-            self.disable_main();
+            self.enable_echo_voice(index);
         }
+    }
+
+    pub fn disable_echo_voice(self: *Pipeline2, index: u3) void {
+        self.enabled = true;
+        self.settings.e_channels_enabled[index] = false;
+    }
+
+    pub fn enable_echo_voice(self: *Pipeline2, index: u3) void {
+        self.enabled = true;
+        self.settings.e_channels_enabled[index] = true;
+        self.check_settings();
     }
 
     pub fn disable_main(self: *Pipeline2) void {
@@ -230,35 +264,33 @@ pub const Pipeline2 = struct {
 
         for (0..self.samples_queued) |i| {
             // TODO: Consider alternate output formats for mixing
-            var sum_left:  i32 = 0;
-            var sum_right: i32 = 0;
-
+            var sum_left:    i32 = 0;
+            var sum_right:   i32 = 0;
             var e_sum_left:  i32 = 0;
             var e_sum_right: i32 = 0;
 
             for (0..8) |c| {
                 const cc: u3 = @intCast(c);
 
+                const v = &self.voice[c];
+
+                const left  = f64_to_i16(v.buffer_left[i]);
+                const right = f64_to_i16(v.buffer_right[i]);
+                const voice_left:  i32 = @as(i32, left)  * @as(i32, v.vol_left)  >> 7;
+                const voice_right: i32 = @as(i32, right) * @as(i32, v.vol_right) >> 7;
+
                 if (self.settings.channels_enabled[c]) {
-                    const v = &self.voice[c];
-
-                    const left  = f64_to_i16(v.buffer_left[i]);
-                    const right = f64_to_i16(v.buffer_right[i]);
-                    const voice_left:  i32 = @as(i32, left)  * @as(i32, v.vol_left)  >> 7;
-                    const voice_right: i32 = @as(i32, right) * @as(i32, v.vol_right) >> 7;
-
                     sum_left  +%= voice_left;
                     sum_right +%= voice_right;
-
-                    if (e.eon & (@as(u8, 1) << cc) != 0) { // If echo enabled for channel
-                        e_sum_left  +%= voice_left;
-                        e_sum_right +%= voice_right;
-                        e_sum_left  = clamp_i16(i32, e_sum_left);
-                        e_sum_right = clamp_i16(i32, e_sum_right);
-                    }
-
                     sum_left  = clamp_i16(i32, sum_left);
                     sum_right = clamp_i16(i32, sum_right);
+                }
+
+                if (self.settings.e_channels_enabled[c] and e.eon & (@as(u8, 1) << cc) != 0) { // If echo enabled for channel
+                    e_sum_left  +%= voice_left;
+                    e_sum_right +%= voice_right;
+                    e_sum_left  = clamp_i16(i32, e_sum_left);
+                    e_sum_right = clamp_i16(i32, e_sum_right);
                 }
             }
 
@@ -401,6 +433,9 @@ pub const Pipeline2 = struct {
 
         for (0..8) |c| {
             if (!self.settings.channels_enabled[c]) {
+                return;
+            }
+            if (!self.settings.e_channels_enabled[c]) {
                 return;
             }
         }
