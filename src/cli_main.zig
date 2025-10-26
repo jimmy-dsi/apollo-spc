@@ -23,7 +23,7 @@ var t_timeout_wait = Atomic(bool).init(false);
 var t_menu_mode    = Atomic(u8).init('i');
 var t_input_mode   = Atomic(u32).init(0);
 var t_other_menu   = Atomic(u8).init('m');
-var t_voice_toggle = Atomic(u8).init(8);
+var t_voice_toggle = Atomic(u8).init(9);
 
 var m_expect_input = std.Thread.Mutex{};
 
@@ -353,7 +353,7 @@ pub fn main() !void {
                         db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
-                    else if (cur_mode == '8') {
+                    else if (cur_mode == '9') {
                         db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_script700_state(&emu);
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
@@ -478,8 +478,8 @@ pub fn main() !void {
                 set_msg(0, 0, false);
                 flush(null, true);
             },
-            '8' => {
-                cur_mode = '8';
+            '9' => {
+                cur_mode = '9';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                 db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
@@ -600,7 +600,7 @@ pub fn main() !void {
                     flush(null, true);
                     set_msg(0, 0, false);
                 }
-                else if (cur_mode == '8') {
+                else if (cur_mode == '9') {
                     db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     db.print_script700_state(&emu);
                     flush(null, true);
@@ -689,9 +689,25 @@ fn run_loop(emu: *Emu) !bool {
     }
 
     const v_idx = t_voice_toggle.load(std.builtin.AtomicOrder.seq_cst);
-    if (v_idx < 8) {
-        emu.pipeline_2.toggle_voice(@intCast(v_idx));
-        t_voice_toggle.store(8, std.builtin.AtomicOrder.seq_cst);
+    if (v_idx == 0) {
+        for (0..8) |c| {
+            emu.pipeline_2.enable_voice(@intCast(c));
+        }
+        t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
+        set_msg(12, 0, false);
+    }
+    else if (v_idx <= 8) {
+        const c = v_idx - 1;
+
+        emu.pipeline_2.toggle_voice(@intCast(c));
+        t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
+
+        if (emu.pipeline_2.settings.channels_enabled[c]) {
+            set_msg(10, v_idx, false);
+        }
+        else {
+            set_msg(11, v_idx, false);
+        }
     }
 
     var stdout_writer = stdout_file.writer();
@@ -731,7 +747,7 @@ fn show_help_menu() void {
     db.print("    r  = DSP register viewer (1) \n", .{});
     db.print("    e  = DSP register viewer (2) \n", .{});
     db.print("    b  = DSP debug viewer \n", .{});
-    db.print("    8  = Script700 debug viewer \n", .{});
+    db.print("    9  = Script700 debug viewer \n", .{});
     db.print(" Action commands: \n", .{});
     db.print("    s  = Step instruction [default] \n", .{});
     db.print("    c  = Continue to next breakpoint \n", .{});
@@ -741,7 +757,8 @@ fn show_help_menu() void {
     db.print("    u  = Shift memory view up one row \n", .{});
     db.print("    d  = Shift memory view down one row \n", .{});
     db.print(" Other: \n", .{});
-    db.print("   0-7 = Toggle channel # output \n", .{});
+    db.print("    0  = Enable all channels \n", .{});
+    db.print("   1-8 = Toggle channel # output \n", .{});
     db.print("    h  = Bring up this menu \n", .{});
     db.print("    m  = View ID666 metadata \n", .{});
     db.print("    q  = Quit \n", .{});
@@ -812,11 +829,13 @@ fn break_listener() void {
                                 prev_input = buffer[0];
                                 set_msg(0, 0, false);
                             },
-                            '0', '1', '2', '3', '4', '5', '6', '7' => {
-                                t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
-                                set_msg(0, 0, false); // TODO: Display message on bottom about channel toggle
+                            '0' => {
+                                t_voice_toggle.store(0, std.builtin.AtomicOrder.seq_cst);
                             },
-                            'v', 'r', 'e', 'b', '8', 'u', 'd', 'n', 'p' => {
+                            '1', '2', '3', '4', '5', '6', '7', '8' => {
+                                t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
+                            },
+                            'v', 'r', 'e', 'b', '9', 'u', 'd', 'n', 'p' => {
                                 cur_mode = buffer[0];
                                 prev_input = buffer[0];
 

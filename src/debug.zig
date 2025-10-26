@@ -1440,6 +1440,23 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
             const address: u8 = line_start + xx;
             const data: u8 = emu.s_dsp.dsp_map[address];
 
+            if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0) {
+                print("\x1B[90m", .{}); // Grey out if disabled
+            }
+            else if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0xA) {
+                print("\x1B[39m", .{}); // Reset foreground color
+            }
+            
+            if (x == 0xA or x == 0xE) {
+                print("\x1B[90m", .{}); // Grey out unconditionally unused region
+            }
+            else if (x == 0xD and y == 0x1) {
+                print("\x1B[90m", .{}); // Grey out unconditionally unused region
+            }
+            else if (x == 0xC or x == 0xF) {
+                print("\x1B[39m", .{});
+            }
+
             print_mem_cell(emu, @as(u16, address), data, false, options);
         }
 
@@ -1449,6 +1466,23 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
             const xx: u8 = @intCast(x);
             const address: u8 = line_start + xx;
             const data: u8 = emu.s_dsp.dsp_map[address];
+
+            if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0) {
+                print("\x1B[90m", .{}); // Grey out if disabled
+            }
+            else if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0xA) {
+                print("\x1B[39m", .{}); // Reset foreground color
+            }
+            
+            if (x == 0xA or x == 0xE) {
+                print("\x1B[90m", .{}); // Grey out unconditionally unused region
+            }
+            else if (x == 0xD and y == 0x1) {
+                print("\x1B[90m", .{}); // Grey out unconditionally unused region
+            }
+            else if (x == 0xC or x == 0xF) {
+                print("\x1B[39m", .{});
+            }
 
             print_mem_cell(emu, @as(u16, address), data, true, options);
         }
@@ -1547,13 +1581,18 @@ pub fn print_dsp_state_2(emu: *Emu, _: OptionStruct) void {
 
 fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
     const s = &emu.s_dsp.state;
+    const st = &emu.pipeline_2.settings;
 
     // Print voice 0-3 states
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
         const val: u8 = @bitCast(v.vol_left);
-        print("V{d}  left volume:  {X:0>2}       ", .{idx, val});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("V{d}  left volume:  {X:0>2}       \x1B[39m", .{idx + 1, val});
     }
     print("\n", .{});
 
@@ -1561,56 +1600,88 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
         const val: u8 = @bitCast(v.vol_right);
-        print("    right volume: {X:0>2}       ", .{val});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    right volume: {X:0>2}       \x1B[39m", .{val});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        print("    pitch:        {X:0>4}     ", .{v.pitch});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    pitch:        {X:0>4}     \x1B[39m", .{v.pitch});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        print("    srcn:         {X:0>2}       ", .{v.source});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    srcn:         {X:0>2}       \x1B[39m", .{v.source});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        print("    adsr 1:       {X:0>2}       ", .{v.adsr_0});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    adsr 1:       {X:0>2}       \x1B[39m", .{v.adsr_0});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        print("    adsr 2:       {X:0>2}       ", .{v.adsr_1});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    adsr 2:       {X:0>2}       \x1B[39m", .{v.adsr_1});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        print("    gain:         {X:0>2}       ", .{v.gain});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    gain:         {X:0>2}       \x1B[39m", .{v.gain});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s.voice[idx];
-        print("    envx:         {X:0>2}       ", .{v.envx});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    envx:         {X:0>2}       \x1B[39m", .{v.envx});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         _ = &s.voice[idx];
-        print("    outx:         {X:0>2}       ", .{0x00});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    outx:         {X:0>2}       \x1B[39m", .{0x00});
     }
     print("\n", .{});
 }
@@ -1740,6 +1811,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
     //print("\n", .{});
 
     const s = emu.s_dsp.int();
+    const st = emu.pipeline_2.settings;
 
     //print("\x1B[90m", .{});
 
@@ -1748,7 +1820,11 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
         const val: u4 = @bitCast(v._buffer_offset);
-        print("V{d}  buff. offset: {X:0>1}        ", .{idx, val});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("V{d}  buff. offset: {X:0>1}        \x1B[39m", .{idx + 1, val});
     }
     print("\n", .{});
 
@@ -1756,42 +1832,66 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
         const val: u16 = @bitCast(v._gaussian_offset);
-        print("    gauss offset: {X:0>4}     ", .{val});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    gauss offset: {X:0>4}     \x1B[39m", .{val});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        print("    brr address:  {X:0>4}     ", .{v._brr_address});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    brr address:  {X:0>4}     \x1B[39m", .{v._brr_address});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        print("    brr offset:   {X:0>1}        ", .{v._brr_offset});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    brr offset:   {X:0>1}        \x1B[39m", .{v._brr_offset});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        print("    key on delay: {X:0>1}        ", .{v._key_on_delay});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    key on delay: {X:0>1}        \x1B[39m", .{v._key_on_delay});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        print("    noise on: {X:0>1}            ", .{v.__noise_on});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    noise on: {X:0>1}            \x1B[39m", .{v.__noise_on});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        print("    pitch mod on: {X:0>1}        ", .{v.__pitch_mod_on});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    pitch mod on: {X:0>1}        \x1B[39m", .{v.__pitch_mod_on});
     }
     print("\n", .{});
 
@@ -1805,19 +1905,31 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
                 .release => "reles",
                 .key_off => "keyof"
             };
-        print("    env. mode:    {s}    ", .{res});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    env. mode:    {s}    \x1B[39m", .{res});
     }
     print("\n", .{});
 
     for (0..4) |i| {
         const idx = i + base;
         const v = &s._voice[idx];
-        print("    env. level:   {X:0>2}.{X:0>1}     ", .{v._env_level >> 4, @as(u12, v._env_level) << 1 & 0xF});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    env. level:   {X:0>2}.{X:0>1}     \x1B[39m", .{v._env_level >> 4, @as(u12, v._env_level) << 1 & 0xF});
     }
     print("\n", .{});
 
-    for (0..4) |_| {
-        print("    buffer:                ", .{});
+    for (0..4) |i| {
+        const idx = i + base;
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("    buffer:                \x1B[39m", .{});
     }
     print("\n", .{});
     
@@ -1828,7 +1940,11 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
             @bitCast(v._buffer[0]), @bitCast(v._buffer[1]),
             @bitCast(v._buffer[2]), @bitCast(v._buffer[3]),
         };
-        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  \x1B[39m", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
     print("\n", .{});
     
@@ -1839,7 +1955,11 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
             @bitCast(v._buffer[4]), @bitCast(v._buffer[5]),
             @bitCast(v._buffer[6]), @bitCast(v._buffer[7]),
         };
-        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  \x1B[39m", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
     print("\n", .{});
     
@@ -1850,71 +1970,13 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
             @bitCast(v._buffer[8]),  @bitCast(v._buffer[9]),
             @bitCast(v._buffer[10]), @bitCast(v._buffer[11]),
         };
-        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  ", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
+
+        if (!st.channels_enabled[idx]) {
+            print("\x1B[90m", .{});
+        }
+        print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  \x1B[39m", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
     }
     print("\n", .{});
-
-    //if (base == 4) {
-    //    print("\n", .{});
-    //    print("echo history:\n", .{});
-    //
-    //    var h_left:  [8]u16 = undefined;
-    //    var h_right: [8]u16 = undefined;
-    //
-    //    for (0..8) |i| {
-    //        h_left[i]  = @bitCast(s._echo._history_left[i]);
-    //        h_right[i] = @bitCast(s._echo._history_right[i]);
-    //    }
-    //
-    //    print("      left:  {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4}\n", .{
-    //        h_left[0], h_left[1], h_left[2], h_left[3],
-    //        h_left[4], h_left[5], h_left[6], h_left[7]
-    //    });
-    //    print("      right: {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4} {X:0>4}\n", .{
-    //        h_right[0], h_right[1], h_right[2], h_right[3],
-    //        h_right[4], h_right[5], h_right[6], h_right[7]
-    //    });
-    //
-    //    const ss = emu.s_dsp.state;
-    //
-    //    const fir = [8]u8 {
-    //        @bitCast(ss.echo.fir[0]), @bitCast(ss.echo.fir[1]),
-    //        @bitCast(ss.echo.fir[2]), @bitCast(ss.echo.fir[3]),
-    //        @bitCast(ss.echo.fir[4]), @bitCast(ss.echo.fir[5]),
-    //        @bitCast(ss.echo.fir[6]), @bitCast(ss.echo.fir[7])
-    //    };
-    //
-    //    print("\n", .{});
-    //    print("history index: {X:0>1}           fir: {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2}\n", .{
-    //        s._echo._history_offset,
-    //        fir[0], fir[1], fir[2], fir[3],
-    //        fir[4], fir[5], fir[6], fir[7],
-    //    });
-    //
-    //    print("\n", .{});
-    //    print("intermediate fir calculations:\n", .{});
-    //
-    //    var c_hist_left:  [8]u17 = undefined;
-    //    var c_hist_right: [8]u17 = undefined;
-    //
-    //    for (0..8) |i| {
-    //        c_hist_left[i]  = @bitCast(s._echo.__calc_history_left[i]);
-    //        c_hist_right[i] = @bitCast(s._echo.__calc_history_right[i]);
-    //    }
-    //
-    //    const c_final_left:  u17 = @bitCast(s._echo.__calc_final_left);
-    //    const c_final_right: u17 = @bitCast(s._echo.__calc_final_right);
-    //
-    //    print("      left:  {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} | {X:0>5}\n", .{
-    //        c_hist_left[0], c_hist_left[1], c_hist_left[2], c_hist_left[3],
-    //        c_hist_left[4], c_hist_left[5], c_hist_left[6], c_hist_left[7], c_final_left
-    //    });
-    //    print("      right: {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} {X:0>5} | {X:0>5}\n", .{
-    //        c_hist_right[0], c_hist_right[1], c_hist_right[2], c_hist_right[3],
-    //        c_hist_right[4], c_hist_right[5], c_hist_right[6], c_hist_right[7], c_final_right
-    //    });
-    //}
-
     print("\x1B[0m", .{});
 }
 
@@ -2109,7 +2171,7 @@ pub var is_error:   bool = false;
 pub var cur_info_msg: u8 = 0;
 pub var cur_err_msg:  u8 = 0;
 
-var info_msgs: [10][]const u8 = [_][]const u8 {
+var info_msgs: [13][]const u8 = [_][]const u8 {
     "Enter h to see help menu",
     "Breakpoint hit. Press enter",
     "\x1B[91mScript700 timed out - see above",
@@ -2119,8 +2181,13 @@ var info_msgs: [10][]const u8 = [_][]const u8 {
     "not enough memory to resize data area.",
     "script area fetch went out of bounds.",
     "script area bytecode is too large.",
-    "unknown error."
+    "unknown error.",
+    "Channel ? enabled     [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]",
+    "Channel ? disabled    [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]",
+    "All channels enabled  [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]"
 };
+
+var chan_display_state: [8]bool = [_]bool{true} ** 8;
 
 pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     var final_buffer: [max_lines * 257]u8 = undefined;
@@ -2148,11 +2215,37 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
         );
     }
     else {
+        var buf: [256]u8 = undefined;
+        const len = info_msgs[cur_info_msg].len;
+
+        @memcpy(buf[0..len], info_msgs[cur_info_msg]);
+
+        if (cur_info_msg == 10 or cur_info_msg == 11) {
+            if (cur_err_msg >= 1 and cur_err_msg <= 8) {
+                buf[8] = cur_err_msg + '0';
+            }
+            chan_display_state[cur_err_msg - 1] = cur_info_msg == 10;
+
+            for (0..8) |c| {
+                if (!chan_display_state[c]) {
+                    const cc: u32 = @intCast(c);
+                    const s_idx = 28 + 6 * cc;
+                    buf[s_idx] = '-';
+                    buf[s_idx - 2] = '0';
+                }
+            }
+        }
+        else if (cur_info_msg == 12) {
+            for (0..8) |c| {
+                chan_display_state[c] = true;
+            }
+        }
+
         std.debug.print(
             "\x1B[H{s}\r\x1B[93m{s}\x1B[39m\n> ",
             .{
                 final_buffer[0 .. (total_chars - 1)],
-                info_msgs[cur_info_msg]
+                buf[0..len]
             }
         );
     }
