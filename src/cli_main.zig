@@ -709,6 +709,10 @@ fn run_loop(emu: *Emu) !bool {
             set_msg(11, v_idx, false);
         }
     }
+    else if (v_idx == 10) {
+        t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
+        emu.pipeline_2.toggle_main();
+    }
 
     var stdout_writer = stdout_file.writer();
 
@@ -757,10 +761,10 @@ fn show_help_menu() void {
     db.print("    u  = Shift memory view up one row \n", .{});
     db.print("    d  = Shift memory view down one row \n", .{});
     db.print(" Other: \n", .{});
-    db.print("    0  = Enable all channels \n", .{});
-    db.print("   1-8 = Toggle channel # output \n", .{});
     db.print("    h  = Bring up this menu \n", .{});
     db.print("    m  = View ID666 metadata \n", .{});
+    db.print("   1-8 = Toggle channel # output \n", .{});
+    db.print("    0  = Enable all channels \n", .{});
     db.print("    q  = Quit \n", .{});
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n\n", .{});
     db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
@@ -834,6 +838,9 @@ fn break_listener() void {
                             },
                             '1', '2', '3', '4', '5', '6', '7', '8' => {
                                 t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
+                            },
+                            'f' => {
+                                t_voice_toggle.store(10, std.builtin.AtomicOrder.seq_cst);
                             },
                             'v', 'r', 'e', 'b', '9', 'u', 'd', 'n', 'p' => {
                                 cur_mode = buffer[0];

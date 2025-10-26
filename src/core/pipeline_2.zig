@@ -42,6 +42,7 @@ pub const Pipeline2 = struct {
 
         disable_surround:    bool = false,
         disable_fir:         bool = false,
+        disable_main:        bool = false,
         disable_echo:        bool = false,
         disable_pitch_mod:   bool = false,
         disable_noise:       bool = false,
@@ -128,6 +129,26 @@ pub const Pipeline2 = struct {
     pub fn enable_voice(self: *Pipeline2, index: u3) void {
         self.enabled = true;
         self.settings.channels_enabled[index] = true;
+        self.check_settings();
+    }
+
+    pub fn toggle_main(self: *Pipeline2) void {
+        if (self.settings.disable_main) {
+            self.enable_main();
+        }
+        else {
+            self.disable_main();
+        }
+    }
+
+    pub fn disable_main(self: *Pipeline2) void {
+        self.enabled = true;
+        self.settings.disable_main = true;
+    }
+
+    pub fn enable_main(self: *Pipeline2) void {
+        self.enabled = true;
+        self.settings.disable_main = false;
         self.check_settings();
     }
 
@@ -290,7 +311,7 @@ pub const Pipeline2 = struct {
 
             e.out_left[i]  = i16_to_f64(@intCast(out_left));
             e.out_right[i] = i16_to_f64(@intCast(out_right));
-            
+
             var left:  i17 = @intCast(e_sum_left);  
             var right: i17 = @intCast(e_sum_right);
             left  +%= @as(i17,  fb_left);
@@ -302,10 +323,19 @@ pub const Pipeline2 = struct {
             e.write_left[i]  = i16_to_f64(write_left);
             e.write_right[i] = i16_to_f64(write_right);
 
-            var dac_left_i17:  i17 = @intCast(sum_left);
-            var dac_right_i17: i17 = @intCast(sum_right);
-            dac_left_i17  +%= out_left;
-            dac_right_i17 +%= out_right;
+            var dac_left_i17:  i17 = undefined;
+            var dac_right_i17: i17 = undefined;
+
+            if (self.settings.disable_main) {
+                dac_left_i17  = @intCast(out_left);
+                dac_right_i17 = @intCast(out_right);
+            }
+            else {
+                dac_left_i17  = @intCast(sum_left);
+                dac_right_i17 = @intCast(sum_right);
+                dac_left_i17  +%= out_left;
+                dac_right_i17 +%= out_right;
+            }
 
             self.dac_left[i]  = i16_to_f64(@intCast(clamp_i16(i17, dac_left_i17)));
             self.dac_right[i] = i16_to_f64(@intCast(clamp_i16(i17, dac_right_i17)));
@@ -365,6 +395,10 @@ pub const Pipeline2 = struct {
     }
 
     fn check_settings(self: *Pipeline2) void {
+        if (self.settings.disable_main) {
+            return;
+        }
+
         for (0..8) |c| {
             if (!self.settings.channels_enabled[c]) {
                 return;
