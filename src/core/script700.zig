@@ -28,7 +28,7 @@ pub const Script700 = struct {
     pub const default_bytecode: [1]u32 = [1]u32 {0x80FFFFFF}; // Preload with single Quit instruction
     pub var   default_data:     [0]u8  = [0]u8  { };
 
-    const allocator = std.heap.page_allocator;
+    pub const allocator = std.heap.page_allocator;
 
     emu: *Emu,
 
@@ -84,7 +84,7 @@ pub const Script700 = struct {
 
     pub const Load = error { bytecode_too_large };
 
-    pub fn load_bytecode(self: *Script700, script_bytecode: []u32) Load! void {
+    pub fn load_bytecode(self: *Script700, script_bytecode: []const u32) Load! void {
         if (script_bytecode.len > 0x1000_0000) {
             // Script bytecode cannot be more than 0x10000000 32-bit words (or 1 GB of data)
             return Load.bytecode_too_large;

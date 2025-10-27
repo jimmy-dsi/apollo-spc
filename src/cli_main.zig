@@ -4,12 +4,13 @@ const Atomic = std.atomic.Value;
 
 const db = @import("debug.zig");
 
-const Emu          = @import("core/emu.zig").Emu;
-const SDSP         = @import("core/s_dsp.zig").SDSP;
-const SSMP         = @import("core/s_smp.zig").SSMP;
-const SPCState     = @import("core/spc_state.zig").SPCState;
-const Script700    = @import("core/script700.zig").Script700;
-const SongMetadata = @import("core/song_metadata.zig").SongMetadata;
+const Emu             = @import("core/emu.zig").Emu;
+const SDSP            = @import("core/s_dsp.zig").SDSP;
+const SSMP            = @import("core/s_smp.zig").SSMP;
+const SPCState        = @import("core/spc_state.zig").SPCState;
+const Script700       = @import("core/script700.zig").Script700;
+const Script700Loader = @import("core/script700_loader.zig").Script700Loader;
+const SongMetadata    = @import("core/song_metadata.zig").SongMetadata;
 
 const spc_loader = @import("core/spc_loader.zig");
 
@@ -84,6 +85,8 @@ pub fn main() !void {
     var cur_mode: u8 = 'i';
     var cur_action: u8 = 's';
 
+    const file_alloc = std.heap.page_allocator;
+
     // Load SPC file from path if present
     if (spc_file_path) |path| {
         var file = std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch {
@@ -94,8 +97,6 @@ pub fn main() !void {
         defer file.close();
 
         const file_size = try file.getEndPos();
-
-        const file_alloc = std.heap.page_allocator;
         const buffer = try file_alloc.alloc(u8, file_size);
         //defer allocator.free(buffer); // The entire app appears to just die after exiting scope if this is uncommented. No idea why
 
@@ -107,10 +108,10 @@ pub fn main() !void {
             std.process.exit(1);
         }
 
-        std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
+        //std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
         db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
 
-        show_metadata();
+        //show_metadata();
 
         if (script700_load_error) |err| {
             report_error(err, true);
@@ -124,6 +125,57 @@ pub fn main() !void {
     if (metadata == null) {
         std.debug.print("error: SPC file not provided\n", .{});
         std.process.exit(1);
+    }
+
+    const L = spc_file_path.?.len;
+    var script700_bin_path = try file_alloc.alloc(u8, L + 4);
+    @memcpy(script700_bin_path[0..L], spc_file_path.?);
+
+    var file_path_adjusted = false;
+
+    if (L >= 4) {
+        var script700_bin_path_lower = try file_alloc.alloc(u8, L + 4);
+        _ = std.ascii.lowerString(script700_bin_path_lower, script700_bin_path);
+
+        if (std.mem.eql(u8, script700_bin_path_lower[(L - 4) .. L], ".spc")) {
+            // Replace extension in above path
+            script700_bin_path[L - 3] = '7';
+            script700_bin_path[L - 2] = 's';
+            script700_bin_path[L - 1] = 'b';
+
+            file_path_adjusted = true;
+        }
+    }
+
+    var new_length = L;
+
+    if (!file_path_adjusted) {
+        // Append '.7sb' extension if file path does not end with '.spc'
+        script700_bin_path[L]     = '.';
+        script700_bin_path[L + 1] = '7';
+        script700_bin_path[L + 2] = 's';
+        script700_bin_path[L + 3] = 'b';
+
+        new_length +%= 4;
+    }
+
+    // Load script700 file if it exists
+    const script700_file: ?std.fs.File = std.fs.cwd().openFile(script700_bin_path, .{ .mode = .read_only }) catch null;
+
+    if (script700_file) |s7f| {
+        defer s7f.close();
+
+        const file_size = try s7f.getEndPos();
+        const buffer    = try file_alloc.alloc(u8, file_size);
+
+        _ = try s7f.readAll(buffer);
+
+        try Script700Loader.load_script(&emu.script700, buffer);
+    }
+
+    defer Script700.deinit(&emu.script700);
+    if (script700_file) |_| {
+        emu.script700.enabled = true; // Enable Script700 if load is successful
     }
 
     const stdin = std.io.getStdIn().reader();
