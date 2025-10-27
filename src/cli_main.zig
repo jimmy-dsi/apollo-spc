@@ -108,10 +108,10 @@ pub fn main() !void {
             std.process.exit(1);
         }
 
-        //std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
+        std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
         db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
 
-        //show_metadata();
+        show_metadata();
 
         if (script700_load_error) |err| {
             report_error(err, true);
