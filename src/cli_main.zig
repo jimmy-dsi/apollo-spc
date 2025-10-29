@@ -49,6 +49,7 @@ pub fn main() !void {
 
     var spc_file_path: ?[]const u8 = null;
     var debug_mode: bool = false;
+    var parse_script700: bool = false;
 
     var i: usize = 0;
     while (args.next()) |arg| {
@@ -59,6 +60,9 @@ pub fn main() !void {
             const str: []const u8 = arg;
             if (std.mem.eql(u8, str, "--debug") or std.mem.eql(u8, str, "-d")) {
                 debug_mode = true;
+            }
+            else if (std.mem.eql(u8, str, "--script700")) {
+                parse_script700 = true;
             }
         }
         i += 1;
@@ -73,6 +77,15 @@ pub fn main() !void {
         Script700.new(&emu),
     );
     defer emu.script700.deinit();
+
+    if (parse_script700) {
+        _ = try compile_script700();
+
+        
+
+        //alloc.free(bin_data);
+        std.process.exit(0);
+    }
 
     var script700_load_error: ?anyerror = null;
     script700_load_error = null;
@@ -1060,6 +1073,361 @@ fn print_instruction(emu: *const Emu, state: *const SPCState) void {
     db.print("\x1B[49m", .{}); // Reset color
 
     flush(null, true);
+}
+
+const ParseMode = enum {
+    script, data
+};
+
+const alloc = std.heap.page_allocator;
+
+fn compile_script700() ![]const u8 {
+    const stdin = std.io.getStdIn().reader();
+    var buffer: [40]u8 = undefined;
+
+    var mode = ParseMode.script;
+
+    var bin_data = std.ArrayList(u8).init(alloc);
+    defer bin_data.deinit();
+
+    // Pre-initialize with label address table
+    for (0..1024) |_| {
+        inline for (0..4) |_| {
+            try bin_data.append(0xFF);
+        }
+    }
+
+    const script_size_offset: u32 = @intCast(bin_data.items.len);
+    // Allocate 4 bytes for where the script size will be stored
+    inline for (0..4) |_| {
+        try bin_data.append(0x00);
+    }
+
+    var bytes: [4][4]u8 = undefined;
+
+    var instr_size: u32 = 1;
+    var first_iter = true;
+
+    //var nybble_buffer: [2]u4 = [_]u4 {0, 0};
+    //var nybble_parity: u1 = 0;
+
+    var pc: u32 = 0;
+
+    while (true) {
+        _token_parse_end = 0;
+        const str = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+
+        if (str.?.len == 0 or std.mem.eql(u8, str.?, "\r\n") or std.mem.eql(u8, str.?, "\n")) {
+            if (mode == ParseMode.script) {
+                for (bytes, 0..) |bb, k| {
+                    if (instr_size <= k) {
+                        break;
+                    }
+                    for (0..4) |i| {
+                        try bin_data.append(bb[i]);
+                    }
+                }
+
+                const size_bytes = u32le_to_u8_array(pc);
+                inline for (0..4) |x| {
+                    bin_data.items[script_size_offset +% x] = size_bytes[x];
+                }
+
+                for (0..1025) |L| {
+                    const lab = u8_array_to_u32le(bin_data.items[(4 * L)..]);
+                    std.debug.print("{X:0>8} ", .{lab});
+                    if (L % 8 == 7) {
+                        std.debug.print("\n", .{});
+                    }
+                }
+
+                var x: u32 = 0;
+                while (x < pc) {
+                    const num = u8_array_to_u32le(bin_data.items[(4096 + 4 + x * 4) .. (4096 + 4 + x * 4 + 4)]);
+                    std.debug.print("{X:0>8} ", .{num});
+                    if (x % 8 == 6) {
+                        std.debug.print("\n", .{});
+                    }
+
+                    x += 1;
+                }
+
+                first_iter = true;
+                mode = ParseMode.data;
+            }
+            else if (mode == ParseMode.data) {
+                break;
+            }
+        }
+        else if (mode == .script) {
+            const mnemonic = next_token(str.?);
+
+            if (!first_iter and (mnemonic == null or mnemonic.?.len < 2 or mnemonic.?.len >= 2 and mnemonic.?[0] != ':')) {
+                for (bytes, 0..) |bb, k| {
+                    if (instr_size <= k) {
+                        break;
+                    }
+                    for (0..4) |i| {
+                        try bin_data.append(bb[i]);
+                    }
+                }
+            }
+
+            instr_size = 1;
+
+            //std.debug.print("Mnemonic: '{s}'\n", .{mnemonic.?});
+            //std.time.sleep(3 * std.time.ns_per_s);
+
+            if (mnemonic == null) {
+                continue;
+            }
+            else if (mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
+                var label_num = std.fmt.parseInt(i32, mnemonic.?[1..], 10) catch -1;
+
+                if (label_num < 0) {
+                    continue;
+                }
+
+                label_num &= 1023;
+                const label_start: u32 = @intCast(label_num * 4);
+
+                inline for (0..4) |i| {
+                    const ii: u32 = @intCast(i);
+                    bin_data.items[label_start +% ii] = @intCast(pc >> ii * 8 & 0xFF);
+                }
+
+                //for (0..1024) |L| {
+                //    const lab = u8_array_to_u32le(bin_data.items[(4 * L)..]);
+                //    std.debug.print("{X:0>8} ", .{lab});
+                //    if (L % 8 == 7) {
+                //        std.debug.print("\n", .{});
+                //    }
+                //}
+
+                continue;
+            }
+
+            first_iter = false;
+
+            // Set both instructions to NOP tentatively
+            var w: [4]u32 = .{
+                0x8000_0000,
+                0x8000_0000,
+                0x8000_0000,
+                0x8000_0000
+            };
+
+            var w_slc: ?[]u32 = null;
+
+            const prefix_value = next_token(str.?);
+
+            //std.debug.print("Prefix value: '{s}'\n", .{prefix_value.?});
+            //std.time.sleep(3 * std.time.ns_per_s);
+
+            if (prefix_value == null) {
+                w_slc = try Script700.compile_instruction(&w, mnemonic.?, .{});
+                for (w_slc.?, 0..) |word, i| {
+                    bytes[i] = u32le_to_u8_array(word);
+                    std.debug.print("{X:0>8} ", .{word});
+                }
+
+                std.debug.print("\n", .{});
+                instr_size = @intCast(w_slc.?.len);
+
+                pc +%= @intCast(w_slc.?.len);
+
+                continue;
+            }
+
+            const prefix, const value = split_token(prefix_value.?);
+
+            const next = next_token(str.?);
+            if (next == null) {
+                w_slc = try Script700.compile_instruction(&w, mnemonic.?, .{
+                    .oper_1_prefix = prefix.?,
+                    .oper_1_value = value
+                });
+
+                for (w_slc.?, 0..) |word, i| {
+                    bytes[i] = u32le_to_u8_array(word);
+                    std.debug.print("{X:0>8} ", .{word});
+                }
+
+                std.debug.print("\n", .{});
+                instr_size = @intCast(w_slc.?.len);
+
+                pc +%= @intCast(w_slc.?.len);
+
+                continue;
+            }
+
+            var operator: ?u8 = null;
+
+            if (next.?.len == 1) {
+                operator = switch (next.?[0]) {
+                    '+', '-', '*', '/', '\\', '%', '$', '&', '|', '^', '<', '_', '>', '!' => next.?[0],
+                    else => null
+                };
+            }
+
+            var prefix_2: ?[]const u8 = null;
+            var value_2:  ?u32        = null;
+
+            var prefix_value_2: ?[]const u8 = null;
+
+            if (operator == null) {
+                prefix_value_2 = next.?;
+
+                //std.debug.print("Prefix value 2: '{s}'\n", .{prefix_value_2.?});
+                //std.time.sleep(3 * std.time.ns_per_s);
+            }
+            else {
+                prefix_value_2 = next_token(str.?);
+            }
+            
+            prefix_2, value_2 = split_token(prefix_value_2.?);
+
+            w_slc = try Script700.compile_instruction(&w, mnemonic.?, .{
+                .oper_1_prefix = prefix, .oper_1_value = value,
+                .operator = operator, .oper_2_prefix = prefix_2, .oper_2_value = value_2
+            });
+
+            for (w_slc.?, 0..) |word, i| {
+                bytes[i] = u32le_to_u8_array(word);
+                std.debug.print("{X:0>8} ", .{word});
+            }
+
+            instr_size = @intCast(w_slc.?.len);
+            std.debug.print("\n", .{});
+
+            pc +%= @intCast(w_slc.?.len);
+        }
+        else {
+            const data_byte_str = next_token(str.?);
+            if (data_byte_str) |dbs| {
+                const data_byte = try std.fmt.parseInt(u8, dbs, 16);
+                try bin_data.append(data_byte);
+            }
+        }
+    }
+
+    var final_data = try alloc.alloc(u8, bin_data.items.len);
+
+    for (bin_data.items, 0..) |b, i| {
+        final_data[i] = b;
+    }
+    
+    return final_data;
+}
+
+var _token_parse_end: u32 = 0;
+
+fn next_token(buffer: []const u8) ?[]const u8 {
+    const buf_ = buffer[_token_parse_end ..];
+
+    var start_found = false;
+    
+    var start: u32 = 0;
+    var end:   u32 = 0;
+
+    for (buf_, 0..) |b, i| {
+        if (b != ' ' and b != '\t' and b != '\r' and b != '\n') {
+            start = @intCast(i);
+            start_found = true;
+            break;
+        }
+    }
+
+    if (!start_found) {
+        return null;
+    }
+
+    for (start..buf_.len) |i| {
+        if (buf_[i] == ' ' or buf_[i] == '\t' or buf_[i] == '\r' or buf_[i] == '\n') {
+            end = @intCast(i);
+            break;
+        }
+    }
+
+    if (end == 0) {
+        end = @intCast(buf_.len);
+    }
+
+    _token_parse_end +%= end;
+
+    return buf_[start .. end];
+}
+
+fn split_token(str: []const u8) struct { ?[]const u8,
+                                         ?u32         }
+{
+    var prefix: ?[]const u8 = null;
+    var value:  ?u32        = null;
+
+    var split_index: u32 = 0;
+    var num_found = false;
+
+    for (str, 0..) |c, i| {
+        if (c == '$' or c >= '0' and c <= '9') {
+            split_index = @intCast(i);
+            num_found = true;
+            break;
+        }
+    }
+
+    if (!num_found) {
+        split_index = @intCast(str.len);
+    }
+
+    prefix = str[0..split_index];
+    var num_index = split_index;
+
+    var is_hex = false;
+
+    if (num_found) {
+        if (str[split_index] == '$') {
+            num_index +%= 1;
+            is_hex = true;
+        }
+        else if (str.len >= 2 and std.mem.eql(u8, str[split_index .. (split_index + 2)], "0x")) {
+            num_index +%= 2;
+            is_hex = true;
+        }
+
+        if (is_hex) {
+            value = std.fmt.parseInt(u32, str[num_index..], 16) catch null;
+        }
+        else {
+            value = std.fmt.parseInt(u32, str[num_index..], 10) catch null;
+        }
+    }
+
+    return .{
+        prefix,
+        if (str[num_index..].len == 0) null else value
+    };
+}
+
+fn u32le_to_u8_array(in: u32) [4]u8 {
+    var arr: [4]u8 = undefined;
+
+    inline for (0..4) |b| {
+        const bb: u32 = @intCast(b);
+        arr[b] = @intCast(in >> bb * 8 & 0xFF);
+    }
+
+    return arr;
+}
+
+fn u8_array_to_u32le(in: []const u8) u32 {
+    var res: u32 = 0;
+
+    inline for (0..4) |b| {
+        const bb: u32 = @intCast(b);
+        res |= @as(u32, in[b]) << bb * 8;
+    }
+
+    return res;
 }
 
 fn quit() void {
