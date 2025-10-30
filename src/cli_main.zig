@@ -78,12 +78,49 @@ pub fn main() !void {
     );
     defer emu.script700.deinit();
 
-    if (parse_script700) {
-        _ = try compile_script700();
+    const file_alloc = std.heap.page_allocator;
 
-        
+    if (parse_script700 and spc_file_path != null) {
+        const bin_data = try compile_script700();
+        defer alloc.free(bin_data);
 
-        //alloc.free(bin_data);
+        const L = spc_file_path.?.len;
+
+        var script700_src_path = try file_alloc.alloc(u8, L + 4);
+        defer alloc.free(script700_src_path);
+        @memcpy(script700_src_path[0..L], spc_file_path.?);
+
+        var file_path_adjusted = false;
+
+        if (L >= 4) {
+            var script700_src_path_lower = try file_alloc.alloc(u8, L + 4);
+            defer alloc.free(script700_src_path_lower);
+            _ = std.ascii.lowerString(script700_src_path_lower, script700_src_path);
+
+            if (std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".spc")) {
+                // Replace extension in above path
+                script700_src_path[L - 3] = '7';
+                script700_src_path[L - 2] = 's';
+                script700_src_path[L - 1] = 'b';
+
+                file_path_adjusted = true;
+            }
+        }
+
+        if (!file_path_adjusted) {
+            // Append '.700' extension if file path does not end with '.spc'
+            script700_src_path[L]     = '.';
+            script700_src_path[L + 1] = '7';
+            script700_src_path[L + 2] = 's';
+            script700_src_path[L + 3] = 'b';
+        }
+
+        // Write out to script700 file and replace it if it exists
+        var file = try std.fs.cwd().createFile(script700_src_path, .{});
+        defer file.close();
+
+        try file.writeAll(bin_data);
+
         std.process.exit(0);
     }
 
@@ -97,8 +134,6 @@ pub fn main() !void {
     var cur_offset: u8 = 0x00;
     var cur_mode: u8 = 'i';
     var cur_action: u8 = 's';
-
-    const file_alloc = std.heap.page_allocator;
 
     // Load SPC file from path if present
     if (spc_file_path) |path| {
@@ -142,12 +177,14 @@ pub fn main() !void {
 
     const L = spc_file_path.?.len;
     var script700_bin_path = try file_alloc.alloc(u8, L + 4);
+    defer alloc.free(script700_bin_path);
     @memcpy(script700_bin_path[0..L], spc_file_path.?);
 
     var file_path_adjusted = false;
 
     if (L >= 4) {
         var script700_bin_path_lower = try file_alloc.alloc(u8, L + 4);
+        defer alloc.free(script700_bin_path_lower);
         _ = std.ascii.lowerString(script700_bin_path_lower, script700_bin_path);
 
         if (std.mem.eql(u8, script700_bin_path_lower[(L - 4) .. L], ".spc")) {
@@ -160,16 +197,12 @@ pub fn main() !void {
         }
     }
 
-    var new_length = L;
-
     if (!file_path_adjusted) {
         // Append '.7sb' extension if file path does not end with '.spc'
         script700_bin_path[L]     = '.';
         script700_bin_path[L + 1] = '7';
         script700_bin_path[L + 2] = 's';
         script700_bin_path[L + 3] = 'b';
-
-        new_length +%= 4;
     }
 
     // Load script700 file if it exists
@@ -1098,6 +1131,8 @@ fn compile_script700() ![]const u8 {
     }
 
     const script_size_offset: u32 = @intCast(bin_data.items.len);
+    var   data_size_offset:   u32 = undefined;
+
     // Allocate 4 bytes for where the script size will be stored
     inline for (0..4) |_| {
         try bin_data.append(0x00);
@@ -1108,10 +1143,8 @@ fn compile_script700() ![]const u8 {
     var instr_size: u32 = 1;
     var first_iter = true;
 
-    //var nybble_buffer: [2]u4 = [_]u4 {0, 0};
-    //var nybble_parity: u1 = 0;
-
     var pc: u32 = 0;
+    var dc: u32 = 0;
 
     while (true) {
         _token_parse_end = 0;
@@ -1133,24 +1166,33 @@ fn compile_script700() ![]const u8 {
                     bin_data.items[script_size_offset +% x] = size_bytes[x];
                 }
 
-                for (0..1025) |L| {
-                    const lab = u8_array_to_u32le(bin_data.items[(4 * L)..]);
-                    std.debug.print("{X:0>8} ", .{lab});
-                    if (L % 8 == 7) {
-                        std.debug.print("\n", .{});
-                    }
+                //for (0..1025) |L| {
+                //    const lab = u8_array_to_u32le(bin_data.items[(4 * L)..]);
+                //    std.debug.print("{X:0>8} ", .{lab});
+                //    if (L % 8 == 7) {
+                //        std.debug.print("\n", .{});
+                //    }
+                //}
+
+                //var x: u32 = 0;
+                //while (x < pc) {
+                //    const num = u8_array_to_u32le(bin_data.items[(4096 + 4 + x * 4) .. (4096 + 4 + x * 4 + 4)]);
+                //    std.debug.print("{X:0>8} ", .{num});
+                //    if (x % 8 == 6) {
+                //        std.debug.print("\n", .{});
+                //    }
+                //
+                //    x += 1;
+                //}
+
+                data_size_offset = @intCast(bin_data.items.len);
+
+                // Allocate 4 bytes for where the data size will be stored
+                inline for (0..4) |_| {
+                    try bin_data.append(0x00);
                 }
 
-                var x: u32 = 0;
-                while (x < pc) {
-                    const num = u8_array_to_u32le(bin_data.items[(4096 + 4 + x * 4) .. (4096 + 4 + x * 4 + 4)]);
-                    std.debug.print("{X:0>8} ", .{num});
-                    if (x % 8 == 6) {
-                        std.debug.print("\n", .{});
-                    }
-
-                    x += 1;
-                }
+                dc = 0;
 
                 first_iter = true;
                 mode = ParseMode.data;
@@ -1159,9 +1201,34 @@ fn compile_script700() ![]const u8 {
                 break;
             }
         }
-        else if (mode == .script) {
-            const mnemonic = next_token(str.?);
 
+        const mnemonic = peek_token(str.?);
+        
+        if (mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
+            _ = next_token(str.?);
+            var label_num = std.fmt.parseInt(i32, mnemonic.?[1..], 10) catch -1;
+
+            if (label_num < 0) {
+                continue;
+            }
+
+            label_num &= 1023;
+            const label_start: u32 = @intCast(label_num * 4);
+
+            inline for (0..4) |i| {
+                const ii: u32 = @intCast(i);
+                if (mode == .script) {
+                    bin_data.items[label_start +% ii] = @intCast(pc >> ii * 8 & 0xFF);
+                }
+                else {
+                    bin_data.items[label_start +% ii] = @intCast((0x8000_0000 +% dc) >> ii * 8 & 0xFF);
+                }
+            }
+
+            continue;
+        }
+        else if (mode == .script) {
+            _ = next_token(str.?);
             if (!first_iter and (mnemonic == null or mnemonic.?.len < 2 or mnemonic.?.len >= 2 and mnemonic.?[0] != ':')) {
                 for (bytes, 0..) |bb, k| {
                     if (instr_size <= k) {
@@ -1175,35 +1242,7 @@ fn compile_script700() ![]const u8 {
 
             instr_size = 1;
 
-            //std.debug.print("Mnemonic: '{s}'\n", .{mnemonic.?});
-            //std.time.sleep(3 * std.time.ns_per_s);
-
             if (mnemonic == null) {
-                continue;
-            }
-            else if (mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
-                var label_num = std.fmt.parseInt(i32, mnemonic.?[1..], 10) catch -1;
-
-                if (label_num < 0) {
-                    continue;
-                }
-
-                label_num &= 1023;
-                const label_start: u32 = @intCast(label_num * 4);
-
-                inline for (0..4) |i| {
-                    const ii: u32 = @intCast(i);
-                    bin_data.items[label_start +% ii] = @intCast(pc >> ii * 8 & 0xFF);
-                }
-
-                //for (0..1024) |L| {
-                //    const lab = u8_array_to_u32le(bin_data.items[(4 * L)..]);
-                //    std.debug.print("{X:0>8} ", .{lab});
-                //    if (L % 8 == 7) {
-                //        std.debug.print("\n", .{});
-                //    }
-                //}
-
                 continue;
             }
 
@@ -1221,17 +1260,12 @@ fn compile_script700() ![]const u8 {
 
             const prefix_value = next_token(str.?);
 
-            //std.debug.print("Prefix value: '{s}'\n", .{prefix_value.?});
-            //std.time.sleep(3 * std.time.ns_per_s);
-
             if (prefix_value == null) {
                 w_slc = try Script700.compile_instruction(&w, mnemonic.?, .{});
                 for (w_slc.?, 0..) |word, i| {
                     bytes[i] = u32le_to_u8_array(word);
-                    std.debug.print("{X:0>8} ", .{word});
                 }
 
-                std.debug.print("\n", .{});
                 instr_size = @intCast(w_slc.?.len);
 
                 pc +%= @intCast(w_slc.?.len);
@@ -1250,10 +1284,8 @@ fn compile_script700() ![]const u8 {
 
                 for (w_slc.?, 0..) |word, i| {
                     bytes[i] = u32le_to_u8_array(word);
-                    std.debug.print("{X:0>8} ", .{word});
                 }
 
-                std.debug.print("\n", .{});
                 instr_size = @intCast(w_slc.?.len);
 
                 pc +%= @intCast(w_slc.?.len);
@@ -1277,9 +1309,6 @@ fn compile_script700() ![]const u8 {
 
             if (operator == null) {
                 prefix_value_2 = next.?;
-
-                //std.debug.print("Prefix value 2: '{s}'\n", .{prefix_value_2.?});
-                //std.time.sleep(3 * std.time.ns_per_s);
             }
             else {
                 prefix_value_2 = next_token(str.?);
@@ -1294,21 +1323,28 @@ fn compile_script700() ![]const u8 {
 
             for (w_slc.?, 0..) |word, i| {
                 bytes[i] = u32le_to_u8_array(word);
-                std.debug.print("{X:0>8} ", .{word});
             }
 
             instr_size = @intCast(w_slc.?.len);
-            std.debug.print("\n", .{});
 
             pc +%= @intCast(w_slc.?.len);
         }
         else {
-            const data_byte_str = next_token(str.?);
-            if (data_byte_str) |dbs| {
+            var data_byte_str = next_token(str.?);
+
+            while (data_byte_str) |dbs| {
                 const data_byte = try std.fmt.parseInt(u8, dbs, 16);
                 try bin_data.append(data_byte);
+                dc +%= 1;
+
+                data_byte_str = next_token(str.?);
             }
         }
+    }
+
+    const data_bytes = u32le_to_u8_array(dc);
+    inline for (0..4) |x| {
+        bin_data.items[data_size_offset +% x] = data_bytes[x];
     }
 
     var final_data = try alloc.alloc(u8, bin_data.items.len);
@@ -1354,6 +1390,40 @@ fn next_token(buffer: []const u8) ?[]const u8 {
     }
 
     _token_parse_end +%= end;
+
+    return buf_[start .. end];
+}
+
+fn peek_token(buffer: []const u8) ?[]const u8 {
+    const buf_ = buffer[_token_parse_end ..];
+
+    var start_found = false;
+    
+    var start: u32 = 0;
+    var end:   u32 = 0;
+
+    for (buf_, 0..) |b, i| {
+        if (b != ' ' and b != '\t' and b != '\r' and b != '\n') {
+            start = @intCast(i);
+            start_found = true;
+            break;
+        }
+    }
+
+    if (!start_found) {
+        return null;
+    }
+
+    for (start..buf_.len) |i| {
+        if (buf_[i] == ' ' or buf_[i] == '\t' or buf_[i] == '\r' or buf_[i] == '\n') {
+            end = @intCast(i);
+            break;
+        }
+    }
+
+    if (end == 0) {
+        end = @intCast(buf_.len);
+    }
 
     return buf_[start .. end];
 }
