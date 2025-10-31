@@ -1148,7 +1148,7 @@ fn compile_script700() ![]const u8 {
 
     while (true) {
         _token_parse_end = 0;
-        const str = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+        const str: ?[]const u8 = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
         if (str.?.len == 0 or std.mem.eql(u8, str.?, "\r\n") or std.mem.eql(u8, str.?, "\n")) {
             if (mode == ParseMode.script) {
@@ -1203,7 +1203,7 @@ fn compile_script700() ![]const u8 {
         }
 
         const mnemonic = peek_token(str.?);
-        
+    
         if (mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
             _ = next_token(str.?);
             var label_num = std.fmt.parseInt(i32, mnemonic.?[1..], 10) catch -1;
