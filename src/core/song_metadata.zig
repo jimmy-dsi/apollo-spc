@@ -673,85 +673,87 @@ const ID666Fmt = enum {
 };
 
 fn determine_format(id666_main_pt2: []const u8) ID666Fmt {
-    var binary_score: i32 = 0;
+    const id6 = id666_main_pt2;
 
-    const date = id666_main_pt2[0..11];
-    if (std.mem.allEqual(u8, date[4..], 0x00) or std.mem.allEqual(u8, date[4..], 0xFF)) {
-        binary_score += 3;
-    }
-    else if (std.mem.allEqual(u8, date[4..10], date[4])) {
-        if (date[4] < 0x20 or date[4] >= 0x7F) {
-            binary_score += 2;
-        }
-        else if (std.mem.allEqual(u8, date[0..4], date[4])) {
-            binary_score -= 1;
+    var text_score: u32 = 0;
+    var bin_score:  u32 = 0;
+
+    const date_field = id6[0..0xB];
+    if (field_exists(date_field)) {
+        if (is_valid_date(date_field)) {
+            text_score += 1;
         }
         else {
-            binary_score += 1;
+            bin_score += 1;
         }
     }
 
-    if (is_all_ascii(date[0..4])) {
-        binary_score -= 4;
+    const time_field = id6[0xB..0xE];
+    if (field_exists(time_field)) {
+        if (is_all_digits(time_field)) {
+            text_score += 1;
+        }
+        else {
+            bin_score += 1;
+        }
     }
 
-    if (is_all_digits(id666_main_pt2[11..14])) {
-        binary_score -= 1;
+    const fade_field = id6[0xE..0x13];
+    if (field_exists(fade_field)) {
+        if (is_all_digits(fade_field)) {
+            text_score += 1;
+        }
+        else {
+            bin_score += 1;
+        }
     }
-    else if (is_all_digits(id666_main_pt2[11..13]) and id666_main_pt2[13] == 0) {
-        binary_score -= 1;
+
+    const artist_field = id6[0xB1..0xD1];
+    if (field_exists(artist_field)) {
+        if (is_all_ascii(artist_field)) {
+            text_score += 1;
+        }
+        else {
+            bin_score += 1;
+        }
     }
-    else if (is_all_digits(id666_main_pt2[11..12]) and std.mem.allEqual(u8, id666_main_pt2[12..13], 0)) {
-        binary_score -= 1;
+
+    if (text_score > bin_score) {
+        return .text;
+    }
+    else if (bin_score > text_score) {
+        return .binary;
     }
     else {
-        binary_score += 6;
+        return .text; // Default to text (TODO: maybe add more conditions to narrow it down even further?)
+    }
+}
+
+fn is_ascii(c: u8) bool {
+    return c >= 0x20 and c <= 0x7E;
+}
+
+fn field_exists(slc: []const u8) bool {
+    for (slc) |c| {
+        if (c != 0) {
+            return true;
+        }
     }
 
-    if (is_all_digits(id666_main_pt2[14..19])) {
-        binary_score -= 4;
-    }
-    else if (is_all_digits(id666_main_pt2[14..18]) and id666_main_pt2[18] == 0) {
-        binary_score -= 3;
-    }
-    else if (is_all_digits(id666_main_pt2[14..17]) and std.mem.allEqual(u8, id666_main_pt2[17..18], 0)) {
-        binary_score -= 2;
-    }
-    else if (is_all_digits(id666_main_pt2[14..16]) and std.mem.allEqual(u8, id666_main_pt2[16..18], 0)) {
-        binary_score -= 1;
-    }
-    else if (is_all_digits(id666_main_pt2[14..15]) and std.mem.allEqual(u8, id666_main_pt2[15..18], 0)) {
-        binary_score -= 1;
-    }
-    else {
-        binary_score += 6;
-    }
-
-    if (id666_main_pt2[0xD2 - 0x9E] != 0x00) {
-        binary_score -= 2;
-    }
-    else {
-        binary_score += 4;
-    }
-
-    const emu_id = id666_main_pt2[(0xD2 - 0x9E)..(0xD3 - 0x9E)];
-    if (is_all_digits(emu_id)) {
-        binary_score -= 4;
-    }
-    else {
-        binary_score += 3;
-    }
-
-    return
-        if (binary_score >= 0)
-            ID666Fmt.binary
-        else
-            ID666Fmt.text;
+    return false;
 }
 
 fn is_all_ascii(slc: []const u8) bool {
+    var nul_found = false;
+
     for (slc) |c| {
-        if (c < 0x20 or c >= 0x7F) {
+        if (c == 0 and !nul_found) {
+            nul_found = true;
+        }
+        else if (c != 0 and nul_found) {
+            return false;
+        }
+        else if ((c < 0x20 or c >= 0x7F) and c != 0) {
             return false;
         }
     }
@@ -760,8 +762,34 @@ fn is_all_ascii(slc: []const u8) bool {
 }
 
 fn is_all_digits(slc: []const u8) bool {
+    var nul_found = false;
+
     for (slc) |c| {
-        if (c < '0' or c > '9') {
+        if (c == 0 and !nul_found) {
+            nul_found = true;
+        }
+        else if (c != 0 and nul_found) {
+            return false;
+        }
+        else if ((c < '0' or c > '9') and c != 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+fn is_valid_date(slc: []const u8) bool {
+    var nul_found = false;
+
+    for (slc) |c| {
+        if (c == 0 and !nul_found) {
+            nul_found = true;
+        }
+        else if (c != 0 and nul_found) {
+            return false;
+        }
+        else if ((c < '0' or c > '9') and c != '/' and c != '-' and c != 0) {
             return false;
         }
     }
