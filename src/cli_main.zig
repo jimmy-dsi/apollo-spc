@@ -949,7 +949,7 @@ fn break_listener() void {
                                 const main_only = t_main_only.load(std.builtin.AtomicOrder.seq_cst);
                                 t_main_only.store(!main_only, std.builtin.AtomicOrder.seq_cst);
                             },
-                            'v', 'r', 'e', 'b', '9', 'u', 'd', 'n', 'p' => {
+                            'v', 'r', 'e', 'b', '9', 'u', 'd', 'n', 'p' => { // Test
                                 cur_mode = buffer[0];
                                 prev_input = buffer[0];
 
