@@ -18,6 +18,7 @@ pub inline fn step_b(s: *DSPStateInternal, non: u8, eon: u8, brr_bank: u8) void 
         v.__echo_on  = @intCast(eon >> v_idx & 1);
     }
 
+    s.pipeline_2.echo.eon = eon;
     s._brr._bank = brr_bank;
 }
 

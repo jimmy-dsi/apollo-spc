@@ -2,6 +2,8 @@ const gauss    = @import("gauss.zig");
 const envelope = @import("envelope.zig");
 const brr      = @import("brr.zig");
 
+const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
+
 pub const DSPStateInternal = struct {
     pub const EnvMode = enum {
         key_off, attack, decay, release
@@ -53,14 +55,31 @@ pub const DSPStateInternal = struct {
         _address:        u16 = 0,
         _offset:         u16 = 0, // Current offset from ESA into echo buffer
         _length:         u16 = 0, // Length in bytes of echo buffer
-        _history_offset: u3  = 0
+        _history_offset: u3  = 0,
+
+        // Debug stuff
+        __fir_coefs_processed: u3 = 0,
+
+        __calc_history_left:  [8]i17 = [_]i17{0x00} ** 8,
+        __calc_history_right: [8]i17 = [_]i17{0x00} ** 8,
+
+        __calc_final_left:  i17 = 0,
+        __calc_final_right: i17 = 0,
     };
+
+    pipeline_2: *Pipeline2,
 
     // Output
     _main_out_left:  i17 = 0,
     _main_out_right: i17 = 0,
     _echo_out_left:  i17 = 0,
     _echo_out_right: i17 = 0,
+
+    __echo_out_left: i17 = 0, // Temporary/intermediate storage for left echo output level
+
+    // Final DAC output
+    _dac_left:  i17 = 0,
+    _dac_right: i17 = 0,
 
     // Misc. Internal state
     _brr:        BRR  = .{},
@@ -88,6 +107,9 @@ pub const DSPStateInternal = struct {
         const echo_out: *i17 =
             if (channel == 0) &self._echo_out_left
             else              &self._echo_out_right;
+
+        const out = [3]i16{self._output, 0, 0};
+        self.pipeline_2.voice_output(v_idx, out[0..], vol, channel);
 
         // Apply left/right volume
         const amp: i17 = @intCast(@as(i24, self._output) * @as(i24, vol) >> 7);
@@ -198,18 +220,15 @@ pub const DSPStateInternal = struct {
             v.__env_level = 0;
 
             // Disable BRR decoding until the last 3 samples
-            if (v._key_on_delay == 4 or v._key_on_delay == 2) {
+            v._gaussian_offset = 0;
+            v._key_on_delay -= 1;
+            if (v._key_on_delay & 3 != 0) {
                 // Begin gaussian offset 4 samples after BRR decoding position in ring buffer
                 v._gaussian_offset = 0x4000;
-            }
-            else {
-                v._gaussian_offset = 0;
             }
 
             // Internal pitch latch is reset to zero during KON and does not advance gaussian offset
             self._pitch = 0;
-
-            v._key_on_delay -= 1;
         }
 
         const output: i16 =
