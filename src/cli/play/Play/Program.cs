@@ -296,8 +296,10 @@ if (fwdArgs.Length >= 1) {
 	var scriptFile = Script700.ScriptFile(fwdArgs[0]);
 	Console.WriteLine(scriptFile);
 	if (scriptFile is not null) {
-		var scriptData = File.ReadAllText(scriptFile);
+		var scriptData = Script700.Simplify(File.ReadAllText(scriptFile));
+		//Console.Error.WriteLine("Script data written");
 		Try.Catch(() => Shell.ExecSetStdin(producerCommand, scriptData.Replace("\r", ""), fwdArgs[0], "--script700"), false);
+		//Console.Error.WriteLine("Process finished?");
 	}
 }
 

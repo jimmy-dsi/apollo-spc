@@ -1,11 +1,251 @@
-﻿namespace SPC;
+﻿using Jimbl;
+
+namespace SPC;
 
 using Jimbl.DataStructs;
+using System.Text;
 
 public static class Script700 {
+	static Dictionary<string, int> mnemonicTable = new() {
+		["a"]   = 2,
+		["bp"]  = 1,
+		["c"]   = 2,
+		["d"]   = 2,
+		["f"]   = 0,
+		["f0"]  = 0,
+		["f1"]  = 0,
+		["i"]   = 0,
+		["ib"]  = 0,
+		["iv"]  = 1,
+		["iw"]  = 1,
+		["m"]   = 2,
+		["n"]   = 3,
+		["nop"] = 0,
+		["r"]   = 0,
+		["r0"]  = 0,
+		["r1"]  = 0,
+		["q"]   = 0,
+		["s"]   = 2,
+		["sw"]  = 0,
+		["u"]   = 2,
+		["w"]   = 1,
+		["wi"]  = 1,
+		["wo"]  = 1,
+		["bra"] = 1,
+		["beq"] = 1,
+		["bne"] = 1,
+		["bge"] = 1,
+		["ble"] = 1,
+		["bgt"] = 1,
+		["blt"] = 1,
+		["bcc"] = 1,
+		["blo"] = 1,
+		["bhi"] = 1,
+		["bcs"] = 1,
+	};
+	
+	public class Instruction {
+		internal string   mnemonic;
+		internal string[] parameters;
+		internal bool     lineMarker;
+		
+		internal bool IsLabel => mnemonic.StartsWith(':');
+		
+		internal string Compile() {
+			if (lineMarker) {
+				return ";@line";
+			}
+			
+			if (IsLabel) {
+				return mnemonic;
+			}
+			
+			if (mnemonic == "n") {
+				var op = parameters[1];
+				if (op == "+") {
+					return $"a {parameters[0]} {parameters[2]}";
+				}
+				else if (op == "-") {
+					return $"s {parameters[0]} {parameters[2]}";
+				}
+				else if (op == "*") {
+					return $"u {parameters[0]} {parameters[2]}";
+				}
+				else if (op == "/") {
+					return $"d {parameters[0]} {parameters[2]}";
+				}
+			}
+			
+			return $"{mnemonic} {string.Join(' ', parameters)}".Trim();
+		}
+		
+		internal static Instruction[] Parse(string line) {
+			var commentIndex = line.IndexOf(';');
+			if (commentIndex >= 0) {
+				line = line[..commentIndex];
+			}
+			
+			line = line.Trim();
+			if (line == "") {
+				return [];
+			}
+			
+			List<Instruction> instructions = new() {
+				new() {
+					mnemonic   = "",
+					parameters = [],
+					lineMarker = true
+				}
+			};
+			
+			var argIndex = 0;
+			
+			var args = line.Trim().Split();
+			string mnemonic;
+			
+			while (argIndex < args.Length) {
+				mnemonic = args[argIndex];
+				
+				if (mnemonic.StartsWith(':')) {
+					Instruction label = new() {
+						mnemonic   = mnemonic,
+						parameters = []
+					};
+				
+					instructions.Add(label);
+					argIndex++;
+					
+					continue;
+				}
+				
+				if (!mnemonicTable.ContainsKey(mnemonic)) {
+					return instructions.ToArray();
+				}
+			
+				var expectedParams = mnemonicTable[mnemonic];
+				
+				if (args.Length < argIndex + expectedParams + 1) {
+					return instructions.ToArray();
+				}
+				
+				Instruction instr = new() {
+					mnemonic   = mnemonic,
+					parameters = args[(argIndex + 1) .. (argIndex + expectedParams + 1)]
+				};
+				
+				instructions.Add(instr);
+				argIndex += expectedParams + 1;
+			}
+			
+			return instructions.ToArray();
+		}
+	}
+	
+	class NybbleStream {
+		bool parity = false;
+		
+		public List<byte> Bytes = new();
+		
+		public void AppendNybble(byte value) {
+			if (parity) {
+				var loNybble = (byte) (value & 0xF);
+				Bytes[^1] |= loNybble;
+			}
+			else {
+				var hiNybble = (value & 0xF) << 4;
+				Bytes.Add((byte) hiNybble);
+			}
+			
+			parity = !parity;
+		}
+		
+		public void Parse(string line) {
+			var commentIndex = line.IndexOf(';');
+			if (commentIndex >= 0) {
+				line = line[..commentIndex];
+			}
+			
+			line = line.Trim();
+			if (line == "") {
+				return;
+			}
+			
+			foreach (var c in line) {
+				if ('0' <= c && c <= '9' || 'a' <= c.ToLower() && c.ToLower() <= 'f') {
+					var nybble = byte.Parse(c.ToString(), System.Globalization.NumberStyles.HexNumber);
+					AppendNybble(nybble);
+				}
+				else if (c is not ' ' and not '\t' and not '\r' and not '\n') {
+					return; // Prematurely stop parsing line if we hit an invalid character
+				}
+			}
+		}
+		
+		public string Compile() {
+			StringBuilder sb = new();
+			
+			foreach (var (i, b) in Bytes.Enum()) {
+				sb.Append(b.ToString("X2"));
+				if (i % 8 == 7) {
+					sb.Append('\n');
+				}
+				else {
+					sb.Append(' ');
+				}
+			}
+			
+			return sb.ToString();
+		}
+	}
+	
+	enum Mode {
+		ScriptArea, ExtendCMD, DataArea
+	}
+	
 	public static string Simplify(string str) { // TODO: Make these UString
-		// TODO: Implement
-		return str;
+		var lines = str.Split('\n').Select(x => x.Trim()).ToArray();
+		StringBuilder sb = new();
+		
+		var mode = Mode.ScriptArea;
+		
+		NybbleStream nybbleStream = new();
+		
+		foreach (var line in lines) {
+			if (line is "" or "::") {
+				continue;
+			}
+			
+			switch (mode) {
+				case Mode.ScriptArea: {
+					Instruction[] instrs = Instruction.Parse(line);
+					
+					foreach (var instr in instrs) {
+						if (line.Trim() == "e") {
+							mode = Mode.ExtendCMD;
+							break;
+						}
+						
+						sb.Append(instr.Compile()).Append('\n');
+					}
+					
+					break;
+				}
+	
+				case Mode.ExtendCMD: {
+					if (line.Trim() == "e") {
+						mode = Mode.DataArea;
+					}
+					break;
+				}
+	
+				case Mode.DataArea: {
+					nybbleStream.Parse(line);
+					break;
+				}
+			}
+		}
+		
+		return sb + "\n" + nybbleStream.Compile();
 	}
 	
 	public static string? ScriptFile(string spcFilePath) {
