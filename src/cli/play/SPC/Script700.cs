@@ -249,14 +249,27 @@ public static class Script700 {
 	}
 	
 	public static string? ScriptFile(string spcFilePath) {
+		string dir = Env.ContainingDirectory(spcFilePath)!;
+		
 		if (spcFilePath.ToLower().EndsWith(".spc")) {
 			var s700 = spcFilePath[..^4] + ".700";
 			if (File.Exists(s700)) {
 				return s700;
 			}
 			
-			if (File.Exists("65816.700")) {
-				return "65816.700";
+			var s7se = spcFilePath[..^4] + ".7se";
+			if (File.Exists(s7se)) {
+				return s7se;
+			}
+			
+			var s65700 = Path.Join(dir, "65816.700");
+			if (File.Exists(s65700)) {
+				return s65700;
+			}
+			
+			var s657se = Path.Join(dir, "65816.7se");
+			if (File.Exists(s657se)) {
+				return s657se;
 			}
 		}
 		

@@ -168,4 +168,9 @@ public static class Env {
 		
 		return false;
 	}
+	
+	
+	public static string? ContainingDirectory(string filePath) {
+		return SPath.GetDirectoryName(filePath);
+	}
 }

@@ -97,7 +97,11 @@ pub fn main() !void {
             defer alloc.free(script700_src_path_lower);
             _ = std.ascii.lowerString(script700_src_path_lower, script700_src_path);
 
-            if (std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".spc")) {
+            if (
+                   std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".spc")
+                or std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".700")
+                or std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".7se")
+            ) {
                 // Replace extension in above path
                 script700_src_path[L - 3] = '7';
                 script700_src_path[L - 2] = 's';
@@ -176,9 +180,14 @@ pub fn main() !void {
     }
 
     const L = spc_file_path.?.len;
-    var script700_bin_path = try file_alloc.alloc(u8, L + 4);
+    var script700_bin_path   = try file_alloc.alloc(u8, L + 4);
+    var script700_bin_path_2 = try file_alloc.alloc(u8, L + 10);
+
     defer alloc.free(script700_bin_path);
-    @memcpy(script700_bin_path[0..L], spc_file_path.?);
+    defer alloc.free(script700_bin_path_2);
+
+    @memcpy(script700_bin_path[0..L],   spc_file_path.?);
+    @memcpy(script700_bin_path_2[0..L], spc_file_path.?);
 
     var file_path_adjusted = false;
 
@@ -206,7 +215,37 @@ pub fn main() !void {
     }
 
     // Load script700 file if it exists
-    const script700_file: ?std.fs.File = std.fs.cwd().openFile(script700_bin_path, .{ .mode = .read_only }) catch null;
+    var script700_file: ?std.fs.File = std.fs.cwd().openFile(script700_bin_path, .{ .mode = .read_only }) catch null;
+    
+    if (script700_file == null) {
+        // Try again with 65816.7sb
+        var si: u32 = @intCast(spc_file_path.?.len);
+
+        while (si != 0) {
+            const ssi = si - 1;
+            const char = spc_file_path.?[ssi];
+
+            if (char == '/' or char == '\\') {
+                break;
+            }
+
+            si -= 1;
+        }
+
+        script700_bin_path_2[si    ] = '6';
+        script700_bin_path_2[si + 1] = '5';
+        script700_bin_path_2[si + 2] = '8';
+        script700_bin_path_2[si + 3] = '1';
+        script700_bin_path_2[si + 4] = '6';
+        script700_bin_path_2[si + 5] = '.';
+        script700_bin_path_2[si + 6] = '7';
+        script700_bin_path_2[si + 7] = 's';
+        script700_bin_path_2[si + 8] = 'b';
+
+        const path: []u8 = script700_bin_path_2[0..(si+9)];
+
+        script700_file = std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch null;
+    }
 
     if (script700_file) |s7f| {
         defer s7f.close();
