@@ -1,0 +1,418 @@
+Script700 Bytecode Format:
+- Uses 32-bit word size
+- Instructions can be either 1 or 2 words
+
+Instruction encoding (General):
+	[0IIIISSS SSDDDDDD DDDDDDDD DDDDDDDD] [XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX]?
+		IIII = Instruction
+			0000 = mov  (m)
+			0001 = add  (a)
+			0010 = sub  (s)
+			0011 = umul (u)
+			0100 = div  (d)
+			0101 = udiv (n ... \ ...)
+			0110 = mod  (n ... % ...)
+			0111 = umod (n ... $ ...)
+			1000 = and  (n ... & ...)
+			1001 = or   (n ... | ...)
+			1010 = xor  (n ... ^ ...)
+			1011 = shl  (n ... < ...)
+			1100 = asr  (n ... _ ...)
+			1101 = lsr  (n ... > ...)
+			1110 = not  (n ... ! ...)
+			1111 = cmp  (c)
+		SSSSS = Source identifier
+			000pp = Input port number (pp = 0-3)
+			001pp = Output port number (pp = 0-3)
+			01www = Work RAM location (www = 0-7)
+			10000 = Data location (address in second word)
+			10001 = Immediate (value in second word)
+			10010 = SPC700 RAM / XRAM location (address in second word)
+			10011 = Label location (label number in second word)
+			10100 = Dynamic pointer immediate (#?)
+			10101 = Dynamic pointer input port (i?)
+			10110 = Dynamic pointer output port ((o)?)
+			10111 = Dynamic pointer work RAM (w?)
+			11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+			11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+			11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+			11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+			11100 = Dynamic pointer 8-bit data location (d(b)?)
+			11101 = Dynamic pointer 16-bit data location (dw?)
+			11110 = Dynamic pointer 32-bit data location (dd?)
+			11111 = Dynamic pointer label number (l?)
+		DDDDDDDDDDDDDDDDDDDDDD = Destination identifier
+			000-ddddd---LLLLLLLLLL
+				ddddd = Additional destination identifier information
+					000pp = Input port number (pp = 0-3)
+					001pp = Output port number (pp = 0-3)
+					01www = Work RAM location (www = 0-7)
+					10000 = Reserved (No operation)
+					10001 = Reserved (No operation)
+					10010 = Reserved (No operation)
+					10011 = Label location
+					10100 = Dynamic pointer immediate (#?)
+					10101 = Dynamic pointer input port (i?)
+					10110 = Dynamic pointer output port ((o)?)
+					10111 = Dynamic pointer work RAM (w?)
+					11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+					11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+					11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+					11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+					11100 = Dynamic pointer 8-bit data location (d(b)?)
+					11101 = Dynamic pointer 16-bit data location (dw?)
+					11110 = Dynamic pointer 32-bit data location (dd?)
+					11111 = Dynamic pointer label number (l?)
+				LLLLLLLLLL = Label number (if destination identifier set to label location)
+			OR
+			001-ddAAAAAAAAAAAAAAAA
+				dd = Destination identifier
+					00 = 8-bit SPC700 RAM location (address in AAAAAAAAAAAAAAAA)
+					01 = 16-bit SPC700 RAM location (address in AAAAAAAAAAAAAAAA)
+					10 = 32-bit SPC700 RAM location (address in AAAAAAAAAAAAAAAA)
+					11 = 8-bit SPC700 XRAM location (address in AAAAAAAAAAAAAAAA)
+			OR
+			01MMMMMMMMMMMMMMMMMMMM = 8-bit data location (address in MMMMMMMMMMMMMMMMMMMM)
+				MMMMMMMMMMMMMMMMMMMM = Memory location
+			OR
+			10MMMMMMMMMMMMMMMMMMMM = 16-bit data location (address in MMMMMMMMMMMMMMMMMMMM)
+				MMMMMMMMMMMMMMMMMMMM = Memory location
+			OR
+			11MMMMMMMMMMMMMMMMMMMM = 32-bit data location (address in MMMMMMMMMMMMMMMMMMMM)
+				MMMMMMMMMMMMMMMMMMMM = Memory location
+				
+		XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX = Extended source identifier information (if needed)
+			----------------------LLLLLLLLLL = Label number (if source identifier set to label location)
+			--------------zzAAAAAAAAAAAAAAAA = RAM address (if source identifier set to SPC700 RAM or XRAM)
+				zz = Bit size / XRAM flag
+					00 = 8-bit  RAM access
+					01 = 16-bit RAM access
+					10 = 32-bit RAM access
+					11 = 8-bit XRAM access
+				AAAAAAAAAAAAAAAA = Address
+			----------zzMMMMMMMMMMMMMMMMMMMM = Data location (if source identifier set to data area)
+				zz = Bit size
+					00 = 8-bit  data access
+					01 = 16-bit data access
+					10 = 32-bit data access
+					11 = Reserved (No operation)
+				MMMMMMMMMMMMMMMMMMMM = Data location
+			iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii = Immediate value (if source identifier set to immediate)
+
+Branch Instructions:
+	[1001IIII -------- -----fMM MMMMMWWW]
+		IIII = Instruction
+			0000 = bra (Jump unconditionally)
+			0001 = beq (Jump if [CMP1] == [CMP2])
+			0010 = bne (Jump if [CMP1] != [CMP2])
+			0011 = bge (Jump if [CMP1] <= [CMP2]) (signed)
+			0100 = ble (Jump if [CMP1] >= [CMP2]) (signed)
+			0101 = bgt (Jump if [CMP1] <  [CMP2]) (signed)
+			0110 = blt (Jump if [CMP1] >  [CMP2]) (signed)
+			0111 = bcc (Jump if [CMP1] <= [CMP2]) (unsigned)
+			1000 = blo (Jump if [CMP1] >= [CMP2]) (unsigned)
+			1001 = bhi (Jump if [CMP1] <  [CMP2]) (unsigned)
+			1010 = bcs (Jump if [CMP1] >  [CMP2]) (unsigned)
+			1011 = Reserved (No operation)
+			11-- = Reserved (No operation)
+		f = Parameter Type Flag
+			0 = Work RAM
+			1 = Label number
+		MMMMMMMWWW
+			LLLLLLLLLL = Label number (if parameter set to label location)
+			-------www = Work RAM location (if parameter set to Work RAM)
+			
+Wait Instructions:
+	[110IISSS SSssssss ssssssss ssssssss] [iiiiiiii iiiiiiii iiiiiiii iiiiiiii]?
+		II = Instruction
+			00 = wait  (w)  - Wait # of cycles
+			01 = waiti (wi) - Wait until input read
+			10 = waito (wo) - Wait until output write
+		SSSSS = Source identifier
+			000pp = Input port number (pp = 0-3)
+			001pp = Output port number (pp = 0-3)
+			01www = Work RAM location (www = 0-7)
+			10000 = Data location (address in ssssssssssssssssssssss)
+			10001 = Immediate (value in second word)
+			10010 = SPC700 RAM / XRAM location (address in ssssssssssssssssssssss)
+			10011 = Label location (label number in ssssssssssssssssssssss)
+			10100 = Dynamic pointer immediate (#?)
+			10101 = Dynamic pointer input port (i?)
+			10110 = Dynamic pointer output port ((o)?)
+			10111 = Dynamic pointer work RAM (w?)
+			11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+			11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+			11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+			11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+			11100 = Dynamic pointer 8-bit data location (d(b)?)
+			11101 = Dynamic pointer 16-bit data location (dw?)
+			11110 = Dynamic pointer 32-bit data location (dd?)
+			11111 = Dynamic pointer label number (l?)
+		ssssssssssssssssssssss = Additional source identifier information (if needed)
+			------------LLLLLLLLLL = Label number (if source identifier set to label location)
+			----zzAAAAAAAAAAAAAAAA = RAM address (if source identifier set to SPC700 RAM or XRAM)
+				zz = Bit size / XRAM flag
+					00 = 8-bit  RAM access
+					01 = 16-bit RAM access
+					10 = 32-bit RAM access
+					11 = 8-bit XRAM access
+				AAAAAAAAAAAAAAAA = Address
+			zzMMMMMMMMMMMMMMMMMMMM = Data location (if source identifier set to data area)
+				zz = Bit size
+					00 = 8-bit  data access
+					01 = 16-bit data access
+					10 = 32-bit data access
+					11 = Reserved (No operation)
+				MMMMMMMMMMMMMMMMMMMM = Data location
+		iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii = Immediate value (if source identifier set to immediate. Entire word not used otherwise)
+			
+Breakpoint (bp) Instruction:
+	[11100SSS SSssssss ssssssss ssssssss] [iiiiiiii iiiiiiii iiiiiiii iiiiiiii]?
+		SSSSS = Source identifier
+			000pp = Input port number (pp = 0-3)
+			001pp = Output port number (pp = 0-3)
+			01www = Work RAM location (www = 0-7)
+			10000 = Data location (address in ssssssssssssssssssssss)
+			10001 = Immediate (value in second word)
+			10010 = SPC700 RAM / XRAM location (address in ssssssssssssssssssssss)
+			10011 = Label location (label number in ssssssssssssssssssssss)
+			10100 = Dynamic pointer immediate (#?)
+			10101 = Dynamic pointer input port (i?)
+			10110 = Dynamic pointer output port ((o)?)
+			10111 = Dynamic pointer work RAM (w?)
+			11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+			11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+			11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+			11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+			11100 = Dynamic pointer 8-bit data location (d(b)?)
+			11101 = Dynamic pointer 16-bit data location (dw?)
+			11110 = Dynamic pointer 32-bit data location (dd?)
+			11111 = Dynamic pointer label number (l?)
+		ssssssssssssssssssssss = Additional source identifier information (if needed)
+			------------LLLLLLLLLL = Label number (if source identifier set to label location)
+			----zzAAAAAAAAAAAAAAAA = RAM address (if source identifier set to SPC700 RAM or XRAM)
+				zz = Bit size / XRAM flag
+					00 = 8-bit  RAM access
+					01 = 16-bit RAM access
+					10 = 32-bit RAM access
+					11 = 8-bit XRAM access
+				AAAAAAAAAAAAAAAA = Address
+			zzMMMMMMMMMMMMMMMMMMMM = Data location (if source identifier set to data area)
+				zz = Bit size
+					00 = 8-bit  data access
+					01 = 16-bit data access
+					10 = 32-bit data access
+					11 = Reserved (No operation)
+				MMMMMMMMMMMMMMMMMMMM = Data location
+		iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii = Immediate value (if source identifier set to immediate. Entire word not used otherwise)
+		
+Return Instructions:
+	[111100II -------- -------- --------]
+		II = Instruction
+			00 = ret  (r)  - Return
+			01 = ret0 (r0) - Return Disable
+			10 = ret1 (r1) - Return Enable
+		
+Flush Instructions:
+	[111101II -------- -------- --------]
+		II = Instruction
+			00 = flush  (f)  - Flush-Port-Writes
+			01 = flush0 (f0) - Flush-Port-Write Enable
+			10 = flush1 (f1) - Flush-Port-Write Disable
+			
+Set CMP Parameter with immediate Instruction:
+	[11110011 c------- -------- --------] [iiiiiiii iiiiiiii iiiiiiii iiiiiiii]
+		c = CMP parameter number affected
+			0 = CMP1
+			1 = CMP2
+		iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii = Immediate value
+			
+No operation (nop) Instruction:
+	[10000000 0------- -------- --------]
+			
+Quit Script Processing (q / quit) Instruction:
+	[10000000 1------- -------- --------]
+		
+Reverse CMP Instruction (Exactly the same as general instruction with c command, but parameters are flipped):
+	[11111SSS SSDDDDDD DDDDDDDD DDDDDDDD] [XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX]?
+		SSSSS = Source identifier
+			000pp = Input port number (pp = 0-3)
+			001pp = Output port number (pp = 0-3)
+			01www = Work RAM location (www = 0-7)
+			10000 = Data location (address in second word)
+			10001 = Immediate (value in second word)
+			10010 = SPC700 RAM / XRAM location (address in second word)
+			10011 = Label location (label number in second word)
+			10100 = Dynamic pointer immediate (#?)
+			10101 = Dynamic pointer input port (i?)
+			10110 = Dynamic pointer output port ((o)?)
+			10111 = Dynamic pointer work RAM (w?)
+			11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+			11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+			11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+			11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+			11100 = Dynamic pointer 8-bit data location (d(b)?)
+			11101 = Dynamic pointer 16-bit data location (dw?)
+			11110 = Dynamic pointer 32-bit data location (dd?)
+			11111 = Dynamic pointer label number (l?)
+		DDDDDDDDDDDDDDDDDDDDDD = Destination identifier
+			000-ddddd---LLLLLLLLLL
+				ddddd = Additional destination identifier information
+					000pp = Input port number (pp = 0-3)
+					001pp = Output port number (pp = 0-3)
+					01www = Work RAM location (www = 0-7)
+					10000 = Reserved (No operation)
+					10001 = Reserved (No operation)
+					10010 = Reserved (No operation)
+					10011 = Label location
+					10100 = Dynamic pointer immediate (#?)
+					10101 = Dynamic pointer input port (i?)
+					10110 = Dynamic pointer output port ((o)?)
+					10111 = Dynamic pointer work RAM (w?)
+					11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+					11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+					11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+					11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+					11100 = Dynamic pointer 8-bit data location (d(b)?)
+					11101 = Dynamic pointer 16-bit data location (dw?)
+					11110 = Dynamic pointer 32-bit data location (dd?)
+					11111 = Dynamic pointer label number (l?)
+				LLLLLLLLLL = Label number (if destination identifier set to label location)
+			OR
+			001-ddAAAAAAAAAAAAAAAA
+				dd = Destination identifier
+					00 = 8-bit SPC700 RAM location (address in AAAAAAAAAAAAAAAA)
+					01 = 16-bit SPC700 RAM location (address in AAAAAAAAAAAAAAAA)
+					10 = 32-bit SPC700 RAM location (address in AAAAAAAAAAAAAAAA)
+					11 = 8-bit SPC700 XRAM location (address in AAAAAAAAAAAAAAAA)
+			OR
+			01MMMMMMMMMMMMMMMMMMMM = 8-bit data location (address in MMMMMMMMMMMMMMMMMMMM)
+				MMMMMMMMMMMMMMMMMMMM = Memory location
+			OR
+			10MMMMMMMMMMMMMMMMMMMM = 16-bit data location (address in MMMMMMMMMMMMMMMMMMMM)
+				MMMMMMMMMMMMMMMMMMMM = Memory location
+			OR
+			11MMMMMMMMMMMMMMMMMMMM = 32-bit data location (address in MMMMMMMMMMMMMMMMMMMM)
+				MMMMMMMMMMMMMMMMMMMM = Memory location
+				
+		XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX = Extended source identifier information (if needed)
+			----------------------LLLLLLLLLL = Label number (if source identifier set to label location)
+			--------------zzAAAAAAAAAAAAAAAA = RAM address (if source identifier set to SPC700 RAM or XRAM)
+				zz = Bit size / XRAM flag
+					00 = 8-bit  RAM access
+					01 = 16-bit RAM access
+					10 = 32-bit RAM access
+					11 = 8-bit XRAM access
+				AAAAAAAAAAAAAAAA = Address
+			----------zzMMMMMMMMMMMMMMMMMMMM = Data location (if source identifier set to data area)
+				zz = Bit size
+					00 = 8-bit  data access
+					01 = 16-bit data access
+					10 = 32-bit data access
+					11 = Reserved (No operation)
+				MMMMMMMMMMMMMMMMMMMM = Data location
+			iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii = Immediate value (if source identifier set to immediate)
+			
+---------------------------------------------------------- Apollo Commands List ----------------------------------------------------------
+
+Send interrupt signal (i / int) Instruction
+	Description: Sends the interrupt signal to the SPC700 using the current configured vector.
+	             If the interrupt is successful, a value of 1 will be stored in [CMP2] after this instruction.
+	             If unsuccessful (due to either interrupts being disabled or SPC700 is in the STOP state (not SLEEP!)),
+	             then a value of 0 will be stored in [CMP2].
+	[11110111 00000000 -------- --------]
+	
+Reset interrupt vector address (ib / intb) Instruction:
+	Description: Configures the BRK vector to use as the address for the interrupt vector for all subsequent i or iw commands.
+	[11110111 00000001 -------- --------]
+	
+Swap CMP1 and CMP2 values (sw / swap) Instruction:
+	Description: Swaps the values stored in [CMP1] and [CMP2].
+	[11110111 00000010 -------- --------]
+	
+Send interrupt and wait (iw / intw) Instruction
+	Description: Sends the interrupt signal to the SPC700 using the current configured vector, and waits until
+	             the SPC700 writes to the specified output port number.
+				 If the interrupt is rejected, then no wait will occur and the script will instantly resume.
+				 If the interrupt is successful, a value of 1 will be stored in [CMP2] after this instruction.
+				 If unsuccessful, then a value of 0 will be stored in [CMP2].
+				 The number of clocks waited (2,048 kHz) is stored in [CMP1].
+	[11101SSS SSssssss ssssssss ssssssss] [iiiiiiii iiiiiiii iiiiiiii iiiiiiii]?
+		SSSSS = Source identifier
+			000pp = Input port number (pp = 0-3)
+			001pp = Output port number (pp = 0-3)
+			01www = Work RAM location (www = 0-7)
+			10000 = Data location (address in ssssssssssssssssssssss)
+			10001 = Immediate (value in second word)
+			10010 = SPC700 RAM / XRAM location (address in ssssssssssssssssssssss)
+			10011 = Label location (label number in ssssssssssssssssssssss)
+			10100 = Dynamic pointer immediate (#?)
+			10101 = Dynamic pointer input port (i?)
+			10110 = Dynamic pointer output port ((o)?)
+			10111 = Dynamic pointer work RAM (w?)
+			11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+			11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+			11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+			11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+			11100 = Dynamic pointer 8-bit data location (d(b)?)
+			11101 = Dynamic pointer 16-bit data location (dw?)
+			11110 = Dynamic pointer 32-bit data location (dd?)
+			11111 = Dynamic pointer label number (l?)
+		ssssssssssssssssssssss = Additional source identifier information (if needed)
+			------------LLLLLLLLLL = Label number (if source identifier set to label location)
+			----zzAAAAAAAAAAAAAAAA = RAM address (if source identifier set to SPC700 RAM or XRAM)
+				zz = Bit size / XRAM flag
+					00 = 8-bit  RAM access
+					01 = 16-bit RAM access
+					10 = 32-bit RAM access
+					11 = 8-bit XRAM access
+				AAAAAAAAAAAAAAAA = Address
+			zzMMMMMMMMMMMMMMMMMMMM = Data location (if source identifier set to data area)
+				zz = Bit size
+					00 = 8-bit  data access
+					01 = 16-bit data access
+					10 = 32-bit data access
+					11 = Reserved (No operation)
+				MMMMMMMMMMMMMMMMMMMM = Data location
+		iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii = Immediate value (if source identifier set to immediate. Entire word not used otherwise)
+	
+Set interrupt vector address (iv / intv) Instruction:
+	Description: Configures the address to use for the interrupt vector for all subsequent i or iw commands (default is the BRK vector).
+	[11011SSS SSssssss ssssssss ssssssss] [iiiiiiii iiiiiiii iiiiiiii iiiiiiii]?
+		SSSSS = Source identifier
+			000pp = Input port number (pp = 0-3)
+			001pp = Output port number (pp = 0-3)
+			01www = Work RAM location (www = 0-7)
+			10000 = Data location (address in ssssssssssssssssssssss)
+			10001 = Immediate (value in second word)
+			10010 = SPC700 RAM / XRAM location (address in ssssssssssssssssssssss)
+			10011 = Label location (label number in ssssssssssssssssssssss)
+			10100 = Dynamic pointer immediate (#?)
+			10101 = Dynamic pointer input port (i?)
+			10110 = Dynamic pointer output port ((o)?)
+			10111 = Dynamic pointer work RAM (w?)
+			11000 = Dynamic pointer 8-bit SPC700 RAM (r(b)?)
+			11001 = Dynamic pointer 16-bit SPC700 RAM (rw?)
+			11010 = Dynamic pointer 32-bit SPC700 RAM (rd?)
+			11011 = Dynamic pointer 8-bit SPC700 XRAM (x?)
+			11100 = Dynamic pointer 8-bit data location (d(b)?)
+			11101 = Dynamic pointer 16-bit data location (dw?)
+			11110 = Dynamic pointer 32-bit data location (dd?)
+			11111 = Dynamic pointer label number (l?)
+		ssssssssssssssssssssss = Additional source identifier information (if needed)
+			------------LLLLLLLLLL = Label number (if source identifier set to label location)
+			----zzAAAAAAAAAAAAAAAA = RAM address (if source identifier set to SPC700 RAM or XRAM)
+				zz = Bit size / XRAM flag
+					00 = 8-bit  RAM access
+					01 = 16-bit RAM access
+					10 = 32-bit RAM access
+					11 = 8-bit XRAM access
+				AAAAAAAAAAAAAAAA = Address
+			zzMMMMMMMMMMMMMMMMMMMM = Data location (if source identifier set to data area)
+				zz = Bit size
+					00 = 8-bit  data access
+					01 = 16-bit data access
+					10 = 32-bit data access
+					11 = Reserved (No operation)
+				MMMMMMMMMMMMMMMMMMMM = Data location
+		iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii = Immediate value (if source identifier set to immediate. Entire word not used otherwise)

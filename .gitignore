@@ -10,6 +10,7 @@ src/cli/play/SPC/bin/*
 src/cli/play/SPC/obj/*
 test/*
 doc/*.txt
+!doc/script700-bytecode.txt
 !src/core/data/bootrom.bin
 !src/core/data/gauss.bin
 apollo

@@ -1,4 +1,5 @@
-﻿using Jimbl;
+﻿using System.Reflection.Emit;
+using Jimbl;
 
 namespace SPC;
 
@@ -144,16 +145,19 @@ public static class Script700 {
 	class NybbleStream {
 		bool parity = false;
 		
-		public List<byte> Bytes = new();
+		public List<List<byte>> Bytes  = new();
+		public List<(int, int)> Labels = new();
 		
 		public void AppendNybble(byte value) {
+			var lastBytes = Bytes[^1];
+			
 			if (parity) {
 				var loNybble = (byte) (value & 0xF);
-				Bytes[^1] |= loNybble;
+				lastBytes[^1] |= loNybble;
 			}
 			else {
 				var hiNybble = (value & 0xF) << 4;
-				Bytes.Add((byte) hiNybble);
+				lastBytes.Add((byte) hiNybble);
 			}
 			
 			parity = !parity;
@@ -170,27 +174,64 @@ public static class Script700 {
 				return;
 			}
 			
+			Bytes.Add(new());
+			var isLabel  = false;
+			var labelStr = "";
+			
 			foreach (var c in line) {
-				if ('0' <= c && c <= '9' || 'a' <= c.ToLower() && c.ToLower() <= 'f') {
+				if (!isLabel && ('0' <= c && c <= '9' || 'a' <= c.ToLower() && c.ToLower() <= 'f')) {
 					var nybble = byte.Parse(c.ToString(), System.Globalization.NumberStyles.HexNumber);
 					AppendNybble(nybble);
 				}
+				else if (isLabel && ('0' <= c && c <= '9')) {
+					labelStr += c;
+				}
+				else if (!isLabel && c == ':') {
+					isLabel = true;
+				}
 				else if (c is not ' ' and not '\t' and not '\r' and not '\n') {
 					return; // Prematurely stop parsing line if we hit an invalid character
+				}
+				else if (isLabel) {
+					var currentByteIndex = 0;
+					foreach (var bytes in Bytes) {
+						currentByteIndex += bytes.Count;
+					}
+					
+					Labels.Add((currentByteIndex, int.Parse(labelStr)));
+					
+					isLabel  = false;
+					labelStr = "";
 				}
 			}
 		}
 		
 		public string Compile() {
 			StringBuilder sb = new();
+			var currentByte = 0;
+			var labelIndex  = 0;
 			
-			foreach (var (i, b) in Bytes.Enum()) {
-				sb.Append(b.ToString("X2"));
-				if (i % 8 == 7) {
-					sb.Append('\n');
-				}
-				else {
-					sb.Append(' ');
+			foreach (var bytes in Bytes) {
+				sb.Append(";@line").Append('\n');
+				
+				foreach (var (i, b) in bytes.Enum()) {
+					if (labelIndex < Labels.Count && currentByte == Labels[^1].Item1) {
+						if (sb[^1] != '\n') {
+							sb.Append('\n');
+						}
+						sb.Append(':').Append(Labels[^1].Item2).Append('\n');
+					}
+					
+					sb.Append(b.ToString("X2"));
+					
+					if (i % 8 == 7) {
+						sb.Append('\n');
+					}
+					else {
+						sb.Append(' ');
+					}
+					
+					currentByte++;
 				}
 			}
 			
