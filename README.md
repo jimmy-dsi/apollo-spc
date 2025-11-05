@@ -133,6 +133,11 @@ Because of this, it is recommended that you stop the process via CTRL+C after a 
 
 This raw file can be imported into tools such as Audacity or ffmpeg and converted to .wav, or any other supported audio format—Just be sure to set the imported raw format to 16-bit stereo at 32kHz (little endian).
 
+## Other Useful Information
+- [Apollo extended Script700 commands](./doc/apollo-specific-script700-commands.md)
+- [Loading Script700 and the 7sb file format](./doc/the-7sb-format.md)
+- [Script700 commands and bytecode format](./doc/script700-bytecode.txt)
+
 ## Licensing
 
 **Apollo** is licensed under the **Mozilla Public License**, version 2.0.
