@@ -20,6 +20,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Jimbl\Jimbl.csproj" />
+      <ProjectReference Include="..\SPC\SPC.csproj" />
     </ItemGroup>
 
 </Project>

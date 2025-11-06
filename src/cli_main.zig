@@ -4,12 +4,13 @@ const Atomic = std.atomic.Value;
 
 const db = @import("debug.zig");
 
-const Emu          = @import("core/emu.zig").Emu;
-const SDSP         = @import("core/s_dsp.zig").SDSP;
-const SSMP         = @import("core/s_smp.zig").SSMP;
-const SPCState     = @import("core/spc_state.zig").SPCState;
-const Script700    = @import("core/script700.zig").Script700;
-const SongMetadata = @import("core/song_metadata.zig").SongMetadata;
+const Emu             = @import("core/emu.zig").Emu;
+const SDSP            = @import("core/s_dsp.zig").SDSP;
+const SSMP            = @import("core/s_smp.zig").SSMP;
+const SPCState        = @import("core/spc_state.zig").SPCState;
+const Script700       = @import("core/script700.zig").Script700;
+const Script700Loader = @import("core/script700_loader.zig").Script700Loader;
+const SongMetadata    = @import("core/song_metadata.zig").SongMetadata;
 
 const spc_loader = @import("core/spc_loader.zig");
 
@@ -23,6 +24,8 @@ var t_timeout_wait = Atomic(bool).init(false);
 var t_menu_mode    = Atomic(u8).init('i');
 var t_input_mode   = Atomic(u32).init(0);
 var t_other_menu   = Atomic(u8).init('m');
+var t_voice_toggle = Atomic(u8).init(9);
+var t_main_only    = Atomic(bool).init(false);
 
 var m_expect_input = std.Thread.Mutex{};
 
@@ -46,6 +49,7 @@ pub fn main() !void {
 
     var spc_file_path: ?[]const u8 = null;
     var debug_mode: bool = false;
+    var parse_script700: bool = false;
 
     var i: usize = 0;
     while (args.next()) |arg| {
@@ -56,6 +60,9 @@ pub fn main() !void {
             const str: []const u8 = arg;
             if (std.mem.eql(u8, str, "--debug") or std.mem.eql(u8, str, "-d")) {
                 debug_mode = true;
+            }
+            else if (std.mem.eql(u8, str, "--script700")) {
+                parse_script700 = true;
             }
         }
         i += 1;
@@ -70,6 +77,59 @@ pub fn main() !void {
         Script700.new(&emu),
     );
     defer emu.script700.deinit();
+
+    const file_alloc = std.heap.page_allocator;
+
+    if (parse_script700 and spc_file_path != null) {
+        const bin_data = try compile_script700();
+        defer alloc.free(bin_data);
+
+        const L = spc_file_path.?.len;
+
+        var script700_src_path = try file_alloc.alloc(u8, L + 4);
+        defer alloc.free(script700_src_path);
+        @memcpy(script700_src_path[0..L], spc_file_path.?);
+
+        var file_path_adjusted = false;
+        var final_script700_path: ?[]const u8 = null;
+
+        if (L >= 4) {
+            var script700_src_path_lower = try file_alloc.alloc(u8, L + 4);
+            defer alloc.free(script700_src_path_lower);
+            _ = std.ascii.lowerString(script700_src_path_lower, script700_src_path);
+
+            if (
+                   std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".spc")
+                or std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".700")
+                or std.mem.eql(u8, script700_src_path_lower[(L - 4) .. L], ".7se")
+            ) {
+                // Replace extension in above path
+                script700_src_path[L - 3] = '7';
+                script700_src_path[L - 2] = 's';
+                script700_src_path[L - 1] = 'b';
+
+                final_script700_path = script700_src_path[0..L];
+                file_path_adjusted = true;
+            }
+        }
+
+        if (!file_path_adjusted) {
+            // Append '.700' extension if file path does not end with '.spc'
+            script700_src_path[L]     = '.';
+            script700_src_path[L + 1] = '7';
+            script700_src_path[L + 2] = 's';
+            script700_src_path[L + 3] = 'b';
+            final_script700_path = script700_src_path[0 .. (L + 4)];
+        }
+
+        // Write out to script700 file and replace it if it exists
+        var file = try std.fs.cwd().createFile(final_script700_path.?, .{});
+        defer file.close();
+
+        try file.writeAll(bin_data);
+
+        std.process.exit(0);
+    }
 
     var script700_load_error: ?anyerror = null;
     script700_load_error = null;
@@ -92,8 +152,6 @@ pub fn main() !void {
         defer file.close();
 
         const file_size = try file.getEndPos();
-
-        const file_alloc = std.heap.page_allocator;
         const buffer = try file_alloc.alloc(u8, file_size);
         //defer allocator.free(buffer); // The entire app appears to just die after exiting scope if this is uncommented. No idea why
 
@@ -122,6 +180,93 @@ pub fn main() !void {
     if (metadata == null) {
         std.debug.print("error: SPC file not provided\n", .{});
         std.process.exit(1);
+    }
+
+    const L = spc_file_path.?.len;
+    var script700_bin_path   = try file_alloc.alloc(u8, L + 4);
+    var script700_bin_path_2 = try file_alloc.alloc(u8, L + 10);
+
+    defer alloc.free(script700_bin_path);
+    defer alloc.free(script700_bin_path_2);
+
+    @memcpy(script700_bin_path[0..L],   spc_file_path.?);
+    @memcpy(script700_bin_path_2[0..L], spc_file_path.?);
+
+    var file_path_adjusted = false;
+    var final_script700_path: ?[]const u8 = null;
+
+    if (L >= 4) {
+        var script700_bin_path_lower = try file_alloc.alloc(u8, L + 4);
+        defer alloc.free(script700_bin_path_lower);
+        _ = std.ascii.lowerString(script700_bin_path_lower, script700_bin_path);
+
+        if (std.mem.eql(u8, script700_bin_path_lower[(L - 4) .. L], ".spc")) {
+            // Replace extension in above path
+            script700_bin_path[L - 3] = '7';
+            script700_bin_path[L - 2] = 's';
+            script700_bin_path[L - 1] = 'b';
+
+            final_script700_path = script700_bin_path[0..L];
+            file_path_adjusted = true;
+        }
+    }
+
+    if (!file_path_adjusted) {
+        // Append '.7sb' extension if file path does not end with '.spc'
+        script700_bin_path[L]     = '.';
+        script700_bin_path[L + 1] = '7';
+        script700_bin_path[L + 2] = 's';
+        script700_bin_path[L + 3] = 'b';
+        final_script700_path = script700_bin_path[0 .. (L + 4)];
+    }
+
+    // Load script700 file if it exists
+    var script700_file: ?std.fs.File = std.fs.cwd().openFile(final_script700_path.?, .{ .mode = .read_only }) catch null;
+    
+    if (script700_file == null) {
+        // Try again with 65816.7sb
+        var si: u32 = @intCast(spc_file_path.?.len);
+
+        while (si != 0) {
+            const ssi = si - 1;
+            const char = spc_file_path.?[ssi];
+
+            if (char == '/' or char == '\\') {
+                break;
+            }
+
+            si -= 1;
+        }
+
+        script700_bin_path_2[si    ] = '6';
+        script700_bin_path_2[si + 1] = '5';
+        script700_bin_path_2[si + 2] = '8';
+        script700_bin_path_2[si + 3] = '1';
+        script700_bin_path_2[si + 4] = '6';
+        script700_bin_path_2[si + 5] = '.';
+        script700_bin_path_2[si + 6] = '7';
+        script700_bin_path_2[si + 7] = 's';
+        script700_bin_path_2[si + 8] = 'b';
+
+        const path: []u8 = script700_bin_path_2[0..(si+9)];
+
+        script700_file = std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch null;
+    }
+
+    if (script700_file) |s7f| {
+        defer s7f.close();
+
+        const file_size = try s7f.getEndPos();
+        const buffer    = try file_alloc.alloc(u8, file_size);
+
+        _ = try s7f.readAll(buffer);
+
+        try Script700Loader.load_script(&emu.script700, buffer);
+    }
+
+    defer Script700.deinit(&emu.script700);
+    if (script700_file) |_| {
+        emu.script700.enabled = true; // Enable Script700 if load is successful
     }
 
     const stdin = std.io.getStdIn().reader();
@@ -352,7 +497,7 @@ pub fn main() !void {
                         db.print_dsp_debug_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
-                    else if (cur_mode == '8') {
+                    else if (cur_mode == '9') {
                         db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_script700_state(&emu);
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
@@ -477,8 +622,8 @@ pub fn main() !void {
                 set_msg(0, 0, false);
                 flush(null, true);
             },
-            '8' => {
-                cur_mode = '8';
+            '9' => {
+                cur_mode = '9';
                 t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
                 t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                 db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
@@ -599,7 +744,7 @@ pub fn main() !void {
                     flush(null, true);
                     set_msg(0, 0, false);
                 }
-                else if (cur_mode == '8') {
+                else if (cur_mode == '9') {
                     db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                     db.print_script700_state(&emu);
                     flush(null, true);
@@ -687,6 +832,39 @@ fn run_loop(emu: *Emu) !bool {
         }
     }
 
+    const v_idx = t_voice_toggle.load(std.builtin.AtomicOrder.seq_cst);
+    if (v_idx == 0) {
+        for (0..8) |c| {
+            emu.pipeline_2.enable_voice(@intCast(c));
+        }
+        t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
+        set_msg(12, 0, false);
+    }
+    else if (v_idx <= 8) {
+        const c = v_idx - 1;
+        if (t_main_only.load(std.builtin.AtomicOrder.seq_cst)) {
+            emu.pipeline_2.toggle_main_voice(@intCast(c));
+            if (emu.pipeline_2.settings.channels_enabled[c]) {
+                emu.pipeline_2.enable_voice(@intCast(c));
+            }
+        }
+        else {
+            emu.pipeline_2.toggle_voice(@intCast(c));
+        }
+
+        t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
+
+        if (emu.pipeline_2.settings.channels_enabled[c]) {
+            set_msg(10, v_idx, false);
+        }
+        else {
+            set_msg(11, v_idx, false);
+        }
+    }
+    else if (v_idx == 10) {
+        t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
+    }
+
     var stdout_writer = stdout_file.writer();
 
     stdout_writer.writeAll(&buf) catch {
@@ -719,24 +897,26 @@ fn run_loop(emu: *Emu) !bool {
 fn show_help_menu() void {
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n", .{});
     db.print(" Mode commands: \n", .{});
-    db.print("    i = Instruction trace log viewer [default] \n", .{});
-    db.print("    v = Memory viewer \n", .{});
-    db.print("    r = DSP register viewer (1) \n", .{});
-    db.print("    e = DSP register viewer (2) \n", .{});
-    db.print("    b = DSP debug viewer \n", .{});
-    db.print("    8 = Script700 debug viewer \n", .{});
+    db.print("    i  = Instruction trace log viewer [default] \n", .{});
+    db.print("    v  = Memory viewer \n", .{});
+    db.print("    r  = DSP register viewer (1) \n", .{});
+    db.print("    e  = DSP register viewer (2) \n", .{});
+    db.print("    b  = DSP debug viewer \n", .{});
+    db.print("    9  = Script700 debug viewer \n", .{});
     db.print(" Action commands: \n", .{});
-    db.print("    s = Step instruction [default] \n", .{});
-    db.print("    c = Continue to next breakpoint \n", .{});
-    db.print("    k = Break execution \n", .{});
-    db.print("    p = View previous page of ARAM \n", .{});
-    db.print("    n = View next page of ARAM \n", .{});
-    db.print("    u = Shift memory view up one row \n", .{});
-    db.print("    d = Shift memory view down one row \n", .{});
+    db.print("    s  = Step instruction [default] \n", .{});
+    db.print("    c  = Continue to next breakpoint \n", .{});
+    db.print("    k  = Break execution \n", .{});
+    db.print("    p  = View previous page of ARAM \n", .{});
+    db.print("    n  = View next page of ARAM \n", .{});
+    db.print("    u  = Shift memory view up one row \n", .{});
+    db.print("    d  = Shift memory view down one row \n", .{});
     db.print(" Other: \n", .{});
-    db.print("    h = Bring up this menu \n", .{});
-    db.print("    m = View ID666 metadata \n", .{});
-    db.print("    q = Quit \n", .{});
+    db.print("    h  = Bring up this menu \n", .{});
+    db.print("    m  = View ID666 metadata \n", .{});
+    db.print("   1-8 = Toggle channel # output \n", .{});
+    db.print("    0  = Enable all channels \n", .{});
+    db.print("    q  = Quit \n", .{});
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n\n", .{});
     db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
     flush(null, false);
@@ -804,7 +984,17 @@ fn break_listener() void {
                                 prev_input = buffer[0];
                                 set_msg(0, 0, false);
                             },
-                            'v', 'r', 'e', 'b', '8', 'u', 'd', 'n', 'p' => {
+                            '0' => {
+                                t_voice_toggle.store(0, std.builtin.AtomicOrder.seq_cst);
+                            },
+                            '1', '2', '3', '4', '5', '6', '7', '8' => {
+                                t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
+                            },
+                            'f' => {
+                                const main_only = t_main_only.load(std.builtin.AtomicOrder.seq_cst);
+                                t_main_only.store(!main_only, std.builtin.AtomicOrder.seq_cst);
+                            },
+                            'v', 'r', 'e', 'b', '9', 'u', 'd', 'n', 'p' => { // Test
                                 cur_mode = buffer[0];
                                 prev_input = buffer[0];
 
@@ -961,6 +1151,423 @@ fn print_instruction(emu: *const Emu, state: *const SPCState) void {
     db.print("\x1B[49m", .{}); // Reset color
 
     flush(null, true);
+}
+
+const ParseMode = enum {
+    script, data
+};
+
+const alloc = std.heap.page_allocator;
+
+fn compile_script700() ![]const u8 {
+    const stdin = std.io.getStdIn().reader();
+    var buffer: [40]u8 = undefined;
+
+    var mode = ParseMode.script;
+
+    var bin_data = std.ArrayList(u8).init(alloc);
+    defer bin_data.deinit();
+
+    // Pre-initialize with label address table
+    for (0..1024) |_| {
+        inline for (0..4) |_| {
+            try bin_data.append(0xFF);
+        }
+    }
+
+    const script_size_offset: u32 = @intCast(bin_data.items.len);
+    var   data_size_offset:   u32 = undefined;
+
+    // Allocate 4 bytes for where the script size will be stored
+    inline for (0..4) |_| {
+        try bin_data.append(0x00);
+    }
+
+    var bytes: [4][4]u8 = undefined;
+
+    var instr_size: u32 = 1;
+    var first_iter = true;
+
+    var pc: u32 = 0;
+    var dc: u32 = 0;
+
+    var ignore = false;
+
+    while (true) {
+        _token_parse_end = 0;
+        const str: ?[]const u8 = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+
+        if (std.mem.eql(u8, str.?, ";@line")) {
+            ignore = false;
+            continue;
+        }
+
+        if (str.?.len == 0 or std.mem.eql(u8, str.?, "\r\n") or std.mem.eql(u8, str.?, "\n")) {
+            if (mode == ParseMode.script) {
+                if (!ignore) {
+                    for (bytes, 0..) |bb, k| {
+                        if (instr_size <= k) {
+                            break;
+                        }
+                        for (0..4) |i| {
+                            try bin_data.append(bb[i]);
+                        }
+                    }
+                }
+
+                const size_bytes = u32le_to_u8_array(pc);
+                inline for (0..4) |x| {
+                    bin_data.items[script_size_offset +% x] = size_bytes[x];
+                }
+
+                data_size_offset = @intCast(bin_data.items.len);
+
+                // Allocate 4 bytes for where the data size will be stored
+                inline for (0..4) |_| {
+                    try bin_data.append(0x00);
+                }
+
+                dc = 0;
+
+                first_iter = true;
+                mode = ParseMode.data;
+
+                if (ignore) {
+                    ignore = false;
+                }
+            }
+            else if (mode == ParseMode.data) {
+                break;
+            }
+        }
+                
+        if (ignore) {
+            continue;
+        }
+
+        const mnemonic = peek_token(str.?);
+    
+        if (mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
+            _ = next_token(str.?);
+            var label_num = std.fmt.parseInt(i32, mnemonic.?[1..], 10) catch -1;
+
+            if (label_num < 0) {
+                ignore = true;
+                continue;
+            }
+
+            label_num &= 1023;
+            const label_start: u32 = @intCast(label_num * 4);
+
+            inline for (0..4) |i| {
+                const ii: u32 = @intCast(i);
+                if (mode == .script) {
+                    bin_data.items[label_start +% ii] = @intCast(pc >> ii * 8 & 0xFF);
+                }
+                else {
+                    bin_data.items[label_start +% ii] = @intCast((0x8000_0000 +% dc) >> ii * 8 & 0xFF);
+                }
+            }
+
+            continue;
+        }
+        else if (mode == .script) {
+            _ = next_token(str.?);
+            if (!first_iter and (mnemonic == null or mnemonic.?.len < 2 or mnemonic.?.len >= 2 and mnemonic.?[0] != ':')) {
+                for (bytes, 0..) |bb, k| {
+                    if (instr_size <= k) {
+                        break;
+                    }
+                    for (0..4) |i| {
+                        try bin_data.append(bb[i]);
+                    }
+                }
+            }
+
+            instr_size = 1;
+
+            if (mnemonic == null) {
+                ignore = true;
+                continue;
+            }
+
+            first_iter = false;
+
+            // Set instructions to NOP tentatively
+            var w: [4]u32 = .{
+                0x8000_0000,
+                0x8000_0000,
+                0x8000_0000,
+                0x8000_0000
+            };
+
+            var w_slc: ?[]u32 = null;
+
+            const prefix_value = next_token(str.?);
+
+            if (prefix_value == null) {
+                const w_err = Script700.compile_instruction(&w, mnemonic.?, .{});
+                if (w_err) |ww| {
+                    w_slc = ww;
+                }
+                else |_| {
+                    ignore = true;
+                    continue;
+                }
+
+                for (w_slc.?, 0..) |word, i| {
+                    bytes[i] = u32le_to_u8_array(word);
+                }
+
+                instr_size = @intCast(w_slc.?.len);
+
+                pc +%= @intCast(w_slc.?.len);
+
+                continue;
+            }
+
+            const prefix, const value = split_token(prefix_value.?);
+
+            const next = next_token(str.?);
+            if (next == null) {
+                const w_err = Script700.compile_instruction(&w, mnemonic.?, .{
+                    .oper_1_prefix = prefix.?,
+                    .oper_1_value = value
+                });
+
+                if (w_err) |ww| {
+                    w_slc = ww;
+                }
+                else |_| {
+                    ignore = true;
+                    continue;
+                }
+
+                for (w_slc.?, 0..) |word, i| {
+                    bytes[i] = u32le_to_u8_array(word);
+                }
+
+                instr_size = @intCast(w_slc.?.len);
+
+                pc +%= @intCast(w_slc.?.len);
+
+                continue;
+            }
+
+            var operator: ?u8 = null;
+
+            if (next.?.len == 1) {
+                operator = switch (next.?[0]) {
+                    '+', '-', '*', '/', '\\', '%', '$', '&', '|', '^', '<', '_', '>', '!' => next.?[0],
+                    else => null
+                };
+            }
+
+            var prefix_2: ?[]const u8 = null;
+            var value_2:  ?u32        = null;
+
+            var prefix_value_2: ?[]const u8 = null;
+
+            if (operator == null) {
+                prefix_value_2 = next.?;
+            }
+            else {
+                prefix_value_2 = next_token(str.?);
+            }
+            
+            prefix_2, value_2 = split_token(prefix_value_2.?);
+
+            const w_err = Script700.compile_instruction(&w, mnemonic.?, .{
+                .oper_1_prefix = prefix, .oper_1_value = value,
+                .operator = operator, .oper_2_prefix = prefix_2, .oper_2_value = value_2
+            });
+
+            if (w_err) |ww| {
+                w_slc = ww;
+            }
+            else |_| {
+                ignore = true;
+                continue;
+            }
+
+            for (w_slc.?, 0..) |word, i| {
+                bytes[i] = u32le_to_u8_array(word);
+            }
+
+            instr_size = @intCast(w_slc.?.len);
+
+            pc +%= @intCast(w_slc.?.len);
+        }
+        else {
+            var data_byte_str = next_token(str.?);
+
+            while (data_byte_str) |dbs| {
+                // TODO: Figure out what to do with unparsable data sections
+                const data_byte = try std.fmt.parseInt(u8, dbs, 16);
+                try bin_data.append(data_byte);
+                dc +%= 1;
+
+                data_byte_str = next_token(str.?);
+            }
+        }
+    }
+
+    const data_bytes = u32le_to_u8_array(dc);
+    inline for (0..4) |x| {
+        bin_data.items[data_size_offset +% x] = data_bytes[x];
+    }
+
+    var final_data = try alloc.alloc(u8, bin_data.items.len);
+
+    for (bin_data.items, 0..) |b, i| {
+        final_data[i] = b;
+    }
+    
+    return final_data;
+}
+
+var _token_parse_end: u32 = 0;
+
+fn next_token(buffer: []const u8) ?[]const u8 {
+    const buf_ = buffer[_token_parse_end ..];
+
+    var start_found = false;
+    
+    var start: u32 = 0;
+    var end:   u32 = 0;
+
+    for (buf_, 0..) |b, i| {
+        if (b != ' ' and b != '\t' and b != '\r' and b != '\n') {
+            start = @intCast(i);
+            start_found = true;
+            break;
+        }
+    }
+
+    if (!start_found) {
+        return null;
+    }
+
+    for (start..buf_.len) |i| {
+        if (buf_[i] == ' ' or buf_[i] == '\t' or buf_[i] == '\r' or buf_[i] == '\n') {
+            end = @intCast(i);
+            break;
+        }
+    }
+
+    if (end == 0) {
+        end = @intCast(buf_.len);
+    }
+
+    _token_parse_end +%= end;
+
+    return buf_[start .. end];
+}
+
+fn peek_token(buffer: []const u8) ?[]const u8 {
+    const buf_ = buffer[_token_parse_end ..];
+
+    var start_found = false;
+    
+    var start: u32 = 0;
+    var end:   u32 = 0;
+
+    for (buf_, 0..) |b, i| {
+        if (b != ' ' and b != '\t' and b != '\r' and b != '\n') {
+            start = @intCast(i);
+            start_found = true;
+            break;
+        }
+    }
+
+    if (!start_found) {
+        return null;
+    }
+
+    for (start..buf_.len) |i| {
+        if (buf_[i] == ' ' or buf_[i] == '\t' or buf_[i] == '\r' or buf_[i] == '\n') {
+            end = @intCast(i);
+            break;
+        }
+    }
+
+    if (end == 0) {
+        end = @intCast(buf_.len);
+    }
+
+    return buf_[start .. end];
+}
+
+fn split_token(str: []const u8) struct { ?[]const u8,
+                                         ?u32         }
+{
+    var prefix: ?[]const u8 = null;
+    var value:  ?u32        = null;
+
+    var split_index: u32 = 0;
+    var num_found = false;
+
+    for (str, 0..) |c, i| {
+        if (c == '$' or c >= '0' and c <= '9') {
+            split_index = @intCast(i);
+            num_found = true;
+            break;
+        }
+    }
+
+    if (!num_found) {
+        split_index = @intCast(str.len);
+    }
+
+    prefix = str[0..split_index];
+    var num_index = split_index;
+
+    var is_hex = false;
+
+    if (num_found) {
+        if (str[split_index] == '$') {
+            num_index +%= 1;
+            is_hex = true;
+        }
+        else if (str.len >= 2 and std.mem.eql(u8, str[split_index .. (split_index + 2)], "0x")) {
+            num_index +%= 2;
+            is_hex = true;
+        }
+
+        if (is_hex) {
+            value = std.fmt.parseInt(u32, str[num_index..], 16) catch null;
+        }
+        else {
+            value = std.fmt.parseInt(u32, str[num_index..], 10) catch null;
+        }
+    }
+
+    return .{
+        prefix,
+        if (str[num_index..].len == 0) null else value
+    };
+}
+
+fn u32le_to_u8_array(in: u32) [4]u8 {
+    var arr: [4]u8 = undefined;
+
+    inline for (0..4) |b| {
+        const bb: u32 = @intCast(b);
+        arr[b] = @intCast(in >> bb * 8 & 0xFF);
+    }
+
+    return arr;
+}
+
+fn u8_array_to_u32le(in: []const u8) u32 {
+    var res: u32 = 0;
+
+    inline for (0..4) |b| {
+        const bb: u32 = @intCast(b);
+        res |= @as(u32, in[b]) << bb * 8;
+    }
+
+    return res;
 }
 
 fn quit() void {

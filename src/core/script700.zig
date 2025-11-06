@@ -28,7 +28,7 @@ pub const Script700 = struct {
     pub const default_bytecode: [1]u32 = [1]u32 {0x80FFFFFF}; // Preload with single Quit instruction
     pub var   default_data:     [0]u8  = [0]u8  { };
 
-    const allocator = std.heap.page_allocator;
+    pub const allocator = std.heap.page_allocator;
 
     emu: *Emu,
 
@@ -84,7 +84,7 @@ pub const Script700 = struct {
 
     pub const Load = error { bytecode_too_large };
 
-    pub fn load_bytecode(self: *Script700, script_bytecode: []u32) Load! void {
+    pub fn load_bytecode(self: *Script700, script_bytecode: []const u32) Load! void {
         if (script_bytecode.len > 0x1000_0000) {
             // Script bytecode cannot be more than 0x10000000 32-bit words (or 1 GB of data)
             return Load.bytecode_too_large;
@@ -261,11 +261,14 @@ pub const Script700 = struct {
     };
 
     pub const Compile = error {no_space, unencodable};
+    var _num_words: u32 = 1;
 
-    pub fn compile_instruction(buffer: []u32, mnemonic: []const u8, operands: Operands) Compile! void {
+    pub fn compile_instruction(buffer: []u32, mnemonic: []const u8, operands: Operands) Compile! []u32 {
         if (buffer.len == 0) {
             return Compile.no_space;
         }
+
+        _num_words = 1;
 
         const op = operands;
 
@@ -321,47 +324,47 @@ pub const Script700 = struct {
         }
         else if (std.mem.eql(u8, mnemonic, "nop")) {
             buffer[0] = 0x8000_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "q")) {
             buffer[0] = 0x80FF_FFFF;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "i")) {
             buffer[0] = 0xF700_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "ib")) {
             buffer[0] = 0xF701_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "sw")) {
             buffer[0] = 0xF702_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "r")) {
             buffer[0] = 0xF000_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "r0")) {
             buffer[0] = 0xF100_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "r1")) {
             buffer[0] = 0xF200_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "f")) {
             buffer[0] = 0xF400_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "f0")) {
             buffer[0] = 0xF500_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "f1")) {
             buffer[0] = 0xF600_0000;
-            return;
+            return buffer[0.._num_words];
         }
         else if (std.mem.eql(u8, mnemonic, "bra")) {
             instr_type = 3;
@@ -479,6 +482,8 @@ pub const Script700 = struct {
                     buffer[1] = v1;          // CMP1 immediate value
                     buffer[2] = 0xF380_0000; // Affects CMP2
                     buffer[3] = v2;          // CMP2 immediate value
+
+                    _num_words = 4;
                 }
                 else if (d_mt == .imm and !d_dp) {
                     // Swap operands and encode as revcmp
@@ -563,6 +568,8 @@ pub const Script700 = struct {
             },
             else => unreachable
         }
+
+        return buffer[0.._num_words];
     }
 
     inline fn parse_memtype(prefix: []const u8) Compile! struct{?MemType, ?u2, bool} {
@@ -1666,6 +1673,7 @@ pub const Script700 = struct {
             }
 
             buffer[1] = icode_2;
+            _num_words = 2;
         }
     }
 
@@ -1801,6 +1809,7 @@ pub const Script700 = struct {
             }
 
             buffer[1] = icode_2;
+            _num_words = 2;
         }
     }
 

@@ -40,6 +40,12 @@ public static class Shell {
 		return tryRunGetStdout(fullCommand);
 	}
 	
+	public static bool ExecSetStdin(string command, string inData, params string[] args) {
+		var fullCommand = GetFullCommand(command, args);
+		tryRunSetStdin(fullCommand, inData);
+		return true;
+	}
+	
 	public static bool ExecInBG(string command, params string[] args) {
 		var fullCommand = $"{GetFullCommand(command, args)}";
 		tryRun(fullCommand, runInBG: true);
@@ -65,6 +71,21 @@ public static class Shell {
 		else {
 			throw new UnreachableException();
 		}
+		
+		tryRun(fullCommand);
+		return true;
+	}
+	
+	/// <summary>
+	/// Spawns two commands: One producer and one consumer. The producer's stdout is piped into the consumer's stdin.
+	/// </summary>
+	public static bool ExecRedirect(string producerCommand, string[] producerArgs,
+	                                string consumerCommand, string[] consumerArgs) {
+		
+		var producerFullCommand = GetFullCommand(producerCommand, producerArgs);
+		var consumerFullCommand = GetFullCommand(consumerCommand, consumerArgs);
+		
+		var fullCommand = $"{consumerFullCommand} < {producerFullCommand}";
 		
 		tryRun(fullCommand);
 		return true;
@@ -151,6 +172,40 @@ public static class Shell {
 		}
 	}
 	
+	static void tryRunSetStdin(string fullCommand, string data) {
+		var process = createProcess(fullCommand, false, true);
+		
+		try {
+			process.Start();
+			
+			using var writer = process.StandardInput;
+			writer.Write(data);
+			writer.Write("\n\n\n");
+			writer.Flush();
+			
+			process.WaitForExit();
+			
+			if (OS.Get() == OS.Windows) {
+				if (process.ExitCode == 9009) { // Not recognized as an internal or external command
+					throw new CommandNotFoundError();
+				}
+			}
+			else if (OS.Get() == OS.Linux) {
+				if (process.ExitCode is 127 or 126) { // Not found / not executable
+					throw new CommandNotFoundError();
+				}
+			}
+			else {
+				throw new UnreachableException();
+			}
+		}
+		catch (Win32Exception ex) when (ex.NativeErrorCode is 2 or 13) {
+			throw new CommandNotFoundError();
+		}
+		
+		LastExitCode = process.ExitCode;
+	}
+	
 	static string tryRunGetStdout(string fullCommand) {
 		var process = createProcess(fullCommand, true);
 		
@@ -182,7 +237,7 @@ public static class Shell {
 		return output;
 	}
 	
-	static Process createProcess(string fullCommand, bool redirectStandardOutput = false) {
+	static Process createProcess(string fullCommand, bool redirectStandardOutput = false, bool redirectStandardInput = false) {
 		ProcessStartInfo psi;
 		
 		switch (OS.Get()) {
@@ -190,6 +245,7 @@ public static class Shell {
 				psi = new() {
 					FileName               = "cmd.exe",
 					Arguments              = $"/d /s /c \"{fullCommand}\"",
+					RedirectStandardInput  = redirectStandardInput,
 					RedirectStandardOutput = redirectStandardOutput,
 					RedirectStandardError  = false,
 					UseShellExecute        = false,
@@ -200,6 +256,7 @@ public static class Shell {
 			case OS.Linux: {
 				psi = new() {
 					FileName               = "/bin/bash",
+					RedirectStandardInput  = redirectStandardInput,
 					RedirectStandardOutput = redirectStandardOutput,
 					RedirectStandardError  = false,
 					UseShellExecute        = false,

@@ -17,6 +17,8 @@ public static class Env {
 	public static string ProgramDirectory => AppContext.BaseDirectory;
 	public static string WorkingDirectory => Directory.GetCurrentDirectory();
 	
+	public static string NewLine => Environment.NewLine;
+	
 	public static VarFront Var = new();
 			
 	static Dictionary<string, string> recognizedTerminals = new() {
@@ -165,5 +167,10 @@ public static class Env {
 		}
 		
 		return false;
+	}
+	
+	
+	public static string? ContainingDirectory(string filePath) {
+		return SPath.GetDirectoryName(filePath);
 	}
 }

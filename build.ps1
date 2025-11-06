@@ -70,7 +70,7 @@ try {
 
     # Build dotnet app
     try {
-        dotnet publish src/cli/play/Play/Play.csproj -r win-x64 -p:PublishAot=true --output bin/
+        dotnet publish src/cli/play/Play/Play.csproj -r win-x64 -p:PublishAot=true -p:WarningLevel=0 --output bin/
     }
     catch {
         exit 1

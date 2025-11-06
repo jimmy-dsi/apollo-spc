@@ -2,11 +2,14 @@
 
 using System.Diagnostics;
 using Jimbl;
+using SPC;
 
 const bool VERIFY_HASH = true;
 
 const int WIDTH  = 133;
 const int HEIGHT = 33;
+
+var producerCommand = Path.Join(Env.ProgramDirectory, "apollo-spc-program");
 
 var fwdArgs       = args.Where(x => x != "--force-no-resize").ToArray();
 var forceNoResize = args.  Any(x => x == "--force-no-resize");
@@ -269,7 +272,6 @@ else {
 	throw new UnreachableException();
 }
 
-var producerCommand = Path.Join(Env.ProgramDirectory, "apollo-spc-program");
 if (OS.Get() == OS.Windows) {
 	producerCommand += ".exe";
 }
@@ -288,6 +290,14 @@ Console.CancelKeyPress += (_, args) => {
 
 if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
 	Console.SetWindowSize(WIDTH, HEIGHT);
+}
+
+if (fwdArgs.Length >= 1) {
+	var scriptFile = Script700.ScriptFile(fwdArgs[0]);
+	if (scriptFile is not null) {
+		var scriptData = Script700.Simplify(File.ReadAllText(scriptFile));
+		Try.Catch(() => Shell.ExecSetStdin(producerCommand, scriptData.Replace("\r", ""), scriptFile, "--script700"), false);
+	}
 }
 
 Shell.ExecPipe(
