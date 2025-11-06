@@ -91,6 +91,7 @@ pub fn main() !void {
         @memcpy(script700_src_path[0..L], spc_file_path.?);
 
         var file_path_adjusted = false;
+        var final_script700_path: ?[]const u8 = null;
 
         if (L >= 4) {
             var script700_src_path_lower = try file_alloc.alloc(u8, L + 4);
@@ -107,6 +108,7 @@ pub fn main() !void {
                 script700_src_path[L - 2] = 's';
                 script700_src_path[L - 1] = 'b';
 
+                final_script700_path = script700_src_path[0..L];
                 file_path_adjusted = true;
             }
         }
@@ -117,10 +119,11 @@ pub fn main() !void {
             script700_src_path[L + 1] = '7';
             script700_src_path[L + 2] = 's';
             script700_src_path[L + 3] = 'b';
+            final_script700_path = script700_src_path[0 .. (L + 4)];
         }
 
         // Write out to script700 file and replace it if it exists
-        var file = try std.fs.cwd().createFile(script700_src_path, .{});
+        var file = try std.fs.cwd().createFile(final_script700_path.?, .{});
         defer file.close();
 
         try file.writeAll(bin_data);
@@ -190,6 +193,7 @@ pub fn main() !void {
     @memcpy(script700_bin_path_2[0..L], spc_file_path.?);
 
     var file_path_adjusted = false;
+    var final_script700_path: ?[]const u8 = null;
 
     if (L >= 4) {
         var script700_bin_path_lower = try file_alloc.alloc(u8, L + 4);
@@ -202,6 +206,7 @@ pub fn main() !void {
             script700_bin_path[L - 2] = 's';
             script700_bin_path[L - 1] = 'b';
 
+            final_script700_path = script700_bin_path[0..L];
             file_path_adjusted = true;
         }
     }
@@ -212,10 +217,11 @@ pub fn main() !void {
         script700_bin_path[L + 1] = '7';
         script700_bin_path[L + 2] = 's';
         script700_bin_path[L + 3] = 'b';
+        final_script700_path = script700_bin_path[0 .. (L + 4)];
     }
 
     // Load script700 file if it exists
-    var script700_file: ?std.fs.File = std.fs.cwd().openFile(script700_bin_path, .{ .mode = .read_only }) catch null;
+    var script700_file: ?std.fs.File = std.fs.cwd().openFile(final_script700_path.?, .{ .mode = .read_only }) catch null;
     
     if (script700_file == null) {
         // Try again with 65816.7sb
