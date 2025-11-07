@@ -40,7 +40,9 @@ fn read(s: *DSPStateInternal, comptime channel: u1, aram_echo_0: [*]u8, aram_ech
     const samp_u16: u16 = @as(u16, lo) | @as(u16, hi) << 8;
     const samp_i16: i16 = @bitCast(samp_u16);
 
-    s.pipeline_2.trigger_echo_read(channel, samp_i16);
+    if (s.pipeline_2) |p| {
+        p.trigger_echo_read(channel, samp_i16);
+    }
 
     if (channel == 0) {
         e._history_left[e._history_offset] = samp_i16 >> 1;
@@ -94,7 +96,9 @@ pub fn step_a(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, fir_
     const left:  i17 = calc_fir(s, 0, 0, fir_0);
     const right: i17 = calc_fir(s, 1, 0, fir_0);
 
-    s.pipeline_2.set_fir_coef(0, fir_0);
+    if (s.pipeline_2) |p| {
+        p.set_fir_coef(0, fir_0);
+    }
 
     e._input_left  = left;
     e._input_right = right;
@@ -110,8 +114,11 @@ pub fn step_b(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, fir_
     left  +%= calc_fir(s, 0, 2, fir_2);
     right +%= calc_fir(s, 1, 2, fir_2);
 
-    s.pipeline_2.set_fir_coef(1, fir_1);
-    s.pipeline_2.set_fir_coef(2, fir_2);
+
+    if (s.pipeline_2) |p| {
+        p.set_fir_coef(1, fir_1);
+        p.set_fir_coef(2, fir_2);
+    }
 
     e._input_left  +%= left;
     e._input_right +%= right;
@@ -132,9 +139,11 @@ pub fn step_c(s: *DSPStateInternal, fir_3: i8, fir_4: i8, fir_5: i8) void {
     left  +%= calc_fir(s, 0, 5, fir_5);
     right +%= calc_fir(s, 1, 5, fir_5);
 
-    s.pipeline_2.set_fir_coef(3, fir_3);
-    s.pipeline_2.set_fir_coef(4, fir_4);
-    s.pipeline_2.set_fir_coef(5, fir_5);
+    if (s.pipeline_2) |p| {
+        p.set_fir_coef(3, fir_3);
+        p.set_fir_coef(4, fir_4);
+        p.set_fir_coef(5, fir_5);
+    }
 
     e._input_left  +%= left;
     e._input_right +%= right;
@@ -153,8 +162,10 @@ pub fn step_d(s: *DSPStateInternal, fir_6: i8, fir_7: i8) void {
     const fir7_l_i16: i16 = @truncate(calc_fir(s, 0, 7, fir_7));
     const fir7_r_i16: i16 = @truncate(calc_fir(s, 1, 7, fir_7));
 
-    s.pipeline_2.set_fir_coef(6, fir_6);
-    s.pipeline_2.set_fir_coef(7, fir_7);
+    if (s.pipeline_2) |p| {
+        p.set_fir_coef(6, fir_6);
+        p.set_fir_coef(7, fir_7);
+    }
 
     left  = @as(i17,  left_i16) +% @as(i17, fir7_l_i16);
     right = @as(i17, right_i16) +% @as(i17, fir7_r_i16);
@@ -166,11 +177,12 @@ pub fn step_d(s: *DSPStateInternal, fir_6: i8, fir_7: i8) void {
 
 pub fn step_e(s: *DSPStateInternal, mvoll: i8, evoll: i8, efb: i8) void {
     const e = &s._echo;
-    const p2 = s.pipeline_2;
 
-    p2.mvol_left = mvoll;
-    p2.evol_left = evoll;
-    p2.echo.feedback = efb;
+    if (s.pipeline_2) |p| {
+        p.mvol_left = mvoll;
+        p.evol_left = evoll;
+        p.echo.feedback = efb;
+    }
 
     // Store echo left output for next clock tick
     s.__echo_out_left = output(s, 0, mvoll, evoll);
@@ -188,10 +200,10 @@ pub fn step_e(s: *DSPStateInternal, mvoll: i8, evoll: i8, efb: i8) void {
 }
 
 pub fn step_f(s: *DSPStateInternal, mvolr: i8, evolr: i8, mute_flg: u1) void {
-    const p2 = s.pipeline_2;
-
-    p2.mvol_right = mvolr;
-    p2.evol_right = evolr;
+    if (s.pipeline_2) |p| {
+        p.mvol_right = mvolr;
+        p.evol_right = evolr;
+    }
 
     var left:  i17 = s.__echo_out_left;
     var right: i17 = output(s, 1, mvolr, evolr);
@@ -214,15 +226,16 @@ pub fn step_g(s: *DSPStateInternal, echo_readonly_flg: u1) void {
 
 pub fn step_h(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, edl: u4, esa: u8, echo_readonly_flg: u1) void {
     var e = &s._echo;
-    const p2 = s.pipeline_2;
 
     e._esa_page = esa;
 
-    p2.echo.delay = edl;
-    p2.echo.esa = esa;
-    p2.echo.readonly = echo_readonly_flg == 1;
+    if (s.pipeline_2) |p| {
+        p.echo.delay = edl;
+        p.echo.esa = esa;
+        p.echo.readonly = echo_readonly_flg == 1;
 
-    p2.prepare_next_output();
+        p.prepare_next_output();
+    }
 
     // Update buffer size based on edl once the current echo read offset wraps back to zero
     if (e._offset == 0) {

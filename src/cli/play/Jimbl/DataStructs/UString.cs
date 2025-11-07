@@ -252,7 +252,7 @@ public class UString: AnyString, IEnumerable<UChar> {
 	}
 	
 	protected override IEnumerable Enumerable() {
-		foreach (var x in (..Length).Enum()) {
+		foreach (var x in (..Length).Iter()) {
 			yield return this[x];
 		}
 	}

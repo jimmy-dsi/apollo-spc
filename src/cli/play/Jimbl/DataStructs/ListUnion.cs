@@ -198,7 +198,7 @@ public class ListUnion<T1, T2>: IList<union<T1, T2>>, Union<List<T1>, List<T2>> 
 	}
 	
 	public IEnumerator<union<T1, T2>> GetEnumerator() {
-		foreach (var x in (..Count).Enum()) {
+		foreach (var x in (..Count).Iter()) {
 			yield return this[x];
 		}
 	}
@@ -526,7 +526,7 @@ public class ListUnion<T1, T2, T3>: IList<union<T1, T2, T3>>, Union<List<T1>, Li
 	}
 	
 	public IEnumerator<union<T1, T2, T3>> GetEnumerator() {
-		foreach (var x in (..Count).Enum()) {
+		foreach (var x in (..Count).Iter()) {
 			yield return this[x];
 		}
 	}

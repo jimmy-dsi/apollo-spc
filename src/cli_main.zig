@@ -70,11 +70,14 @@ pub fn main() !void {
 
     Emu.static_init();
 
+    var singleton = Emu.Singleton { };
+
     var emu = Emu.new();
     emu.init(
         SDSP.new(&emu),
         SSMP.new(&emu, .{}),
         Script700.new(&emu),
+        &singleton
     );
     defer emu.script700.deinit();
 
@@ -796,7 +799,11 @@ fn run_loop(emu: *Emu) !bool {
         }
     }
 
-    const l1, const r1, const l2, const r2 = emu.view_dac_samples(samples);
+    if (emu.singleton == null) {
+        return true;
+    }
+
+    const l1, const r1, const l2, const r2 = try emu.view_dac_samples(samples);
 
     for (0..l1.len) |x| {
         const l1_: []u16 = @ptrCast(l1);
@@ -835,7 +842,9 @@ fn run_loop(emu: *Emu) !bool {
     const v_idx = t_voice_toggle.load(std.builtin.AtomicOrder.seq_cst);
     if (v_idx == 0) {
         for (0..8) |c| {
-            emu.pipeline_2.enable_voice(@intCast(c));
+            if (emu.singleton) |s| {
+                s.pipeline_2.enable_voice(@intCast(c));
+            }
         }
         t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
         set_msg(12, 0, false);
@@ -843,22 +852,28 @@ fn run_loop(emu: *Emu) !bool {
     else if (v_idx <= 8) {
         const c = v_idx - 1;
         if (t_main_only.load(std.builtin.AtomicOrder.seq_cst)) {
-            emu.pipeline_2.toggle_main_voice(@intCast(c));
-            if (emu.pipeline_2.settings.channels_enabled[c]) {
-                emu.pipeline_2.enable_voice(@intCast(c));
+            if (emu.singleton) |s| {
+                s.pipeline_2.toggle_main_voice(@intCast(c));
+                if (s.pipeline_2.settings.channels_enabled[c]) {
+                    s.pipeline_2.enable_voice(@intCast(c));
+                }
             }
         }
         else {
-            emu.pipeline_2.toggle_voice(@intCast(c));
+            if (emu.singleton) |s| {
+                s.pipeline_2.toggle_voice(@intCast(c));
+            }
         }
 
         t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
 
-        if (emu.pipeline_2.settings.channels_enabled[c]) {
-            set_msg(10, v_idx, false);
-        }
-        else {
-            set_msg(11, v_idx, false);
+        if (emu.singleton) |s| {
+            if (s.pipeline_2.settings.channels_enabled[c]) {
+                set_msg(10, v_idx, false);
+            }
+            else {
+                set_msg(11, v_idx, false);
+            }
         }
     }
     else if (v_idx == 10) {

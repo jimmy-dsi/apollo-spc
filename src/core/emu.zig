@@ -6,7 +6,7 @@ const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
 const Script700 = @import("script700.zig").Script700;
 
 pub const Emu = struct {
-    pub const Error = error { Timeout };
+    pub const Error = error { Timeout, NoSingletonAttached };
 
     pub const DebugMode = enum {
         none, shadow_mode, shadow_exec
@@ -17,38 +17,238 @@ pub const Emu = struct {
         force_exit:    bool = false
     };
 
+    // This struct is for storing the emulator-specific info where it only makes sense to have one single global instance
+    pub const Singleton = struct {
+        pipeline_2: Pipeline2 = .{}, // Second audio rendering pipeline
+
+        dac_buffer_left:  [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
+        dac_buffer_right: [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
+        dac_buffer_offset: u32 = 0,
+        dac_offset_prev:   u32 = 0,
+
+        master_debug_mode: DebugMode = DebugMode.none,
+        cur_debug_mode:    DebugMode = DebugMode.none,
+
+        pre_shadow_cycle: u64 = 0,
+
+        debug_persist_shadow_mode:  bool = false,
+        debug_persist_spc_state:    bool = false,
+        debug_return_on_force_exit: bool = true,
+
+        break_exec: bool = false,
+
+        pub fn init(self: *Singleton) void {
+            self.cur_debug_mode = DebugMode.none;
+        }
+
+        pub inline fn queue_dac_sample(self: *Singleton, left: i17, right: i17) void {
+            // Clip to 16-bit signed if overflow
+            const lu17: u17 = @bitCast(left);
+            const ru17: u17 = @bitCast(right);
+            //
+            const lu16: u16 = @intCast(lu17 & 0xFFFF);
+            const ru16: u16 = @intCast(ru17 & 0xFFFF);
+            //
+            const ls16: i16 = @bitCast(lu16);
+            const rs16: i16 = @bitCast(ru16);
+
+            self.dac_buffer_left [self.dac_buffer_offset] = ls16;
+            self.dac_buffer_right[self.dac_buffer_offset] = rs16;
+
+            self.dac_buffer_offset = (self.dac_buffer_offset + 1) % DacBufSize;
+        }
+
+        pub inline fn consume_dac_samples(self: *Singleton) struct {[]i16, []i16, ?[]i16, ?[]i16} {
+            const start_1 = self.dac_offset_prev;
+            var   end_1   = self.dac_offset_prev;
+
+            self.dac_offset_prev = self.dac_buffer_offset;
+            
+            var has_second = false;
+
+            if (end_1 > self.dac_buffer_offset) {
+                end_1 = DacBufSize;
+                has_second = true;
+            }
+            else {
+                end_1 = self.dac_buffer_offset;
+            }
+
+            if (!has_second) {
+                return .{
+                    self.dac_buffer_left [start_1..end_1],
+                    self.dac_buffer_right[start_1..end_1],
+                    null, null
+                };
+            }
+
+            const start_2: u32 = 0;
+            const end_2:   u32 = self.dac_buffer_offset;
+
+            return .{
+                self.dac_buffer_left [start_1..end_1],
+                self.dac_buffer_right[start_1..end_1],
+                self.dac_buffer_left [start_2..end_2],
+                self.dac_buffer_right[start_2..end_2],
+            };
+        }
+
+        pub inline fn view_dac_samples(self: *Singleton, length: u32) struct {[]i16, []i16, ?[]i16, ?[]i16} {
+            const start_1 = (self.dac_buffer_offset + DacBufSize - length) % DacBufSize;
+            const end_1 =
+                if (start_1 + length <= DacBufSize)
+                    start_1 + length
+                else
+                    DacBufSize;
+
+            const has_second = start_1 + length > DacBufSize;
+
+            if (!has_second) {
+                return .{
+                    self.dac_buffer_left [start_1..end_1],
+                    self.dac_buffer_right[start_1..end_1],
+                    null, null
+                };
+            }
+
+            const start_2: u32 = 0;
+            const end_2:   u32 = (start_1 + length) % DacBufSize;
+
+            return .{
+                self.dac_buffer_left [start_1..end_1],
+                self.dac_buffer_right[start_1..end_1],
+                self.dac_buffer_left [start_2..end_2],
+                self.dac_buffer_right[start_2..end_2],
+            };
+        }
+
+        pub inline fn enable_shadow_mode(self: *Singleton, emu: *Emu, options: DebugModeOptions) void {
+            if (options.set_as_master) {
+                switch (self.cur_debug_mode) {
+                    DebugMode.none => {
+                        emu.s_smp.enable_shadow_execution();
+                        emu.s_smp.enable_shadow_mode();
+                        self.cur_debug_mode = DebugMode.shadow_mode;
+                    },
+                    DebugMode.shadow_mode => { },
+                    DebugMode.shadow_exec => {
+                        emu.s_smp.enable_shadow_mode();
+                        self.cur_debug_mode = DebugMode.shadow_mode;
+                    },
+                }
+
+                self.master_debug_mode = DebugMode.shadow_mode;
+            }
+            else {
+                switch (self.cur_debug_mode) {
+                    DebugMode.none => {
+                        emu.s_smp.enable_shadow_execution();
+                        emu.s_smp.enable_shadow_mode();
+                        self.cur_debug_mode = DebugMode.shadow_mode;
+                        self.master_debug_mode = DebugMode.shadow_mode;
+                    },
+                    DebugMode.shadow_mode => { },
+                    DebugMode.shadow_exec => {
+                        emu.s_smp.enable_shadow_mode();
+                        self.cur_debug_mode = DebugMode.shadow_mode;
+                    },
+                }
+            }
+        }
+
+        pub inline fn enable_shadow_execution(self: *Singleton, emu: *Emu, _: DebugModeOptions) void {
+            switch (self.cur_debug_mode) {
+                DebugMode.none => {
+                    emu.s_smp.enable_shadow_execution();
+                    self.cur_debug_mode = DebugMode.shadow_exec;
+                    self.master_debug_mode = DebugMode.shadow_exec;
+                },
+                DebugMode.shadow_mode => { },
+                DebugMode.shadow_exec => { },
+            }
+        }
+
+        pub inline fn disable_shadow_mode(self: *Singleton, emu: *Emu, options: DebugModeOptions) void {
+            if (options.set_as_master) {
+                switch (self.cur_debug_mode) {
+                    DebugMode.none => { },
+                    DebugMode.shadow_mode => {
+                        self.cur_debug_mode = DebugMode.shadow_exec;
+                        self.master_debug_mode = DebugMode.shadow_exec;
+                        emu.s_smp.disable_shadow_mode();
+                    },
+                    DebugMode.shadow_exec => {
+                        self.master_debug_mode = DebugMode.shadow_exec;
+                    },
+                }
+            }
+            else {
+                switch (self.cur_debug_mode) {
+                    DebugMode.none => { },
+                    DebugMode.shadow_mode => {
+                        self.cur_debug_mode = DebugMode.shadow_exec;
+                        emu.s_smp.disable_shadow_mode();
+                    },
+                    DebugMode.shadow_exec => { },
+                }
+            }
+        }
+
+        pub inline fn disable_shadow_execution(self: *Singleton, emu: *Emu, options: DebugModeOptions) void {
+            switch (self.cur_debug_mode) {
+                DebugMode.none => {
+                    if (!options.force_exit) {
+                        emu.s_smp.disable_shadow_mode();
+                        emu.s_smp.disable_shadow_execution(options.force_exit);
+                    }
+                },
+                DebugMode.shadow_mode => {
+                    emu.s_smp.disable_shadow_mode();
+                    emu.s_smp.disable_shadow_execution(options.force_exit);
+                    self.cur_debug_mode = DebugMode.none;
+                    self.master_debug_mode = DebugMode.none;
+                },
+                DebugMode.shadow_exec => {
+                    emu.s_smp.disable_shadow_mode();
+                    emu.s_smp.disable_shadow_execution(options.force_exit);
+                    self.cur_debug_mode = DebugMode.none;
+                    self.master_debug_mode = DebugMode.none;
+                }
+            }
+        }
+
+        pub inline fn pause_sdsp(self: *Singleton, emu: *Emu) void {
+            self.pre_shadow_cycle = emu.s_dsp.clock_counter;
+            emu.s_dsp.pause();
+        }
+
+        pub inline fn unpause_sdsp(self: *Singleton, emu: *Emu) void {
+            emu.s_dsp.clock_counter = self.pre_shadow_cycle;
+            emu.s_dsp.unpause();
+        }
+
+        pub inline fn break_check(self: *Singleton) bool {
+            const res = self.break_exec;
+            self.break_exec = false;
+            return res;
+        }
+    };
+
     const StepTimeout = 100;
     const DacBufSize = 96_000;
 
     pub var rand: std.Random = undefined;
     var prng: std.Random.DefaultPrng = undefined;
 
+    singleton: ?*Singleton = null, // Only the primary emu object will have this non-null
+
     s_dsp: SDSP,
     s_smp: SSMP,
 
-    pipeline_2: Pipeline2 = .{}, // Second audio rendering pipeline
-
     script700: Script700,
-
-    break_exec: bool = false,
-
-    dac_buffer_left:  [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
-    dac_buffer_right: [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
-    dac_buffer_offset: u32 = 0,
-    dac_offset_prev:   u32 = 0,
+    script700_error: ?anyerror = null,
 
     default_interrupt_vector: u16 = 0xFFDE,
-
-    master_debug_mode: DebugMode = DebugMode.none,
-    cur_debug_mode:    DebugMode = DebugMode.none,
-
-    pre_shadow_cycle: u64 = 0,
-
-    debug_persist_shadow_mode:  bool = false,
-    debug_persist_spc_state:    bool = false,
-    debug_return_on_force_exit: bool = true,
-
-    script700_error: ?anyerror = null,
 
     pub fn static_init() void {
         prng = std.Random.DefaultPrng.init(blk: {
@@ -64,17 +264,19 @@ pub const Emu = struct {
             .s_dsp = undefined,
             .s_smp = undefined,
             .script700 = undefined,
-            .cur_debug_mode = DebugMode.none,
+            .singleton = undefined,
         };
     }
 
-    pub fn init(self: *Emu, s_dsp: SDSP, s_smp: SSMP, script700: Script700) void {
-        self.s_dsp          = s_dsp;
-        self.s_smp          = s_smp;
-        self.script700      = script700;
-        self.cur_debug_mode = DebugMode.none;
+    pub fn init(self: *Emu, s_dsp: SDSP, s_smp: SSMP, script700: Script700, singleton: ?*Singleton) void {
+        self.s_dsp     = s_dsp;
+        self.s_smp     = s_smp;
+        self.script700 = script700;
+        self.singleton = singleton;
 
-        //self.pipeline_2.disable_voice(0);
+        if (self.singleton) |s| {
+            s.init();
+        }
     }
 
     pub fn set_default_vector(self: *Emu, vector: u16) void {
@@ -83,178 +285,48 @@ pub const Emu = struct {
     }
 
     pub inline fn queue_dac_sample(self: *Emu, left: i17, right: i17) void {
-        // Clip to 16-bit signed if overflow
-        const lu17: u17 = @bitCast(left);
-        const ru17: u17 = @bitCast(right);
-        //
-        const lu16: u16 = @intCast(lu17 & 0xFFFF);
-        const ru16: u16 = @intCast(ru17 & 0xFFFF);
-        //
-        const ls16: i16 = @bitCast(lu16);
-        const rs16: i16 = @bitCast(ru16);
-
-        self.dac_buffer_left [self.dac_buffer_offset] = ls16;
-        self.dac_buffer_right[self.dac_buffer_offset] = rs16;
-
-        self.dac_buffer_offset = (self.dac_buffer_offset + 1) % DacBufSize;
+        if (self.singleton) |s| {
+            s.queue_dac_sample(left, right);
+        }
     }
 
-    pub fn consume_dac_samples(self: *Emu) struct {[]i16, []i16, ?[]i16, ?[]i16} {
-        const start_1 = self.dac_offset_prev;
-        var   end_1   = self.dac_offset_prev;
-
-        self.dac_offset_prev = self.dac_buffer_offset;
-        
-        var has_second = false;
-
-        if (end_1 > self.dac_buffer_offset) {
-            end_1 = DacBufSize;
-            has_second = true;
-        }
-        else {
-            end_1 = self.dac_buffer_offset;
+    pub fn consume_dac_samples(self: *Emu) !struct {[]i16, []i16, ?[]i16, ?[]i16} {
+        if (self.singleton) |s| {
+            return s.consume_dac_samples();
         }
 
-        if (!has_second) {
-            return .{
-                self.dac_buffer_left [start_1..end_1],
-                self.dac_buffer_right[start_1..end_1],
-                null, null
-            };
-        }
-
-        const start_2: u32 = 0;
-        const end_2:   u32 = self.dac_buffer_offset;
-
-        return .{
-            self.dac_buffer_left [start_1..end_1],
-            self.dac_buffer_right[start_1..end_1],
-            self.dac_buffer_left [start_2..end_2],
-            self.dac_buffer_right[start_2..end_2],
-        };
+        return Error.NoSingletonAttached;
     }
 
-    pub fn view_dac_samples(self: *Emu, length: u32) struct {[]i16, []i16, ?[]i16, ?[]i16} {
-        const start_1 = (self.dac_buffer_offset + DacBufSize - length) % DacBufSize;
-        const end_1 =
-            if (start_1 + length <= DacBufSize)
-                start_1 + length
-            else
-                DacBufSize;
-
-        const has_second = start_1 + length > DacBufSize;
-
-        if (!has_second) {
-            return .{
-                self.dac_buffer_left [start_1..end_1],
-                self.dac_buffer_right[start_1..end_1],
-                null, null
-            };
+    pub fn view_dac_samples(self: *Emu, length: u32) !struct {[]i16, []i16, ?[]i16, ?[]i16} {
+        if (self.singleton) |s| {
+            return s.view_dac_samples(length);
         }
 
-        const start_2: u32 = 0;
-        const end_2:   u32 = (start_1 + length) % DacBufSize;
-
-        return .{
-            self.dac_buffer_left [start_1..end_1],
-            self.dac_buffer_right[start_1..end_1],
-            self.dac_buffer_left [start_2..end_2],
-            self.dac_buffer_right[start_2..end_2],
-        };
+        return Error.NoSingletonAttached;
     }
 
     pub fn enable_shadow_mode(self: *Emu, options: DebugModeOptions) void {
-        if (options.set_as_master) {
-            switch (self.cur_debug_mode) {
-                DebugMode.none => {
-                    self.s_smp.enable_shadow_execution();
-                    self.s_smp.enable_shadow_mode();
-                    self.cur_debug_mode = DebugMode.shadow_mode;
-                },
-                DebugMode.shadow_mode => { },
-                DebugMode.shadow_exec => {
-                    self.s_smp.enable_shadow_mode();
-                    self.cur_debug_mode = DebugMode.shadow_mode;
-                },
-            }
-
-            self.master_debug_mode = DebugMode.shadow_mode;
-        }
-        else {
-            switch (self.cur_debug_mode) {
-                DebugMode.none => {
-                    self.s_smp.enable_shadow_execution();
-                    self.s_smp.enable_shadow_mode();
-                    self.cur_debug_mode = DebugMode.shadow_mode;
-                    self.master_debug_mode = DebugMode.shadow_mode;
-                },
-                DebugMode.shadow_mode => { },
-                DebugMode.shadow_exec => {
-                    self.s_smp.enable_shadow_mode();
-                    self.cur_debug_mode = DebugMode.shadow_mode;
-                },
-            }
+        if (self.singleton) |s| {
+            s.enable_shadow_mode(self, options);
         }
     }
 
-    pub fn enable_shadow_execution(self: *Emu, _: DebugModeOptions) void {
-        switch (self.cur_debug_mode) {
-            DebugMode.none => {
-                self.s_smp.enable_shadow_execution();
-                self.cur_debug_mode = DebugMode.shadow_exec;
-                self.master_debug_mode = DebugMode.shadow_exec;
-            },
-            DebugMode.shadow_mode => { },
-            DebugMode.shadow_exec => { },
+    pub fn enable_shadow_execution(self: *Emu, options: DebugModeOptions) void {
+        if (self.singleton) |s| {
+            s.enable_shadow_execution(self, options);
         }
     }
 
     pub fn disable_shadow_mode(self: *Emu, options: DebugModeOptions) void {
-        if (options.set_as_master) {
-            switch (self.cur_debug_mode) {
-                DebugMode.none => { },
-                DebugMode.shadow_mode => {
-                    self.cur_debug_mode = DebugMode.shadow_exec;
-                    self.master_debug_mode = DebugMode.shadow_exec;
-                    self.s_smp.disable_shadow_mode();
-                },
-                DebugMode.shadow_exec => {
-                    self.master_debug_mode = DebugMode.shadow_exec;
-                },
-            }
-        }
-        else {
-            switch (self.cur_debug_mode) {
-                DebugMode.none => { },
-                DebugMode.shadow_mode => {
-                    self.cur_debug_mode = DebugMode.shadow_exec;
-                    self.s_smp.disable_shadow_mode();
-                },
-                DebugMode.shadow_exec => { },
-            }
+        if (self.singleton) |s| {
+            s.disable_shadow_mode(self, options);
         }
     }
 
     pub fn disable_shadow_execution(self: *Emu, options: DebugModeOptions) void {
-        switch (self.cur_debug_mode) {
-            DebugMode.none => {
-                if (!options.force_exit) {
-                    self.s_smp.disable_shadow_mode();
-                    self.s_smp.disable_shadow_execution(options.force_exit);
-                }
-            },
-            DebugMode.shadow_mode => {
-                self.s_smp.disable_shadow_mode();
-                self.s_smp.disable_shadow_execution(options.force_exit);
-                self.cur_debug_mode = DebugMode.none;
-                self.master_debug_mode = DebugMode.none;
-            },
-            DebugMode.shadow_exec => {
-                self.s_smp.disable_shadow_mode();
-                self.s_smp.disable_shadow_execution(options.force_exit);
-                self.cur_debug_mode = DebugMode.none;
-                self.master_debug_mode = DebugMode.none;
-            }
+        if (self.singleton) |s| {
+            s.disable_shadow_execution(self, options);
         }
     }
 
@@ -374,19 +446,23 @@ pub const Emu = struct {
     }
 
     pub fn pause_sdsp(self: *Emu) void {
-        self.pre_shadow_cycle = self.s_dsp.clock_counter;
-        self.s_dsp.pause();
+        if (self.singleton) |s| {
+            s.pause_sdsp(self);
+        }
     }
 
     pub fn unpause_sdsp(self: *Emu) void {
-        self.s_dsp.clock_counter = self.pre_shadow_cycle;
-        self.s_dsp.unpause();
+        if (self.singleton) |s| {
+            s.unpause_sdsp(self);
+        }
     }
 
     pub inline fn break_check(self: *Emu) bool {
-        const res = self.break_exec;
-        self.break_exec = false;
-        return res;
+        if (self.singleton) |s| {
+            return s.break_check();
+        }
+
+        return false;
     }
 
     inline fn run_script700(self: *Emu) void {

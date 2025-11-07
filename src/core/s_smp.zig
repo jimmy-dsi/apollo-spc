@@ -173,8 +173,9 @@ pub const SSMP = struct {
         if (self.co.null_transition(.{})) {
             if (self.instr_boundary) {
                 self.prev_spc_state = self.spc.state;
-                if (self.emu.script700.state.has_breakpoint(self.spc.pc())) {
-                    self.emu.break_exec = true;
+
+                if (self.emu.singleton != null and self.emu.script700.state.has_breakpoint(self.spc.pc())) {
+                    self.emu.singleton.?.break_exec = true;
                 }
             }
             self.instr_boundary = false;
@@ -463,25 +464,27 @@ pub const SSMP = struct {
     inline fn maybe_transition_debug_mode(self: *SSMP) void {
         const pc = self.spc.pc();
 
-        // If PC is on the outer cusp of the end of the shadow region, automatically disable Shadow Execution/Shadow Mode
-        if (self.cur_debug_mode != Emu.DebugMode.none and self.in_shadow_region(pc, 3) and !self.in_shadow_region(pc, 0)) {
-            self.emu.disable_shadow_execution(.{.set_as_master = true});
-        }
-        // Otherwise, if the shadow region is exited via other means (i.e. call instruction), end Shadow Mode if applicable
-        else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode and self.next_debug_mode != Emu.DebugMode.none and !self.in_shadow_region(pc, 0) and !self.emu.debug_persist_shadow_mode) {
-            self.emu.disable_shadow_mode(.{});
-        }
-        // If the shadow region has been *re-entered* (i.e. via ret instruction), reapply Shadow Mode if applicable
-        else if (self.cur_debug_mode == Emu.DebugMode.shadow_exec and self.in_shadow_region(pc, 0) and self.emu.master_debug_mode == Emu.DebugMode.shadow_mode) {
-            self.emu.enable_shadow_mode(.{});
-        }
-        // If shadow execution is enabled and a STOP instruction has been hit, end shadow execution
-        else if (self.cur_debug_mode != Emu.DebugMode.none and self.last_opcode == 0xFF) {
-            self.emu.disable_shadow_execution(.{.set_as_master = true});
-        }
-        // Or if we are pending a change to the current debug mode for any other reason
-        else if (self.cur_debug_mode != Emu.DebugMode.none and self.next_debug_mode == Emu.DebugMode.none) {
-            self.emu.disable_shadow_execution(.{.set_as_master = true});
+        if (self.emu.singleton) |s| {
+            // If PC is on the outer cusp of the end of the shadow region, automatically disable Shadow Execution/Shadow Mode
+            if (self.cur_debug_mode != Emu.DebugMode.none and self.in_shadow_region(pc, 3) and !self.in_shadow_region(pc, 0)) {
+                self.emu.disable_shadow_execution(.{.set_as_master = true});
+            }
+            // Otherwise, if the shadow region is exited via other means (i.e. call instruction), end Shadow Mode if applicable
+            else if (self.cur_debug_mode == Emu.DebugMode.shadow_mode and self.next_debug_mode != Emu.DebugMode.none and !self.in_shadow_region(pc, 0) and !s.debug_persist_shadow_mode) {
+                self.emu.disable_shadow_mode(.{});
+            }
+            // If the shadow region has been *re-entered* (i.e. via ret instruction), reapply Shadow Mode if applicable
+            else if (self.cur_debug_mode == Emu.DebugMode.shadow_exec and self.in_shadow_region(pc, 0) and s.master_debug_mode == Emu.DebugMode.shadow_mode) {
+                self.emu.enable_shadow_mode(.{});
+            }
+            // If shadow execution is enabled and a STOP instruction has been hit, end shadow execution
+            else if (self.cur_debug_mode != Emu.DebugMode.none and self.last_opcode == 0xFF) {
+                self.emu.disable_shadow_execution(.{.set_as_master = true});
+            }
+            // Or if we are pending a change to the current debug mode for any other reason
+            else if (self.cur_debug_mode != Emu.DebugMode.none and self.next_debug_mode == Emu.DebugMode.none) {
+                self.emu.disable_shadow_execution(.{.set_as_master = true});
+            }
         }
     }
 
@@ -809,11 +812,11 @@ pub const SSMP = struct {
     }
 
     pub inline fn cur_cycle(self: *SSMP) u64 {
-        return self.emu.*.s_dsp.clock_counter / 2;
+        return self.emu.s_dsp.clock_counter / 2;
     }
 
     pub inline fn s_dsp(self: *const SSMP) *SDSP {
-        return &self.emu.*.s_dsp;
+        return &self.emu.s_dsp;
     }
 
     pub inline fn fetch(self: *SSMP, substate_offset: u32) !u8 {

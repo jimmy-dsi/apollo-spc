@@ -1440,10 +1440,10 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
             const address: u8 = line_start + xx;
             const data: u8 = emu.s_dsp.dsp_map[address];
 
-            if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0) {
+            if (emu.singleton != null and !emu.singleton.?.pipeline_2.settings.channels_enabled[y] and x == 0) {
                 print("\x1B[90m", .{}); // Grey out if disabled
             }
-            else if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0xA) {
+            else if (emu.singleton == null or !emu.singleton.?.pipeline_2.settings.channels_enabled[y] and x == 0xA) {
                 print("\x1B[39m", .{}); // Reset foreground color
             }
             
@@ -1467,10 +1467,10 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
             const address: u8 = line_start + xx;
             const data: u8 = emu.s_dsp.dsp_map[address];
 
-            if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0) {
+            if (emu.singleton != null and !emu.singleton.?.pipeline_2.settings.channels_enabled[y] and x == 0) {
                 print("\x1B[90m", .{}); // Grey out if disabled
             }
-            else if (!emu.pipeline_2.settings.channels_enabled[y] and x == 0xA) {
+            else if (emu.singleton == null or !emu.singleton.?.pipeline_2.settings.channels_enabled[y] and x == 0xA) {
                 print("\x1B[39m", .{}); // Reset foreground color
             }
             
@@ -1581,7 +1581,12 @@ pub fn print_dsp_state_2(emu: *Emu, _: OptionStruct) void {
 
 fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
     const s = &emu.s_dsp.state;
-    const st = &emu.pipeline_2.settings;
+
+    const channels_enabled: [8]bool =
+        if (emu.singleton != null)
+            emu.singleton.?.pipeline_2.settings.channels_enabled
+        else
+            [_]bool{true}**8;
 
     // Print voice 0-3 states
     for (0..4) |i| {
@@ -1589,7 +1594,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const v = &s.voice[idx];
         const val: u8 = @bitCast(v.vol_left);
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("V{d}  left volume:  {X:0>2}       \x1B[39m", .{idx + 1, val});
@@ -1601,7 +1606,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const v = &s.voice[idx];
         const val: u8 = @bitCast(v.vol_right);
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    right volume: {X:0>2}       \x1B[39m", .{val});
@@ -1612,7 +1617,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    pitch:        {X:0>4}     \x1B[39m", .{v.pitch});
@@ -1623,7 +1628,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    srcn:         {X:0>2}       \x1B[39m", .{v.source});
@@ -1634,7 +1639,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    adsr 1:       {X:0>2}       \x1B[39m", .{v.adsr_0});
@@ -1645,7 +1650,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    adsr 2:       {X:0>2}       \x1B[39m", .{v.adsr_1});
@@ -1656,7 +1661,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    gain:         {X:0>2}       \x1B[39m", .{v.gain});
@@ -1667,7 +1672,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s.voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    envx:         {X:0>2}       \x1B[39m", .{v.envx});
@@ -1678,7 +1683,7 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         _ = &s.voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    outx:         {X:0>2}       \x1B[39m", .{0x00});
@@ -1807,13 +1812,13 @@ pub fn print_dsp_debug_state(emu: *Emu, options: OptionStruct) void {
 }
 
 fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
-    //print_dsp_voices(emu, base, options);
-    //print("\n", .{});
-
     const s = emu.s_dsp.int();
-    const st = emu.pipeline_2.settings;
 
-    //print("\x1B[90m", .{});
+    const channels_enabled: [8]bool =
+        if (emu.singleton != null)
+            emu.singleton.?.pipeline_2.settings.channels_enabled
+        else
+            [_]bool{true}**8;
 
     // Print voice 0-3 states
     for (0..4) |i| {
@@ -1821,7 +1826,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const v = &s._voice[idx];
         const val: u4 = @bitCast(v._buffer_offset);
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("V{d}  buff. offset: {X:0>1}        \x1B[39m", .{idx + 1, val});
@@ -1833,7 +1838,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const v = &s._voice[idx];
         const val: u16 = @bitCast(v._gaussian_offset);
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    gauss offset: {X:0>4}     \x1B[39m", .{val});
@@ -1844,7 +1849,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    brr address:  {X:0>4}     \x1B[39m", .{v._brr_address});
@@ -1855,7 +1860,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    brr offset:   {X:0>1}        \x1B[39m", .{v._brr_offset});
@@ -1866,7 +1871,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    key on delay: {X:0>1}        \x1B[39m", .{v._key_on_delay});
@@ -1877,7 +1882,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    noise on: {X:0>1}            \x1B[39m", .{v.__noise_on});
@@ -1888,7 +1893,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    pitch mod on: {X:0>1}        \x1B[39m", .{v.__pitch_mod_on});
@@ -1906,7 +1911,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
                 .key_off => "keyof"
             };
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    env. mode:    {s}    \x1B[39m", .{res});
@@ -1917,7 +1922,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         const idx = i + base;
         const v = &s._voice[idx];
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    env. level:   {X:0>2}.{X:0>1}     \x1B[39m", .{v._env_level >> 4, @as(u12, v._env_level) << 1 & 0xF});
@@ -1926,7 +1931,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
 
     for (0..4) |i| {
         const idx = i + base;
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("    buffer:                \x1B[39m", .{});
@@ -1941,7 +1946,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
             @bitCast(v._buffer[2]), @bitCast(v._buffer[3]),
         };
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  \x1B[39m", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
@@ -1956,7 +1961,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
             @bitCast(v._buffer[6]), @bitCast(v._buffer[7]),
         };
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  \x1B[39m", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});
@@ -1971,7 +1976,7 @@ fn print_dsp_debug_voices(emu: *Emu, base: u3, _: OptionStruct) void {
             @bitCast(v._buffer[10]), @bitCast(v._buffer[11]),
         };
 
-        if (!st.channels_enabled[idx]) {
+        if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
         print("      {X:0>4} {X:0>4} {X:0>4} {X:0>4}  \x1B[39m", .{cast_buf[0], cast_buf[1], cast_buf[2], cast_buf[3]});

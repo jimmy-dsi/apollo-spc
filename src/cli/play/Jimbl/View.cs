@@ -37,7 +37,7 @@ public class view<T>: IEnumerable<T> {
 	}
 	
 	public IEnumerator<T> GetEnumerator() {
-		foreach (var x in (..Length).Enum()) {
+		foreach (var x in (..Length).Iter()) {
 			yield return this[Start + x];
 		}
 	}
