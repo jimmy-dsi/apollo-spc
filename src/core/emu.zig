@@ -264,7 +264,7 @@ pub const Emu = struct {
             .s_dsp = undefined,
             .s_smp = undefined,
             .script700 = undefined,
-            .singleton = undefined,
+            .singleton = null,
         };
     }
 

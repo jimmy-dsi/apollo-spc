@@ -26,6 +26,7 @@ var t_input_mode   = Atomic(u32).init(0);
 var t_other_menu   = Atomic(u8).init('m');
 var t_voice_toggle = Atomic(u8).init(9);
 var t_main_only    = Atomic(bool).init(false);
+var t_seek_signal  = Atomic(i8).init(0);
 
 var m_expect_input = std.Thread.Mutex{};
 
@@ -768,14 +769,61 @@ var buf: [samples * 4]u8 = [_]u8 {0} ** (samples * 4);
 var stream_start: u32 = 0;
 
 var last_time: i128 = 0;
+var savestates = std.ArrayList(Emu).init(alloc);
+
+fn savestate(emu: *Emu) void {
+    const new_emu = Emu {
+        .s_dsp = SDSP.new(emu),
+        .s_smp = SSMP.new(emu, .{}),
+        .script700 = Script700.new(emu),
+        .singleton = null,
+    };
+    savestates.append(new_emu) catch {};
+    savestates.items[savestates.items.len - 1].load_from(emu);
+}
 
 fn run_loop(emu: *Emu) !bool {
     const cycles = samples * 64;
 
     is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
 
+    var seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
+
+    if (seek_amt < 0) {
+        seek_amt += 1;
+        var last_save: ?*Emu = null;
+
+        while (seek_amt < 0) {
+            var save: ?*Emu = null;
+
+            if (savestates.items.len > 1) {
+                _ = savestates.pop();
+                save = &savestates.items[savestates.items.len - 1];
+            }
+            else {
+                break;
+            }
+
+            if (save != null) {
+                last_save = save;
+            }
+
+            seek_amt += 1;
+        }
+
+        if (last_save) |ls| {
+            emu.load_from(ls);
+        }
+
+        t_seek_signal.store(0, std.builtin.AtomicOrder.seq_cst);
+    }
+
     if (emu.script700.enabled) {
         for (stream_start..cycles) |i| {
+            if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
+                savestate(emu);
+            }
+
             emu.step_cycle_safe() catch |e| {
                 stream_start = @intCast(i);
                 return e;
@@ -790,6 +838,10 @@ fn run_loop(emu: *Emu) !bool {
     }
     else {
         for (stream_start..cycles) |i| {
+            if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
+                savestate(emu);
+            }
+
             emu.step_cycle_fast();
             if (emu.break_check()) {
                 is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
@@ -926,6 +978,7 @@ fn show_help_menu() void {
     db.print("    n  = View next page of ARAM \n", .{});
     db.print("    u  = Shift memory view up one row \n", .{});
     db.print("    d  = Shift memory view down one row \n", .{});
+    db.print("    l  = Go back 5 seconds \n", .{});
     db.print(" Other: \n", .{});
     db.print("    h  = Bring up this menu \n", .{});
     db.print("    m  = View ID666 metadata \n", .{});
@@ -1022,6 +1075,12 @@ fn break_listener() void {
                                 prev_input = buffer[0];
                                 
                                 set_msg(0, 0, false);
+                            },
+                            'l' => {
+                                t_seek_signal.store(-5, std.builtin.AtomicOrder.seq_cst);
+                                prev_input = buffer[0];
+                                
+                                //set_msg(0, 0, false); // TODO: Configure msg for this
                             },
                             else => {
                                 buffer[0] = prev_input;

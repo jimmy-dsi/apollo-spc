@@ -67,7 +67,7 @@ pub const DSPStateInternal = struct {
         __calc_final_right: i17 = 0,
     };
 
-    pipeline_2: ?*Pipeline2,
+    pipeline_2: ?*Pipeline2 = null,
 
     // Output
     _main_out_left:  i17 = 0,
