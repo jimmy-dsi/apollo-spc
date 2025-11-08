@@ -779,7 +779,7 @@ fn savestate(emu: *Emu) void {
         .singleton = null,
     };
     savestates.append(new_emu) catch {};
-    savestates.items[savestates.items.len - 1].load_from(emu);
+    savestates.items[savestates.items.len - 1].load_from(emu, .{});
 }
 
 fn run_loop(emu: *Emu) !bool {
@@ -790,7 +790,6 @@ fn run_loop(emu: *Emu) !bool {
     var seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
 
     if (seek_amt < 0) {
-        seek_amt += 1;
         var last_save: ?*Emu = null;
 
         while (seek_amt < 0) {
@@ -812,7 +811,7 @@ fn run_loop(emu: *Emu) !bool {
         }
 
         if (last_save) |ls| {
-            emu.load_from(ls);
+            emu.load_from(ls, .{});
         }
 
         t_seek_signal.store(0, std.builtin.AtomicOrder.seq_cst);

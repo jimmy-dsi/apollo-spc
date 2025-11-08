@@ -1689,6 +1689,10 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
         print("    outx:         {X:0>2}       \x1B[39m", .{0x00});
     }
     print("\n", .{});
+
+    if (base == 4) {
+        print("{d}\n", .{@divFloor(emu.s_dsp.cur_cycle(), 2048000)});
+    }
 }
 
 fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: OptionStruct) void {
