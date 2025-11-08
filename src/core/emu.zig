@@ -279,6 +279,26 @@ pub const Emu = struct {
         }
     }
 
+    pub inline fn load_from(self: *Emu, other: *const Emu) void {
+        self.s_dsp.load_from(&other.s_dsp);
+        self.s_smp.load_from(&other.s_smp);
+
+        self.s_dsp.emu = self;
+        self.s_smp.emu = self;
+
+        self.s_smp.spc.emu = self;
+
+        self.script700.load_from(&other.script700, .{});
+        self.script700_error = other.script700_error;
+
+        self.script700.emu = self;
+        if (self.script700.state.wait_value != null) {
+            self.script700.state.wait_value = &self.s_smp.state.input_ports[0];
+        }
+
+        self.default_interrupt_vector = other.default_interrupt_vector;
+    }
+
     pub fn set_default_vector(self: *Emu, vector: u16) void {
         self.default_interrupt_vector = vector;
         self.s_smp.update_interrupt_vector(vector);

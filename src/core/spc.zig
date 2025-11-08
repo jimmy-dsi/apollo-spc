@@ -59,6 +59,18 @@ pub const SPC = struct {
         };
     }
 
+    pub inline fn load_from(self: *SPC, other: *const SPC) void {
+        self.state = other.state;
+        self.interrupt_vector = other.interrupt_vector;
+
+        self.current_interrupt_vector = other.current_interrupt_vector;
+
+        self.data_u8  = other.data_u8;
+        self.data_i8  = other.data_i8;
+        self.data_u16 = other.data_u16;
+        self.data_u32 = other.data_u32;
+    }
+
     pub fn power_on(self: *SPC) void {
         _ = self;
     }

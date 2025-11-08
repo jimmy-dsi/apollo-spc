@@ -124,6 +124,33 @@ pub const SSMP = struct {
         return s_smp;
     }
 
+    pub inline fn load_from(self: *SSMP, other: *const SSMP) void {
+        self.state = other.state;
+        self.co    = other.co;
+
+        self.exec_state = other.exec_state;
+
+        self.last_opcode     = other.last_opcode;
+        self.last_read_bytes = other.last_read_bytes;
+
+        self.access_logs = other.access_logs;
+
+        self.timer_logs = other.timer_logs;
+        self.last_timer_log_index = other.last_timer_log_index;
+
+        self.instr_boundary = other.instr_boundary;
+        self.vector_changed = other.vector_changed;
+        self.next_vector    = other.next_vector;
+
+        self.timer_wait_cycles = other.timer_wait_cycles;
+
+        self.cur_exec_cycle  = other.cur_exec_cycle;
+        self.prev_exec_cycle = other.prev_exec_cycle;
+
+        self.spc.load_from(&other.spc);
+        self.prev_spc_state = other.prev_spc_state;
+    }
+
     pub fn power_on(self: *SSMP) void {
         self.exec_state = State.main;
         self.spc.power_on();

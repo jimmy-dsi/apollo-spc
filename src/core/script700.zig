@@ -25,6 +25,10 @@ pub const Script700 = struct {
         cmp, rcmp
     };
 
+    pub const LoadOptions = struct {
+        copy_everything: bool = false
+    };
+
     pub const default_bytecode: [1]u32 = [1]u32 {0x80FFFFFF}; // Preload with single Quit instruction
     pub var   default_data:     [0]u8  = [0]u8  { };
 
@@ -64,6 +68,29 @@ pub const Script700 = struct {
         self.label_remappings = null;
         self.initialized = false;
         self.data_area = &default_data;
+    }
+
+    pub inline fn load_from(self: *Script700, other: *const Script700, options: LoadOptions) void {
+        self._finished = other._finished;
+
+        self.enabled = other.enabled;
+        self.compat_mode = other.compat_mode;
+        self.initialized = other.initialized;
+
+        if (options.copy_everything) {
+            self.label_addresses  = other.label_addresses;
+            self.label_remappings = other.label_remappings; // TODO: Handle this
+
+            self.script_bytecode = other.script_bytecode;
+            self.data_area       = other.data_area; // TODO: Deep copy
+        }
+        else {
+            self.data_area = other.data_area; // Copy pointer only
+        }
+
+        self.self_alloc_data = other.self_alloc_data;
+
+        self.state = other.state;
     }
 
     pub fn reset(self: *Script700) void {

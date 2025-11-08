@@ -64,6 +64,21 @@ pub const SDSP = struct {
         return s_dsp;
     }
 
+    pub inline fn load_from(self: *SDSP, other: *const SDSP) void {
+        self.audio_ram = other.audio_ram;
+        self.dsp_map   = other.dsp_map;
+
+        self.state.load_from(&other.state);
+        self.co = other.co;
+
+        self.exec_state = other.exec_state;
+
+        self.last_processed_cycle = other.last_processed_cycle;
+        self.clock_counter        = other.clock_counter;
+
+        self.paused = false;
+    }
+
     pub fn power_on(self: *SDSP) void {
         self.exec_state = State.init;
 

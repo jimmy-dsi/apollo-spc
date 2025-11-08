@@ -49,5 +49,22 @@ pub const DSPState = struct {
 
     voice: [8]Voice = [_]Voice {.{}} ** 8,
 
-    _internal: DSPStateInternal
+    _internal: DSPStateInternal,
+
+    pub inline fn load_from(self: *DSPState, other: *const DSPState) void {
+        self.reset = other.reset;
+        self.mute  = other.mute;
+        self.main_vol_left  = other.main_vol_left;
+        self.main_vol_right = other.main_vol_right;
+
+        self.echo = other.echo;
+        
+        self.noise_rate = other.noise_rate;
+
+        self.brr_bank = other.brr_bank;
+
+        self.voice = other.voice;
+
+        self._internal.load_from(&other._internal);
+    }
 };
