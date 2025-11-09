@@ -1491,11 +1491,11 @@ pub fn print_dsp_map(emu: *Emu, options: OptionStruct) void {
     }
 }
 
-pub fn print_dsp_state(emu: *Emu, options: OptionStruct) void {
+pub fn print_dsp_state(emu: *Emu, run_ahead_emu: *Emu, options: OptionStruct) void {
     // Print voice registers
-    print_dsp_voices(emu, 0, options);
+    print_dsp_voices(emu, run_ahead_emu, 0, options);
     print("\n", .{});
-    print_dsp_voices(emu, 4, options);
+    print_dsp_voices(emu, run_ahead_emu, 4, options);
     print("\n", .{});
 }
 
@@ -1579,7 +1579,7 @@ pub fn print_dsp_state_2(emu: *Emu, _: OptionStruct) void {
     print("\n", .{});
 }
 
-fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
+fn print_dsp_voices(emu: *Emu, run_ahead_emu: *Emu, base: u3, _: OptionStruct) void {
     const s = &emu.s_dsp.state;
 
     const channels_enabled: [8]bool =
@@ -1691,7 +1691,13 @@ fn print_dsp_voices(emu: *Emu, base: u3, _: OptionStruct) void {
     print("\n", .{});
 
     if (base == 4) {
-        print("{d}\n", .{@divFloor(emu.s_dsp.cur_cycle(), 2048000)});
+        print(
+            "{d:0>5}\t{d:0>5}\n",
+            .{
+                @divFloor(emu.s_dsp.cur_cycle(), 2048000),
+                @divFloor(run_ahead_emu.s_dsp.cur_cycle(), 2048000)
+            }
+        );
     }
 }
 

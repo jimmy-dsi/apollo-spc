@@ -27,6 +27,7 @@ var t_other_menu   = Atomic(u8).init('m');
 var t_voice_toggle = Atomic(u8).init(9);
 var t_main_only    = Atomic(bool).init(false);
 var t_seek_signal  = Atomic(i8).init(0);
+var t_cur_clock    = Atomic(u64).init(0);
 
 var m_expect_input = std.Thread.Mutex{};
 
@@ -140,6 +141,9 @@ pub fn main() !void {
 
     var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
     defer t_break_listener.join();
+
+    //var t_audio_writer = try std.Thread.spawn(.{}, audio_writer, .{});
+    //defer t_audio_writer.join();
 
     var cur_page: u8 = 0x00;
     var cur_offset: u8 = 0x00;
@@ -273,6 +277,14 @@ pub fn main() !void {
         emu.script700.enabled = true; // Enable Script700 if load is successful
     }
 
+    // After all load is done, make copy of initial emulator state
+    var emu_run_ahead: Emu = undefined;
+    emu_run_ahead.singleton = null;
+    emu_run_ahead.s_dsp = SDSP.new(&emu_run_ahead);
+    emu_run_ahead.s_smp = SSMP.new(&emu_run_ahead, .{});
+    emu_run_ahead.script700 = Script700.new(&emu_run_ahead);
+    emu_run_ahead.load_from(&emu, .{ .copy_everything = true });
+
     const stdin = std.io.getStdIn().reader();
     var buffer: [8]u8 = undefined;
 
@@ -403,7 +415,7 @@ pub fn main() !void {
 
                 var s7en = emu.script700.enabled;
 
-                var res = run_loop(&emu) catch null;
+                var res = run_loop(&emu, &emu_run_ahead) catch null;
                 var attempts: u32 = 0;
                 var step_instr: bool = false;
 
@@ -434,7 +446,7 @@ pub fn main() !void {
                         };
                     }
                     else {
-                        res = run_loop(&emu) catch null;
+                        res = run_loop(&emu, &emu_run_ahead) catch null;
                     }
                 }
 
@@ -483,7 +495,7 @@ pub fn main() !void {
                         db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
 
                         db.print("\n", .{});
-                        db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
+                        db.print_dsp_state(&emu, &emu_run_ahead, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
 
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
@@ -598,7 +610,7 @@ pub fn main() !void {
                 db.print_dsp_map(&emu, .{.is_dsp = true});
 
                 db.print("\n", .{});
-                db.print_dsp_state(&emu, .{.is_dsp = true});
+                db.print_dsp_state(&emu, &emu_run_ahead, .{.is_dsp = true});
 
                 set_msg(0, 0, false);
                 flush(null, true);
@@ -726,7 +738,7 @@ pub fn main() !void {
                     db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
                     db.print("\n", .{});
-                    db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
+                    db.print_dsp_state(&emu, &emu_run_ahead, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
                     flush(null, true);
                     set_msg(0, 0, false);
@@ -778,36 +790,40 @@ fn savestate(emu: *Emu) void {
         .script700 = Script700.new(emu),
         .singleton = null,
     };
-    savestates.append(new_emu) catch {};
-    savestates.items[savestates.items.len - 1].load_from(emu, .{});
+
+    if (savestates.items.len < 600) { // 10 minutes is enough run ahead - stop here to avoid blowing up memory
+        savestates.append(new_emu) catch {};
+        savestates.items[savestates.items.len - 1].load_from(emu, .{});
+    }
 }
 
-fn run_loop(emu: *Emu) !bool {
+fn run_loop(emu: *Emu, emu_run_ahead: *Emu) !bool {
     const cycles = samples * 64;
 
     is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
 
-    var seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
+    const seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
+    const target_cycle = @as(i128, emu.s_dsp.cur_cycle()) + @as(i128, seek_amt) * @as(i128, 2048000);
 
-    if (seek_amt < 0) {
+    if (seek_amt < 0 and savestates.items.len > 0) {
         var last_save: ?*Emu = null;
+        var i: u32 = @intCast(savestates.items.len - 1);
 
-        while (seek_amt < 0) {
-            var save: ?*Emu = null;
-
-            if (savestates.items.len > 1) {
-                _ = savestates.pop();
-                save = &savestates.items[savestates.items.len - 1];
-            }
-            else {
-                break;
-            }
+        while (true) {
+            const save: ?*Emu = &savestates.items[i];
 
             if (save != null) {
                 last_save = save;
+                if (last_save.?.s_dsp.cur_cycle() < target_cycle) {
+                    break;
+                }
             }
 
-            seek_amt += 1;
+            if (i == 0) {
+                break;
+            }
+
+            i -= 1;
         }
 
         if (last_save) |ls| {
@@ -816,13 +832,32 @@ fn run_loop(emu: *Emu) !bool {
 
         t_seek_signal.store(0, std.builtin.AtomicOrder.seq_cst);
     }
+    else if (seek_amt > 0) {
+        t_cur_clock.store(emu.s_dsp.cur_cycle(), std.builtin.AtomicOrder.seq_cst);
+        t_seek_signal.store(0, std.builtin.AtomicOrder.seq_cst);
+    }
+
+    const cur_clock = t_cur_clock.load(std.builtin.AtomicOrder.seq_cst);
+
+    if (cur_clock > 0 and savestates.items.len > 0) {
+        const last = &savestates.items[savestates.items.len - 1];
+        const cur_s = @divFloor(cur_clock, 2048000);
+
+        if ((cur_s + 5) * 2048000 <= last.s_dsp.cur_cycle()) {
+            const last_s = @divFloor(last.s_dsp.cur_cycle(), 2048000);
+            const diff_s = last_s - (cur_s + 5);
+
+            if (diff_s <= savestates.items.len - 1) {
+                const idx = savestates.items.len - 1 - diff_s;
+                emu.load_from(&savestates.items[idx], .{});
+
+                t_cur_clock.store(0, std.builtin.AtomicOrder.seq_cst);
+            }
+        }
+    }
 
     if (emu.script700.enabled) {
         for (stream_start..cycles) |i| {
-            if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
-                savestate(emu);
-            }
-
             emu.step_cycle_safe() catch |e| {
                 stream_start = @intCast(i);
                 return e;
@@ -837,10 +872,6 @@ fn run_loop(emu: *Emu) !bool {
     }
     else {
         for (stream_start..cycles) |i| {
-            if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
-                savestate(emu);
-            }
-
             emu.step_cycle_fast();
             if (emu.break_check()) {
                 is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
@@ -939,12 +970,49 @@ fn run_loop(emu: *Emu) !bool {
         std.time.sleep(2 * std.time.ns_per_s);
         std.process.exit(1);
     };
-    stream_start = 0;
 
+    // Utilize the idle time before processing next batch to execute run-ahead
     const expected_next_time = last_time + @as(i128, samples) * std.time.ns_per_s / 32000;
 
-    const now = std.time.nanoTimestamp();
-    const amt = expected_next_time - now - 1 * std.time.ns_per_ms;
+    var now = std.time.nanoTimestamp();
+    var amt = expected_next_time - now - 1 * std.time.ns_per_ms;
+
+    //std.debug.print("{d}\n", .{@divFloor(amt, std.time.ns_per_ms)});
+    //std.time.sleep(2 * std.time.ns_per_s);
+    //std.process.exit(0);
+
+    while (amt >= 4 * std.time.ns_per_ms) {
+        if (emu_run_ahead.script700.enabled) {
+            for (0..cycles) |_| {
+                if (emu_run_ahead.s_dsp.cur_cycle() % 2048000 == 0) {
+                    savestate(emu_run_ahead);
+                }
+
+                var retry = true;
+                while (retry) {
+                    retry = false;
+                    // If Script700 times out, sleep for a bit and try again
+                    emu_run_ahead.step_cycle_safe() catch {
+                        retry = true;
+                        std.time.sleep(2 * std.time.ns_per_ms);
+                    };
+                }
+            }
+        }
+        else {
+            for (0..cycles) |_| {
+                if (emu_run_ahead.s_dsp.cur_cycle() % 2048000 == 0) {
+                    savestate(emu_run_ahead);
+                }
+
+                emu_run_ahead.step_cycle_fast();
+            }
+        }
+
+        now = std.time.nanoTimestamp();
+        amt = expected_next_time - now - 1 * std.time.ns_per_ms;
+    }
+
     if (amt > 0) {
         const sleep_amt: u64 = @intCast(expected_next_time - now - 1 * std.time.ns_per_ms);
         std.time.sleep(sleep_amt);
@@ -977,7 +1045,8 @@ fn show_help_menu() void {
     db.print("    n  = View next page of ARAM \n", .{});
     db.print("    u  = Shift memory view up one row \n", .{});
     db.print("    d  = Shift memory view down one row \n", .{});
-    db.print("    l  = Go back 5 seconds \n", .{});
+    db.print("    l  = Skip back 5 seconds \n", .{});
+    db.print("    f  = Skip ahead 5 seconds \n", .{});
     db.print(" Other: \n", .{});
     db.print("    h  = Bring up this menu \n", .{});
     db.print("    m  = View ID666 metadata \n", .{});
@@ -1057,7 +1126,7 @@ fn break_listener() void {
                             '1', '2', '3', '4', '5', '6', '7', '8' => {
                                 t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
                             },
-                            'f' => {
+                            'g' => {
                                 const main_only = t_main_only.load(std.builtin.AtomicOrder.seq_cst);
                                 t_main_only.store(!main_only, std.builtin.AtomicOrder.seq_cst);
                             },
@@ -1078,6 +1147,16 @@ fn break_listener() void {
                             'l' => {
                                 t_seek_signal.store(-5, std.builtin.AtomicOrder.seq_cst);
                                 prev_input = buffer[0];
+                                
+                                //set_msg(0, 0, false); // TODO: Configure msg for this
+                            },
+                            'f' => {
+                                const cc = t_cur_clock.load(std.builtin.AtomicOrder.seq_cst);
+
+                                if (cc == 0) {
+                                    t_seek_signal.store(5, std.builtin.AtomicOrder.seq_cst);
+                                    prev_input = buffer[0];
+                                }
                                 
                                 //set_msg(0, 0, false); // TODO: Configure msg for this
                             },
