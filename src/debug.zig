@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const time = @import("core/common/time.zig");
+
 const Emu      = @import("core/emu.zig").Emu;
 const SDSP     = @import("core/s_dsp.zig").SDSP;
 const SSMP     = @import("core/s_smp.zig").SSMP;
@@ -1579,7 +1581,7 @@ pub fn print_dsp_state_2(emu: *Emu, _: OptionStruct) void {
     print("\n", .{});
 }
 
-fn print_dsp_voices(emu: *Emu, run_ahead_emu: *Emu, base: u3, _: OptionStruct) void {
+fn print_dsp_voices(emu: *Emu, _: *Emu, base: u3, _: OptionStruct) void {
     const s = &emu.s_dsp.state;
 
     const channels_enabled: [8]bool =
@@ -1689,16 +1691,6 @@ fn print_dsp_voices(emu: *Emu, run_ahead_emu: *Emu, base: u3, _: OptionStruct) v
         print("    outx:         {X:0>2}       \x1B[39m", .{0x00});
     }
     print("\n", .{});
-
-    if (base == 4) {
-        print(
-            "{d:0>5}\t{d:0>5}\n",
-            .{
-                @divFloor(emu.s_dsp.cur_cycle(), 2048000),
-                @divFloor(run_ahead_emu.s_dsp.cur_cycle(), 2048000)
-            }
-        );
-    }
 }
 
 fn print_mem_cell(emu: *Emu, address: u16, data: u8, as_char: bool, options: OptionStruct) void {
@@ -2204,6 +2196,9 @@ var info_msgs: [13][]const u8 = [_][]const u8 {
 
 var chan_display_state: [8]bool = [_]bool{true} ** 8;
 
+pub var emu_:           ?*Emu = null;
+pub var run_ahead_emu_: ?*Emu = null;
+
 pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     var final_buffer: [max_lines * 257]u8 = undefined;
     var total_chars: u32 = 0;
@@ -2220,10 +2215,18 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
         }
     }
 
+    var display_time: [12]u8 = [_]u8 {' '} ** 12;
+
+    if (emu_ != null and run_ahead_emu_ != null) {
+        const cur_ms = @divFloor(emu_.?.s_dsp.cur_cycle(), 2048);
+        _ = time.fmt_time(cur_ms, &display_time);
+    }
+
     if (is_error) {
-        std.debug.print("\x1B[H{s}\r\x1B[91m{s}: {s}\x1B[39m\n> ",
+        std.debug.print("\x1B[H{s}\r{s}\n\x1B[91m{s}: {s}\x1B[39m\n> ",
             .{
                 final_buffer[0 .. (total_chars - 1)],
+                display_time[0..],
                 info_msgs[cur_info_msg],
                 info_msgs[cur_err_msg]
             }
@@ -2257,9 +2260,10 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
         }
 
         std.debug.print(
-            "\x1B[H{s}\r\x1B[93m{s}\x1B[39m\n> ",
+            "\x1B[H{s}\r{s}\n\x1B[93m{s}\x1B[39m\n> ",
             .{
                 final_buffer[0 .. (total_chars - 1)],
+                display_time[0..],
                 buf[0..len]
             }
         );

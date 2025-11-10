@@ -285,6 +285,10 @@ pub fn main() !void {
     emu_run_ahead.script700 = Script700.new(&emu_run_ahead);
     emu_run_ahead.load_from(&emu, .{ .copy_everything = true });
 
+    // Set debug values
+    db.emu_           = &emu;
+    db.run_ahead_emu_ = &emu_run_ahead;
+
     const stdin = std.io.getStdIn().reader();
     var buffer: [8]u8 = undefined;
 

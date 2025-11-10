@@ -7,7 +7,7 @@ using SPC;
 const bool VERIFY_HASH = true;
 
 const int WIDTH  = 133;
-const int HEIGHT = 33;
+const int HEIGHT = 34;
 
 var producerCommand = Path.Join(Env.ProgramDirectory, "apollo-spc-program");
 
