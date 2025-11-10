@@ -2196,8 +2196,9 @@ var info_msgs: [13][]const u8 = [_][]const u8 {
 
 var chan_display_state: [8]bool = [_]bool{true} ** 8;
 
-pub var emu_:           ?*Emu = null;
-pub var run_ahead_emu_: ?*Emu = null;
+pub var emu_:            ?*Emu = null;
+pub var run_ahead_emu_:  ?*Emu = null;
+pub var total_length_ms:   u64 = 10 * 60 * 1000;
 
 pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     var final_buffer: [max_lines * 257]u8 = undefined;
@@ -2216,17 +2217,82 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     }
 
     var display_time: [12]u8 = [_]u8 {' '} ** 12;
+    var play_bar:    [128]u8 = [1]u8 {'['} ++ [_]u8 {' '} ** 126 ++ [1]u8 {']'};
+
+    var complete_ratio: f64 = 0;
+    var buffered_ratio: f64 = 0;
+
+    var bar_pos:   u64 = 0;
+    var bar_pos_2: u64 = 0;
+
+    var cur_ms:       u64 = 0;
+    var run_ahead_ms: u64 = 0;
 
     if (emu_ != null and run_ahead_emu_ != null) {
-        const cur_ms = @divFloor(emu_.?.s_dsp.cur_cycle(), 2048);
+        cur_ms       = @divFloor(          emu_.?.s_dsp.cur_cycle(), 2048);
+        run_ahead_ms = @divFloor(run_ahead_emu_.?.s_dsp.cur_cycle(), 2048);
+        
         _ = time.fmt_time(cur_ms, &display_time);
+
+        const cur_ms_float:          f64 = @floatFromInt(cur_ms);
+        const run_ahead_ms_float:    f64 = @floatFromInt(run_ahead_ms);
+        const total_length_ms_float: f64 = @floatFromInt(total_length_ms);
+
+        complete_ratio = @divExact(cur_ms_float,       total_length_ms_float);
+        buffered_ratio = @divExact(run_ahead_ms_float, total_length_ms_float);
+        
+        bar_pos   = @intFromFloat(complete_ratio * 116);
+        bar_pos_2 = @intFromFloat(buffered_ratio * 116);
+
+        if (bar_pos >= 116) {
+            bar_pos = 116;
+        }
+        else {
+            play_bar[1 + bar_pos] = '|';
+        }
+
+        for (1 .. (1 + bar_pos)) |i| {
+            play_bar[i] = '=';
+        }
+
+        if (bar_pos_2 > bar_pos) {
+            if (bar_pos_2 >= 116) {
+                bar_pos_2 = 116;
+            }
+            else {
+                play_bar[1 + bar_pos_2 + 5] = '=';
+            }
+
+            if (bar_pos_2 > bar_pos) {
+                for ((2 + bar_pos + 5) .. (1 + bar_pos_2 + 5)) |i| {
+                    play_bar[i] = '=';
+                }
+            }
+        }
     }
 
+    if (bar_pos >= 116) {
+        bar_pos = 115;
+    }
+
+    play_bar[2 + bar_pos] = 0x1B;
+    play_bar[3 + bar_pos] = '[';
+    play_bar[4 + bar_pos] = '9';
+    play_bar[5 + bar_pos] = '0';
+    play_bar[6 + bar_pos] = 'm';
+    
+    play_bar[122] = 0x1B;
+    play_bar[123] = '[';
+    play_bar[124] = '3';
+    play_bar[125] = '9';
+    play_bar[126] = 'm';
+
     if (is_error) {
-        std.debug.print("\x1B[H{s}\r{s}\n\x1B[91m{s}: {s}\x1B[39m\n> ",
+        std.debug.print("\x1B[H{s}\r\x1B[96m{s} {s}\n\x1B[91m{s}: {s}                    \x1B[39m\n> ",
             .{
                 final_buffer[0 .. (total_chars - 1)],
                 display_time[0..],
+                play_bar[0..],
                 info_msgs[cur_info_msg],
                 info_msgs[cur_err_msg]
             }
@@ -2260,10 +2326,11 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
         }
 
         std.debug.print(
-            "\x1B[H{s}\r{s}\n\x1B[93m{s}\x1B[39m\n> ",
+            "\x1B[H{s}\r\x1B[96m{s} {s}\n\x1B[93m{s}                    \x1B[39m\n> ",
             .{
                 final_buffer[0 .. (total_chars - 1)],
                 display_time[0..],
+                play_bar[0..],
                 buf[0..len]
             }
         );

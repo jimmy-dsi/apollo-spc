@@ -288,6 +288,7 @@ pub fn main() !void {
     // Set debug values
     db.emu_           = &emu;
     db.run_ahead_emu_ = &emu_run_ahead;
+    db.total_length_ms = @as(u64, metadata.?.length_in_seconds orelse 600) * 1000;
 
     const stdin = std.io.getStdIn().reader();
     var buffer: [8]u8 = undefined;
