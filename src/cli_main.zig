@@ -29,6 +29,7 @@ var t_main_only    = Atomic(bool).init(false);
 var t_seek_signal  = Atomic(i8).init(0);
 var t_cur_clock    = Atomic(u64).init(0);
 
+var m_save_buffer  = std.Thread.Mutex{};
 var m_expect_input = std.Thread.Mutex{};
 
 var stdout_file: std.fs.File = undefined;
@@ -290,6 +291,10 @@ pub fn main() !void {
     db.run_ahead_emu_ = &emu_run_ahead;
     db.total_length_ms = @as(u64, metadata.?.length_in_seconds orelse 600) * 1000;
 
+    // Start run ahead thread after run ahead emu object has been created
+    var t_run_ahead = try std.Thread.spawn(.{}, run_ahead, .{&emu_run_ahead});
+    defer t_run_ahead.join();
+
     const stdin = std.io.getStdIn().reader();
     var buffer: [8]u8 = undefined;
 
@@ -420,7 +425,7 @@ pub fn main() !void {
 
                 var s7en = emu.script700.enabled;
 
-                var res = run_loop(&emu, &emu_run_ahead) catch null;
+                var res = run_loop(&emu) catch null;
                 var attempts: u32 = 0;
                 var step_instr: bool = false;
 
@@ -451,7 +456,7 @@ pub fn main() !void {
                         };
                     }
                     else {
-                        res = run_loop(&emu, &emu_run_ahead) catch null;
+                        res = run_loop(&emu) catch null;
                     }
                 }
 
@@ -802,13 +807,64 @@ fn savestate(emu: *Emu) void {
     }
 }
 
-fn run_loop(emu: *Emu, emu_run_ahead: *Emu) !bool {
+fn run_ahead(emu: *Emu) void {
+    var cycles: u32 = samples * 64;
+    cycles = @divFloor(cycles, 8);
+
+    while (true) {
+        db.m_run_ahead.lock();
+
+        // No point in running ahead past the point where emu states are no longer saved
+        if (@divFloor(emu.s_dsp.cur_cycle(), 2048000) >= 600) {
+            db.m_run_ahead.unlock();
+            break;
+        }
+
+        if (emu.script700.enabled) {
+            for (0..cycles) |_| {
+                if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
+                    m_save_buffer.lock();
+                    savestate(emu);
+                    m_save_buffer.unlock();
+                }
+
+                var retry = true;
+                while (retry) {
+                    retry = false;
+                    // If Script700 times out, sleep for a bit and try again
+                    emu.step_cycle_safe() catch {
+                        retry = true;
+                        std.time.sleep(2 * std.time.ns_per_ms);
+                    };
+                }
+            }
+        }
+        else {
+            for (0..cycles) |_| {
+                if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
+                    m_save_buffer.lock();
+                    savestate(emu);
+                    m_save_buffer.unlock();
+                }
+
+                emu.step_cycle_fast();
+            }
+        }
+
+        db.m_run_ahead.unlock();
+        std.time.sleep(10 * std.time.ns_per_us);
+    }
+}
+
+fn run_loop(emu: *Emu) !bool {
     const cycles = samples * 64;
 
     is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
 
     const seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
     const target_cycle = @as(i128, emu.s_dsp.cur_cycle()) + @as(i128, seek_amt) * @as(i128, 2048000);
+
+    m_save_buffer.lock();
 
     if (seek_amt < 0 and savestates.items.len > 0) {
         var last_save: ?*Emu = null;
@@ -860,6 +916,8 @@ fn run_loop(emu: *Emu, emu_run_ahead: *Emu) !bool {
             }
         }
     }
+    
+    m_save_buffer.unlock();
 
     if (emu.script700.enabled) {
         for (stream_start..cycles) |i| {
@@ -979,44 +1037,8 @@ fn run_loop(emu: *Emu, emu_run_ahead: *Emu) !bool {
     // Utilize the idle time before processing next batch to execute run-ahead
     const expected_next_time = last_time + @as(i128, samples) * std.time.ns_per_s / 32000;
 
-    var now = std.time.nanoTimestamp();
-    var amt = expected_next_time - now - 1 * std.time.ns_per_ms;
-
-    //std.debug.print("{d}\n", .{@divFloor(amt, std.time.ns_per_ms)});
-    //std.time.sleep(2 * std.time.ns_per_s);
-    //std.process.exit(0);
-
-    while (amt >= 4 * std.time.ns_per_ms) {
-        if (emu_run_ahead.script700.enabled) {
-            for (0..cycles) |_| {
-                if (emu_run_ahead.s_dsp.cur_cycle() % 2048000 == 0) {
-                    savestate(emu_run_ahead);
-                }
-
-                var retry = true;
-                while (retry) {
-                    retry = false;
-                    // If Script700 times out, sleep for a bit and try again
-                    emu_run_ahead.step_cycle_safe() catch {
-                        retry = true;
-                        std.time.sleep(2 * std.time.ns_per_ms);
-                    };
-                }
-            }
-        }
-        else {
-            for (0..cycles) |_| {
-                if (emu_run_ahead.s_dsp.cur_cycle() % 2048000 == 0) {
-                    savestate(emu_run_ahead);
-                }
-
-                emu_run_ahead.step_cycle_fast();
-            }
-        }
-
-        now = std.time.nanoTimestamp();
-        amt = expected_next_time - now - 1 * std.time.ns_per_ms;
-    }
+    const now = std.time.nanoTimestamp();
+    const amt = expected_next_time - now - 1 * std.time.ns_per_ms;
 
     if (amt > 0) {
         const sleep_amt: u64 = @intCast(expected_next_time - now - 1 * std.time.ns_per_ms);

@@ -2199,6 +2199,7 @@ var chan_display_state: [8]bool = [_]bool{true} ** 8;
 pub var emu_:            ?*Emu = null;
 pub var run_ahead_emu_:  ?*Emu = null;
 pub var total_length_ms:   u64 = 10 * 60 * 1000;
+pub var m_run_ahead            = std.Thread.Mutex{};
 
 pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     var final_buffer: [max_lines * 257]u8 = undefined;
@@ -2229,8 +2230,10 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     var run_ahead_ms: u64 = 0;
 
     if (emu_ != null and run_ahead_emu_ != null) {
+        m_run_ahead.lock();
         cur_ms       = @divFloor(          emu_.?.s_dsp.cur_cycle(), 2048);
         run_ahead_ms = @divFloor(run_ahead_emu_.?.s_dsp.cur_cycle(), 2048);
+        m_run_ahead.unlock();
         
         _ = time.fmt_time(cur_ms, &display_time);
 
