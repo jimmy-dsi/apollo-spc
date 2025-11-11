@@ -1547,13 +1547,14 @@ pub fn print_dsp_state_2(emu: *Emu, _: OptionStruct) void {
     const evoll: u8 = @bitCast(s.echo.vol_left);
     const evolr: u8 = @bitCast(s.echo.vol_right);
     const efb:   u8 = @bitCast(s.echo.feedback);
+    const endx:  u8 = emu.s_dsp.dsp_map[0x7C];
 
     print("main volume - left:   {X:0>2}      ", .{mvoll});
     print("key on:                 {X:0>2}\n",   .{kon});
     print("main volume - right:  {X:0>2}      ", .{mvolr});
     print("key off:                {X:0>2}\n",   .{koff});
     print("echo volume - left:   {X:0>2}      ", .{evoll});
-    print("source end (endx):      {X:0>2}\n",   .{0x00});
+    print("source end (endx):      {X:0>2}\n",   .{endx});
     print("echo volume - right:  {X:0>2}      ", .{evolr});
     print("echo feedback:          {X:0>2}\n",   .{efb});
     print("\n", .{});
@@ -1688,7 +1689,7 @@ fn print_dsp_voices(emu: *Emu, _: *Emu, base: u3, _: OptionStruct) void {
         if (!channels_enabled[idx]) {
             print("\x1B[90m", .{});
         }
-        print("    outx:         {X:0>2}       \x1B[39m", .{0x00});
+        print("    outx:         {X:0>2}       \x1B[39m", .{emu.s_dsp.dsp_map[idx << 4 | 9]});
     }
     print("\n", .{});
 }
@@ -2178,7 +2179,7 @@ pub var is_error:   bool = false;
 pub var cur_info_msg: u8 = 0;
 pub var cur_err_msg:  u8 = 0;
 
-var info_msgs: [13][]const u8 = [_][]const u8 {
+var info_msgs: [15][]const u8 = [_][]const u8 {
     "Enter h to see help menu",
     "Breakpoint hit. Press enter",
     "\x1B[91mScript700 timed out - see above",
@@ -2191,7 +2192,9 @@ var info_msgs: [13][]const u8 = [_][]const u8 {
     "unknown error.",
     "Channel ? enabled     [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]",
     "Channel ? disabled    [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]",
-    "All channels enabled  [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]"
+    "All channels enabled  [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]",
+    "Seek +5 seconds",
+    "Seek -5 seconds"
 };
 
 var chan_display_state: [8]bool = [_]bool{true} ** 8;
@@ -2291,7 +2294,7 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
     play_bar[126] = 'm';
 
     if (is_error) {
-        std.debug.print("\x1B[H{s}\r\x1B[96m{s} {s}\n\x1B[91m{s}: {s}                    \x1B[39m\n> ",
+        std.debug.print("\x1B[H{s}\r\x1B[96m{s} {s}\n\x1B[91m{s}: {s}                         \x1B[39m\n> ",
             .{
                 final_buffer[0 .. (total_chars - 1)],
                 display_time[0..],
@@ -2329,7 +2332,7 @@ pub inline fn flush(_: ?[]const u8, no_clear: bool) void {
         }
 
         std.debug.print(
-            "\x1B[H{s}\r\x1B[96m{s} {s}\n\x1B[93m{s}                    \x1B[39m\n> ",
+            "\x1B[H{s}\r\x1B[96m{s} {s}\n\x1B[93m{s}                         \x1B[39m\n> ",
             .{
                 final_buffer[0 .. (total_chars - 1)],
                 display_time[0..],

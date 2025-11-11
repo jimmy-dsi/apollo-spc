@@ -1175,7 +1175,7 @@ fn break_listener() void {
                                 t_seek_signal.store(-5, std.builtin.AtomicOrder.seq_cst);
                                 prev_input = buffer[0];
                                 
-                                //set_msg(0, 0, false); // TODO: Configure msg for this
+                                set_msg(14, 0, false);
                             },
                             'f' => {
                                 const cc = t_cur_clock.load(std.builtin.AtomicOrder.seq_cst);
@@ -1185,7 +1185,7 @@ fn break_listener() void {
                                     prev_input = buffer[0];
                                 }
                                 
-                                //set_msg(0, 0, false); // TODO: Configure msg for this
+                                set_msg(13, 0, false);
                             },
                             else => {
                                 buffer[0] = prev_input;
