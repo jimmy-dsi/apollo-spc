@@ -28,6 +28,7 @@ var t_voice_toggle = Atomic(u8).init(9);
 var t_main_only    = Atomic(bool).init(false);
 var t_seek_signal  = Atomic(i8).init(0);
 var t_cur_clock    = Atomic(u64).init(0);
+var t_instr_clear  = Atomic(bool).init(false);
 
 var m_save_buffer  = std.Thread.Mutex{};
 var m_expect_input = std.Thread.Mutex{};
@@ -378,7 +379,7 @@ pub fn main() !void {
                 if (cur_mode == 'i') {
                     db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
-                    show_metadata();
+                    show_metadata_noclear();
                 }
             }
         }
@@ -479,6 +480,7 @@ pub fn main() !void {
                     cur_action = 's';
 
                     if (cur_mode == 'i') {
+                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                         print_instruction(&emu, &emu.s_smp.spc.state);
                     }
                     else if (t_other_menu.load(std.builtin.AtomicOrder.seq_cst) == 'h') {
@@ -527,6 +529,12 @@ pub fn main() !void {
                         db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_script700_state(&emu);
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
+                    }
+                    else if (cur_mode == 'i') {
+                        //db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                        //t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                        //show_metadata();
+                        flush(null, true);
                     }
                 }
 
@@ -668,6 +676,14 @@ pub fn main() !void {
             's' => {
                 cur_action = 's';
                 // Default behavior: Step instruction
+                var no_cursor_up = false;
+
+                if (t_instr_clear.load(std.builtin.AtomicOrder.seq_cst)) {
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    flush(null, false);
+                    t_instr_clear.store(false, std.builtin.AtomicOrder.seq_cst);
+                    no_cursor_up = true;
+                }
 
                 var s7en = emu.script700.enabled;
                 var attempts: u32 = 0;
@@ -722,7 +738,9 @@ pub fn main() !void {
                     const prev_logs = emu.s_smp.get_access_logs_range(last_cycle);
                     var logs = db.filter_access_logs(prev_logs);
 
-                    db.move_cursor_up();
+                    if (!no_cursor_up) {
+                        db.move_cursor_up();
+                    }
                     
                     db.print_pc(prev_spc_state.pc);
                     db.print(" |  ", .{});
@@ -1099,6 +1117,20 @@ fn show_metadata() void {
     flush(null, false);
 }
 
+fn show_metadata_noclear() void {
+    var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
+    const result = metadata.?.print(&print_buf);
+
+    if (result) |metastring| {
+        db.print("{s}\n", .{metastring});
+    }
+    else |_| {
+        db.print("{s}\n", .{print_buf[0..]});
+    }
+
+    flush(null, true);
+}
+
 fn break_listener() void {
     var prev_input: u8 = 'k';
 
@@ -1118,8 +1150,8 @@ fn break_listener() void {
 
             if (is_breakpoint.load(std.builtin.AtomicOrder.seq_cst)) {
                 break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+                t_instr_clear.store(true, std.builtin.AtomicOrder.seq_cst);
                 set_msg(0, 0, false);
-                flush(null, true);
             }
             else {
                 switch (t_input_mode.load(std.builtin.AtomicOrder.seq_cst)) {
@@ -1167,6 +1199,7 @@ fn break_listener() void {
                             },
                             'k' => {
                                 break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+                                t_instr_clear.store(true, std.builtin.AtomicOrder.seq_cst);
                                 prev_input = buffer[0];
                                 
                                 set_msg(0, 0, false);
@@ -1316,7 +1349,7 @@ fn set_msg(msg_id: u8, sub_msg_id: u8, is_error: bool) void {
 }
 
 fn print_instruction(emu: *const Emu, state: *const SPCState) void {
-    db.print("\x1B[43m", .{}); // Yellow highlight
+    db.print("\x1B[45m", .{}); // Highlight
 
     db.print_pc(state.pc);
     db.print(" |  ", .{});
