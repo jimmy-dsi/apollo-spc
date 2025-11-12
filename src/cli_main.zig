@@ -17,18 +17,20 @@ const spc_loader = @import("core/spc_loader.zig");
 const max_consecutive_timeouts: u32 = 90;
 const busyloop_relief_ms:       u32 = 20;
 
-var t_started      = Atomic(bool).init(false);
-var break_signal   = Atomic(bool).init(false);
-var is_breakpoint  = Atomic(bool).init(false);
-var t_timeout_wait = Atomic(bool).init(false);
-var t_menu_mode    = Atomic(u8).init('i');
-var t_input_mode   = Atomic(u32).init(0);
-var t_other_menu   = Atomic(u8).init('m');
-var t_voice_toggle = Atomic(u8).init(9);
-var t_main_only    = Atomic(bool).init(false);
-var t_seek_signal  = Atomic(i8).init(0);
-var t_cur_clock    = Atomic(u64).init(0);
-var t_instr_clear  = Atomic(bool).init(false);
+var t_started            = Atomic(bool).init(false);
+var break_signal         = Atomic(bool).init(false);
+var is_breakpoint        = Atomic(bool).init(false);
+var t_timeout_wait       = Atomic(bool).init(false);
+var t_menu_mode          = Atomic(u8).init('i');
+var t_input_mode         = Atomic(u32).init(0);
+var t_other_menu         = Atomic(u8).init('m');
+var t_voice_toggle       = Atomic(u8).init(9);
+var t_main_only          = Atomic(bool).init(false);
+var t_seek_signal        = Atomic(i8).init(0);
+var t_cur_clock          = Atomic(u64).init(0);
+var t_instr_clear        = Atomic(bool).init(false);
+var t_script700_canceled = Atomic(bool).init(false);
+var t_script700_restored = Atomic(bool).init(false);
 
 var m_save_buffer  = std.Thread.Mutex{};
 var m_expect_input = std.Thread.Mutex{};
@@ -835,7 +837,8 @@ fn run_ahead(emu: *Emu) void {
         // No point in running ahead past the point where emu states are no longer saved
         if (@divFloor(emu.s_dsp.cur_cycle(), 2048000) >= 600) {
             db.m_run_ahead.unlock();
-            break;
+            std.time.sleep(1 * std.time.ns_per_ms);
+            continue;
         }
 
         if (emu.script700.enabled) {
@@ -883,6 +886,26 @@ fn run_loop(emu: *Emu) !bool {
 
     const seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
     const target_cycle = @as(i128, emu.s_dsp.cur_cycle()) + @as(i128, seek_amt) * @as(i128, 2048000);
+
+    // Remove all saved emu states past this point if Script700 has been canceled.
+    if (t_script700_canceled.load(std.builtin.AtomicOrder.seq_cst)) {
+        db.m_run_ahead.lock();
+
+        var top = savestates.items[savestates.items.len - 1];
+        while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
+            const res = savestates.pop();
+            if (res == null) {
+                break;
+            }
+            top = res.?;
+        }
+        db.run_ahead_emu_.?.load_from(emu, .{});
+        savestate(db.run_ahead_emu_.?);
+
+        db.m_run_ahead.unlock();
+
+        t_script700_canceled.store(false, std.builtin.AtomicOrder.seq_cst);
+    }
 
     m_save_buffer.lock();
 
@@ -962,6 +985,26 @@ fn run_loop(emu: *Emu) !bool {
                 return false;
             }
         }
+    }
+
+    // Remove all saved emu states past this point if Script700 has been restored.
+    if (t_script700_restored.load(std.builtin.AtomicOrder.seq_cst)) {
+        db.m_run_ahead.lock();
+
+        var top = savestates.items[savestates.items.len - 1];
+        while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
+            const res = savestates.pop();
+            if (res == null) {
+                break;
+            }
+            top = res.?;
+        }
+        db.run_ahead_emu_.?.load_from(emu, .{});
+        savestate(db.run_ahead_emu_.?);
+
+        db.m_run_ahead.unlock();
+
+        t_script700_restored.store(false, std.builtin.AtomicOrder.seq_cst);
     }
 
     stream_start = 0;
@@ -1237,9 +1280,11 @@ fn break_listener() void {
                                 set_msg(3, 0, false);
                                 flush(null, true);
                                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
+                                t_script700_restored.store(true, std.builtin.AtomicOrder.seq_cst);
                             },
                             'c' => {
                                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
+                                t_script700_canceled.store(true, std.builtin.AtomicOrder.seq_cst);
                             },
                             'q' => {
                                 stdout_file.close();
@@ -1288,9 +1333,11 @@ fn report_timeout() void {
                 set_msg(3, 0, false);
                 flush(null, true);
                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
+                t_script700_restored.store(true, std.builtin.AtomicOrder.seq_cst);
             },
             'c' => {
                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
+                t_script700_canceled.store(true, std.builtin.AtomicOrder.seq_cst);
             },
             'q' => {
                 stdout_file.close();
