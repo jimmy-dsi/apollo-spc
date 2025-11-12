@@ -70,7 +70,7 @@ pub const Script700 = struct {
         self.data_area = &default_data;
     }
 
-    pub inline fn load_from(self: *Script700, other: *const Script700, options: LoadOptions) void {
+    pub inline fn load_from(self: *Script700, other: *const Script700, options: LoadOptions) !void {
         self._finished = other._finished;
 
         self.enabled = other.enabled;
@@ -82,13 +82,19 @@ pub const Script700 = struct {
             self.label_remappings = other.label_remappings; // TODO: Handle this
 
             self.script_bytecode = other.script_bytecode;
-            self.data_area       = other.data_area; // TODO: Deep copy
+
+            self.self_alloc_data = false;
+            self.data_area = other.data_area;
+            if (self.enabled) {
+                try self.expand_data_area(@intCast(other.data_area.len)); // Deep copy data
+            }
         }
         else {
             self.data_area = other.data_area; // Copy pointer only
+            self.self_alloc_data = false;
         }
 
-        self.self_alloc_data = other.self_alloc_data;
+        //self.self_alloc_data = other.self_alloc_data;
 
         self.state = other.state;
     }

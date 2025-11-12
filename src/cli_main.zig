@@ -287,7 +287,10 @@ pub fn main() !void {
     emu_run_ahead.s_dsp = SDSP.new(&emu_run_ahead);
     emu_run_ahead.s_smp = SSMP.new(&emu_run_ahead, .{});
     emu_run_ahead.script700 = Script700.new(&emu_run_ahead);
-    emu_run_ahead.load_from(&emu, .{ .copy_everything = true });
+    emu_run_ahead.load_from(&emu, .{ .copy_everything = true }) catch {
+        std.debug.print("Save memory error\n", .{});
+        std.process.exit(1);
+    };
 
     // Set debug values
     db.emu_           = &emu;
@@ -823,7 +826,10 @@ fn savestate(emu: *Emu) void {
         };
 
         savestates.append(new_emu) catch {};
-        savestates.items[savestates.items.len - 1].load_from(emu, .{});
+        savestates.items[savestates.items.len - 1].load_from(emu, .{}) catch {
+            std.debug.print("Save memory error\n", .{});
+            std.process.exit(1);
+        };
     }
 }
 
@@ -891,16 +897,33 @@ fn run_loop(emu: *Emu) !bool {
     if (t_script700_canceled.load(std.builtin.AtomicOrder.seq_cst)) {
         db.m_run_ahead.lock();
 
-        var top = savestates.items[savestates.items.len - 1];
-        while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
-            const res = savestates.pop();
-            if (res == null) {
+        var any_enabled = false;
+
+        var index: i32 = @intCast(savestates.items.len - 1);
+        while (index >= 0) {
+            const val = savestates.items[savestates.items.len - 1];
+            if (val.script700.enabled) {
+                any_enabled = true;
                 break;
             }
-            top = res.?;
+            index -= 1;
         }
-        db.run_ahead_emu_.?.load_from(emu, .{});
-        savestate(db.run_ahead_emu_.?);
+
+        if (any_enabled) {
+            var top = savestates.items[savestates.items.len - 1];
+            while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
+                const res = savestates.pop();
+                if (res == null) {
+                    break;
+                }
+                top = res.?;
+            }
+            db.run_ahead_emu_.?.load_from(emu, .{}) catch {
+                std.debug.print("Save memory error\n", .{});
+                std.process.exit(1);
+            };
+            savestate(db.run_ahead_emu_.?);
+        }
 
         db.m_run_ahead.unlock();
 
@@ -931,7 +954,10 @@ fn run_loop(emu: *Emu) !bool {
         }
 
         if (last_save) |ls| {
-            emu.load_from(ls, .{});
+            emu.load_from(ls, .{}) catch {
+                std.debug.print("Save memory error\n", .{});
+                std.process.exit(1);
+            };
         }
 
         t_seek_signal.store(0, std.builtin.AtomicOrder.seq_cst);
@@ -953,7 +979,10 @@ fn run_loop(emu: *Emu) !bool {
 
             if (diff_s <= savestates.items.len - 1) {
                 const idx = savestates.items.len - 1 - diff_s;
-                emu.load_from(&savestates.items[idx], .{});
+                emu.load_from(&savestates.items[idx], .{}) catch {
+                    std.debug.print("Save memory error\n", .{});
+                    std.process.exit(1);
+                };
 
                 t_cur_clock.store(0, std.builtin.AtomicOrder.seq_cst);
             }
@@ -991,16 +1020,34 @@ fn run_loop(emu: *Emu) !bool {
     if (t_script700_restored.load(std.builtin.AtomicOrder.seq_cst)) {
         db.m_run_ahead.lock();
 
-        var top = savestates.items[savestates.items.len - 1];
-        while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
-            const res = savestates.pop();
-            if (res == null) {
+        var any_disabled = false;
+
+        var index: i32 = @intCast(savestates.items.len - 1);
+        while (index >= 0) {
+            const val = savestates.items[savestates.items.len - 1];
+            if (!val.script700.enabled) {
+                any_disabled = true;
                 break;
             }
-            top = res.?;
+            index -= 1;
         }
-        db.run_ahead_emu_.?.load_from(emu, .{});
-        savestate(db.run_ahead_emu_.?);
+
+        if (any_disabled) {
+            var top = savestates.items[savestates.items.len - 1];
+            while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
+                const res = savestates.pop();
+                if (res == null) {
+                    break;
+                }
+                top = res.?;
+            }
+
+            db.run_ahead_emu_.?.load_from(emu, .{}) catch {
+                std.debug.print("Save memory error\n", .{});
+                std.process.exit(1);
+            };
+            savestate(db.run_ahead_emu_.?);
+        }
 
         db.m_run_ahead.unlock();
 

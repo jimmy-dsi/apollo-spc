@@ -279,7 +279,7 @@ pub const Emu = struct {
         }
     }
 
-    pub inline fn load_from(self: *Emu, other: *const Emu, options: Script700.LoadOptions) void {
+    pub inline fn load_from(self: *Emu, other: *const Emu, options: Script700.LoadOptions) !void {
         self.s_dsp.load_from(&other.s_dsp);
         self.s_smp.load_from(&other.s_smp);
 
@@ -288,7 +288,7 @@ pub const Emu = struct {
 
         self.s_smp.spc.emu = self;
 
-        self.script700.load_from(&other.script700, options);
+        try self.script700.load_from(&other.script700, options);
         self.script700_error = other.script700_error;
 
         self.script700.emu = self;
