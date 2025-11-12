@@ -708,7 +708,7 @@ fn determine_format(id666_main_pt2: []const u8) ID666Fmt {
         }
     }
 
-    const artist_field = id6[0xB1..0xD1];
+    const artist_field = id6[0x13..0x33];
     if (field_exists(artist_field)) {
         if (is_all_ascii(artist_field)) {
             text_score += 1;

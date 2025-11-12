@@ -2014,7 +2014,7 @@ pub const Script700 = struct {
         var new_data = allocator.alloc(u8, new_size) catch {
             return Runtime.out_of_memory;
         };
-        @memcpy(new_data, old_data);
+        @memcpy(new_data[0..old_data.len], old_data);
         // Fill the remainder with zeroes
         for (old_data.len..new_data.len) |i| {
             new_data[i] = 0x00;

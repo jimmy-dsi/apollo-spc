@@ -1556,7 +1556,7 @@ fn compile_script700() ![]const u8 {
 
         const mnemonic = peek_token(str.?);
     
-        if (mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
+        if (mnemonic != null and mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
             _ = next_token(str.?);
             var label_num = std.fmt.parseInt(i32, mnemonic.?[1..], 10) catch -1;
 
@@ -1838,7 +1838,7 @@ fn split_token(str: []const u8) struct { ?[]const u8,
             num_index +%= 1;
             is_hex = true;
         }
-        else if (str.len >= 2 and std.mem.eql(u8, str[split_index .. (split_index + 2)], "0x")) {
+        else if (str.len >= split_index + 2 and std.mem.eql(u8, str[split_index .. (split_index + 2)], "0x")) {
             num_index +%= 2;
             is_hex = true;
         }
