@@ -812,14 +812,14 @@ var last_time: i128 = 0;
 var savestates = std.ArrayList(Emu).init(alloc);
 
 fn savestate(emu: *Emu) void {
-    const new_emu = Emu {
-        .s_dsp = SDSP.new(emu),
-        .s_smp = SSMP.new(emu, .{}),
-        .script700 = Script700.new(emu),
-        .singleton = null,
-    };
-
     if (savestates.items.len < 600) { // 10 minutes is enough run ahead - stop here to avoid blowing up memory
+        const new_emu = Emu {
+            .s_dsp = SDSP.new(emu),
+            .s_smp = SSMP.new(emu, .{}),
+            .script700 = Script700.new(emu),
+            .singleton = null,
+        };
+
         savestates.append(new_emu) catch {};
         savestates.items[savestates.items.len - 1].load_from(emu, .{});
     }
@@ -852,7 +852,9 @@ fn run_ahead(emu: *Emu) void {
                     // If Script700 times out, sleep for a bit and try again
                     emu.step_cycle_safe() catch {
                         retry = true;
+                        db.m_run_ahead.unlock();
                         std.time.sleep(2 * std.time.ns_per_ms);
+                        db.m_run_ahead.lock();
                     };
                 }
             }
@@ -962,6 +964,8 @@ fn run_loop(emu: *Emu) !bool {
         }
     }
 
+    stream_start = 0;
+
     if (emu.singleton == null) {
         return true;
     }
@@ -1052,7 +1056,6 @@ fn run_loop(emu: *Emu) !bool {
         std.process.exit(1);
     };
 
-    // Utilize the idle time before processing next batch to execute run-ahead
     const expected_next_time = last_time + @as(i128, samples) * std.time.ns_per_s / 32000;
 
     const now = std.time.nanoTimestamp();
