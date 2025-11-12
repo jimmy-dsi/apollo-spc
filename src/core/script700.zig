@@ -1096,7 +1096,7 @@ pub const Script700 = struct {
                 return; // Cannot write to immediate or label - Treat as NOP
             },
             else => {
-                switch (info.src_data_size.?) {
+                switch (info.dest_data_size.?) {
                     0, 3 => {
                         try self.write_u8(info.dest_memtype, dest_address, @intCast(final_result & 0xFF));
                     },
