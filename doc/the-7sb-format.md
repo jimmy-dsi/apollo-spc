@@ -1,10 +1,10 @@
 # The 7sb Format
 ## Overview
-When loading Script700 files into the player, you may notice that a file named `<your-spc-file>.7sb` or `65816.7sb` generated upon load.
+When loading Script700 files into the player, you may notice a file named `<your-spc-file>.7sb` or `65816.7sb` generated upon load.
 
-This is a binary file which stores the Script700 bytecode, as well as the bytes from the data area and information about labels.
+This is a binary file which stores the Script700 bytecode, as well as the data area bytes and label address pointers.
 
-At this moment, **apollo-spc-program** does not understand .700 or .7se files natively, but it *can* read data from .7sb files. Reading of .700 or .7se files can only be done if the player is launched via **play**, as that app is the one with the capability to parse Script700 and convert into bytecode.
+At this moment, **apollo-spc-program** does not understand .700 or .7se files natively, but it *can* read data from .7sb files. Reading of .700 or .7se files can only be done if the player is launched via **play**, as that app is the one with the capability to parse Script700 reliably and convert it into bytecode.
 
 ## Terminology
 
