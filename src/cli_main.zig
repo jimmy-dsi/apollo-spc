@@ -178,16 +178,18 @@ pub fn main() !void {
         }
 
         std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
-        db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
-
-        show_metadata();
+    
+        if (debug_mode) {
+            print_instruction(&emu, &emu.s_smp.spc.state);
+        }
+        else {
+            db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
+            cur_action = 'c';
+            show_metadata();
+        }
 
         if (script700_load_error) |err| {
             report_error(err, true);
-        }
-    
-        if (!debug_mode) {
-            cur_action = 'c';
         }
     }
 
@@ -490,12 +492,14 @@ pub fn main() !void {
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
 
                 if (!res.?) {
-                    t_started.store(true, std.builtin.AtomicOrder.seq_cst);
+                    if (is_breakpoint.load(std.builtin.AtomicOrder.seq_cst)) {
+                        t_started.store(true, std.builtin.AtomicOrder.seq_cst);
 
-                    // Wait until start acknowledged
-                    var acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
-                    while (!acked) {
-                        acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
+                        // Wait until start acknowledged
+                        var acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
+                        while (!acked) {
+                            acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
+                        }
                     }
 
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
@@ -1358,6 +1362,11 @@ fn break_listener() void {
                                 flush(null, true);
                                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
                                 t_script700_restored.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                                flush(null, false);
+
+                                show_metadata_noclear();
                             },
                             'c' => {
                                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
@@ -1416,6 +1425,11 @@ fn report_timeout() void {
                 flush(null, true);
                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
                 t_script700_restored.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                flush(null, false);
+
+                show_metadata_noclear();
             },
             'c' => {
                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
