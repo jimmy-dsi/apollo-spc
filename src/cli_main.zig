@@ -17,20 +17,22 @@ const spc_loader = @import("core/spc_loader.zig");
 const max_consecutive_timeouts: u32 = 90;
 const busyloop_relief_ms:       u32 = 20;
 
-var t_started            = Atomic(bool).init(false);
-var break_signal         = Atomic(bool).init(false);
-var is_breakpoint        = Atomic(bool).init(false);
-var t_timeout_wait       = Atomic(bool).init(false);
-var t_menu_mode          = Atomic(u8).init('i');
-var t_input_mode         = Atomic(u32).init(0);
-var t_other_menu         = Atomic(u8).init('m');
-var t_voice_toggle       = Atomic(u8).init(9);
-var t_main_only          = Atomic(bool).init(false);
-var t_seek_signal        = Atomic(i8).init(0);
-var t_cur_clock          = Atomic(u64).init(0);
-var t_instr_clear        = Atomic(bool).init(false);
-var t_script700_canceled = Atomic(bool).init(false);
-var t_script700_restored = Atomic(bool).init(false);
+var t_started             = Atomic(bool).init(false);
+var t_start_ack           = Atomic(bool).init(false);
+var break_signal          = Atomic(bool).init(false);
+var is_breakpoint         = Atomic(bool).init(false);
+var t_timeout_wait        = Atomic(bool).init(false);
+var t_menu_mode           = Atomic(u8).init('i');
+var t_input_mode          = Atomic(u32).init(0);
+var t_other_menu          = Atomic(u8).init('m');
+var t_voice_toggle        = Atomic(u8).init(9);
+var t_main_only           = Atomic(bool).init(false);
+var t_seek_signal         = Atomic(i8).init(0);
+var t_cur_clock           = Atomic(u64).init(0);
+var t_instr_clear         = Atomic(bool).init(false);
+var t_script700_canceled  = Atomic(bool).init(false);
+var t_script700_restored  = Atomic(bool).init(false);
+var t_breakpoints_enabled = Atomic(bool).init(true);
 
 var m_save_buffer  = std.Thread.Mutex{};
 var m_expect_input = std.Thread.Mutex{};
@@ -424,6 +426,13 @@ pub fn main() !void {
                 set_msg(0, 0, false);
                 flush(null, true);
             },
+            'a' => {
+                const brk_on = t_breakpoints_enabled.load(std.builtin.AtomicOrder.seq_cst);
+                t_breakpoints_enabled.store(!brk_on, std.builtin.AtomicOrder.seq_cst);
+
+                set_msg(if (!brk_on) 15 else 16, 0, false);
+                flush(null, true);
+            },
             'c' => {
                 t_started.store(true, std.builtin.AtomicOrder.seq_cst);
                 cur_action = 'c';
@@ -481,6 +490,14 @@ pub fn main() !void {
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
 
                 if (!res.?) {
+                    t_started.store(true, std.builtin.AtomicOrder.seq_cst);
+
+                    // Wait until start acknowledged
+                    var acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
+                    while (!acked) {
+                        acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
+                    }
+
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
                     cur_action = 's';
 
@@ -893,6 +910,8 @@ fn run_loop(emu: *Emu) !bool {
     const seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
     const target_cycle = @as(i128, emu.s_dsp.cur_cycle()) + @as(i128, seek_amt) * @as(i128, 2048000);
 
+    const brk_on = t_breakpoints_enabled.load(std.builtin.AtomicOrder.seq_cst);
+
     // Remove all saved emu states past this point if Script700 has been canceled.
     if (t_script700_canceled.load(std.builtin.AtomicOrder.seq_cst)) {
         db.m_run_ahead.lock();
@@ -998,7 +1017,7 @@ fn run_loop(emu: *Emu) !bool {
                 return e;
             };
 
-            if (emu.break_check()) {
+            if (emu.break_check() and brk_on) {
                 is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
                 stream_start = @intCast(i);
                 return false;
@@ -1008,7 +1027,7 @@ fn run_loop(emu: *Emu) !bool {
     else {
         for (stream_start..cycles) |i| {
             emu.step_cycle_fast();
-            if (emu.break_check()) {
+            if (emu.break_check() and brk_on) {
                 is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
                 stream_start = @intCast(i);
                 return false;
@@ -1190,6 +1209,7 @@ fn show_help_menu() void {
     db.print("    m  = View ID666 metadata \n", .{});
     db.print("   1-8 = Toggle channel # output \n", .{});
     db.print("    0  = Enable all channels \n", .{});
+    db.print("    a  = Toggle all breakpoints on/off \n", .{});
     db.print("    q  = Quit \n", .{});
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n\n", .{});
     db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
@@ -1234,12 +1254,16 @@ fn break_listener() void {
             started = t_started.load(std.builtin.AtomicOrder.seq_cst);
         }
 
+        t_start_ack.store(true, std.builtin.AtomicOrder.seq_cst);
+
         var buffer: [8]u8 = undefined;
         const stdin = std.io.getStdIn().reader();
 
         if (m_expect_input.tryLock()) {
             buffer[0] = ' ';
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
+
+            t_start_ack.store(false, std.builtin.AtomicOrder.seq_cst);
 
             if (is_breakpoint.load(std.builtin.AtomicOrder.seq_cst)) {
                 break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
@@ -1271,6 +1295,12 @@ fn break_listener() void {
                             'i' => {
                                 prev_input = buffer[0];
                                 set_msg(0, 0, false);
+                            },
+                            'a' => {
+                                const brk_on = t_breakpoints_enabled.load(std.builtin.AtomicOrder.seq_cst);
+                                t_breakpoints_enabled.store(!brk_on, std.builtin.AtomicOrder.seq_cst);
+
+                                set_msg(if (!brk_on) 15 else 16, 0, false);
                             },
                             '0' => {
                                 t_voice_toggle.store(0, std.builtin.AtomicOrder.seq_cst);
@@ -1332,6 +1362,11 @@ fn break_listener() void {
                             'c' => {
                                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
                                 t_script700_canceled.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                                flush(null, false);
+
+                                show_metadata_noclear();
                             },
                             'q' => {
                                 stdout_file.close();
@@ -1385,6 +1420,11 @@ fn report_timeout() void {
             'c' => {
                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
                 t_script700_canceled.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                flush(null, false);
+
+                show_metadata_noclear();
             },
             'q' => {
                 stdout_file.close();

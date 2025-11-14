@@ -2179,7 +2179,7 @@ pub var is_error:   bool = false;
 pub var cur_info_msg: u8 = 0;
 pub var cur_err_msg:  u8 = 0;
 
-var info_msgs: [15][]const u8 = [_][]const u8 {
+var info_msgs: [17][]const u8 = [_][]const u8 {
     "Enter h to see help menu",
     "Breakpoint hit. Press enter",
     "\x1B[91mScript700 timed out - see above",
@@ -2194,7 +2194,9 @@ var info_msgs: [15][]const u8 = [_][]const u8 {
     "Channel ? disabled    [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]",
     "All channels enabled  [\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[92m+\x1B[93m]",
     "Seek +5 seconds",
-    "Seek -5 seconds"
+    "Seek -5 seconds",
+    "All breakpoints enabled",
+    "All breakpoints disabled"
 };
 
 var chan_display_state: [8]bool = [_]bool{true} ** 8;
