@@ -17,16 +17,24 @@ const spc_loader = @import("core/spc_loader.zig");
 const max_consecutive_timeouts: u32 = 90;
 const busyloop_relief_ms:       u32 = 20;
 
-var t_started      = Atomic(bool).init(false);
-var break_signal   = Atomic(bool).init(false);
-var is_breakpoint  = Atomic(bool).init(false);
-var t_timeout_wait = Atomic(bool).init(false);
-var t_menu_mode    = Atomic(u8).init('i');
-var t_input_mode   = Atomic(u32).init(0);
-var t_other_menu   = Atomic(u8).init('m');
-var t_voice_toggle = Atomic(u8).init(9);
-var t_main_only    = Atomic(bool).init(false);
+var t_started             = Atomic(bool).init(false);
+var t_start_ack           = Atomic(bool).init(false);
+var break_signal          = Atomic(bool).init(false);
+var is_breakpoint         = Atomic(bool).init(false);
+var t_timeout_wait        = Atomic(bool).init(false);
+var t_menu_mode           = Atomic(u8).init('i');
+var t_input_mode          = Atomic(u32).init(0);
+var t_other_menu          = Atomic(u8).init('m');
+var t_voice_toggle        = Atomic(u8).init(9);
+var t_main_only           = Atomic(bool).init(false);
+var t_seek_signal         = Atomic(i8).init(0);
+var t_cur_clock           = Atomic(u64).init(0);
+var t_instr_clear         = Atomic(bool).init(false);
+var t_script700_canceled  = Atomic(bool).init(false);
+var t_script700_restored  = Atomic(bool).init(false);
+var t_breakpoints_enabled = Atomic(bool).init(true);
 
+var m_save_buffer  = std.Thread.Mutex{};
 var m_expect_input = std.Thread.Mutex{};
 
 var stdout_file: std.fs.File = undefined;
@@ -70,11 +78,14 @@ pub fn main() !void {
 
     Emu.static_init();
 
+    var singleton = Emu.Singleton { };
+
     var emu = Emu.new();
     emu.init(
         SDSP.new(&emu),
         SSMP.new(&emu, .{}),
         Script700.new(&emu),
+        &singleton
     );
     defer emu.script700.deinit();
 
@@ -137,6 +148,9 @@ pub fn main() !void {
     var t_break_listener = try std.Thread.spawn(.{}, break_listener, .{});
     defer t_break_listener.join();
 
+    //var t_audio_writer = try std.Thread.spawn(.{}, audio_writer, .{});
+    //defer t_audio_writer.join();
+
     var cur_page: u8 = 0x00;
     var cur_offset: u8 = 0x00;
     var cur_mode: u8 = 'i';
@@ -164,16 +178,18 @@ pub fn main() !void {
         }
 
         std.debug.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
-        db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
-
-        show_metadata();
+    
+        if (debug_mode) {
+            print_instruction(&emu, &emu.s_smp.spc.state);
+        }
+        else {
+            db.print("SPC file \"{s}\" loaded successfully!\n\n", .{path});
+            cur_action = 'c';
+            show_metadata();
+        }
 
         if (script700_load_error) |err| {
             report_error(err, true);
-        }
-    
-        if (!debug_mode) {
-            cur_action = 'c';
         }
     }
 
@@ -269,6 +285,26 @@ pub fn main() !void {
         emu.script700.enabled = true; // Enable Script700 if load is successful
     }
 
+    // After all load is done, make copy of initial emulator state
+    var emu_run_ahead: Emu = undefined;
+    emu_run_ahead.singleton = null;
+    emu_run_ahead.s_dsp = SDSP.new(&emu_run_ahead);
+    emu_run_ahead.s_smp = SSMP.new(&emu_run_ahead, .{});
+    emu_run_ahead.script700 = Script700.new(&emu_run_ahead);
+    emu_run_ahead.load_from(&emu, .{ .copy_everything = true }) catch {
+        std.debug.print("Save memory error\n", .{});
+        std.process.exit(1);
+    };
+
+    // Set debug values
+    db.emu_           = &emu;
+    db.run_ahead_emu_ = &emu_run_ahead;
+    db.total_length_ms = @as(u64, metadata.?.length_in_seconds orelse 600) * 1000;
+
+    // Start run ahead thread after run ahead emu object has been created
+    var t_run_ahead = try std.Thread.spawn(.{}, run_ahead, .{&emu_run_ahead});
+    defer t_run_ahead.join();
+
     const stdin = std.io.getStdIn().reader();
     var buffer: [8]u8 = undefined;
 
@@ -352,7 +388,7 @@ pub fn main() !void {
                 if (cur_mode == 'i') {
                     db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                     t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
-                    show_metadata();
+                    show_metadata_noclear();
                 }
             }
         }
@@ -390,6 +426,13 @@ pub fn main() !void {
                 db.print_memory_page(&emu, cur_page, cur_offset, .{});
 
                 set_msg(0, 0, false);
+                flush(null, true);
+            },
+            'a' => {
+                const brk_on = t_breakpoints_enabled.load(std.builtin.AtomicOrder.seq_cst);
+                t_breakpoints_enabled.store(!brk_on, std.builtin.AtomicOrder.seq_cst);
+
+                set_msg(if (!brk_on) 15 else 16, 0, false);
                 flush(null, true);
             },
             'c' => {
@@ -449,10 +492,21 @@ pub fn main() !void {
                 break_signal.store(false, std.builtin.AtomicOrder.seq_cst);
 
                 if (!res.?) {
+                    if (is_breakpoint.load(std.builtin.AtomicOrder.seq_cst)) {
+                        t_started.store(true, std.builtin.AtomicOrder.seq_cst);
+
+                        // Wait until start acknowledged
+                        var acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
+                        while (!acked) {
+                            acked = t_start_ack.load(std.builtin.AtomicOrder.seq_cst);
+                        }
+                    }
+
                     t_started.store(false, std.builtin.AtomicOrder.seq_cst);
                     cur_action = 's';
 
                     if (cur_mode == 'i') {
+                        db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
                         print_instruction(&emu, &emu.s_smp.spc.state);
                     }
                     else if (t_other_menu.load(std.builtin.AtomicOrder.seq_cst) == 'h') {
@@ -479,7 +533,7 @@ pub fn main() !void {
                         db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
 
                         db.print("\n", .{});
-                        db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
+                        db.print_dsp_state(&emu, &emu_run_ahead, .{.is_dsp = true, .prev_pc = emu.s_smp.spc.pc(), .prev_state = &emu.s_smp.state});
 
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
                     }
@@ -501,6 +555,12 @@ pub fn main() !void {
                         db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position
                         db.print_script700_state(&emu);
                         t_other_menu.store(0, std.builtin.AtomicOrder.seq_cst);
+                    }
+                    else if (cur_mode == 'i') {
+                        //db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                        //t_menu_mode.store(cur_mode, std.builtin.AtomicOrder.seq_cst);
+                        //show_metadata();
+                        flush(null, true);
                     }
                 }
 
@@ -594,7 +654,7 @@ pub fn main() !void {
                 db.print_dsp_map(&emu, .{.is_dsp = true});
 
                 db.print("\n", .{});
-                db.print_dsp_state(&emu, .{.is_dsp = true});
+                db.print_dsp_state(&emu, &emu_run_ahead, .{.is_dsp = true});
 
                 set_msg(0, 0, false);
                 flush(null, true);
@@ -642,6 +702,14 @@ pub fn main() !void {
             's' => {
                 cur_action = 's';
                 // Default behavior: Step instruction
+                var no_cursor_up = false;
+
+                if (t_instr_clear.load(std.builtin.AtomicOrder.seq_cst)) {
+                    db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                    flush(null, false);
+                    t_instr_clear.store(false, std.builtin.AtomicOrder.seq_cst);
+                    no_cursor_up = true;
+                }
 
                 var s7en = emu.script700.enabled;
                 var attempts: u32 = 0;
@@ -696,7 +764,9 @@ pub fn main() !void {
                     const prev_logs = emu.s_smp.get_access_logs_range(last_cycle);
                     var logs = db.filter_access_logs(prev_logs);
 
-                    db.move_cursor_up();
+                    if (!no_cursor_up) {
+                        db.move_cursor_up();
+                    }
                     
                     db.print_pc(prev_spc_state.pc);
                     db.print(" |  ", .{});
@@ -722,7 +792,7 @@ pub fn main() !void {
                     db.print_dsp_map(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
                     db.print("\n", .{});
-                    db.print_dsp_state(&emu, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
+                    db.print_dsp_state(&emu, &emu_run_ahead, .{.is_dsp = true, .prev_pc = last_pc, .prev_state = &prev_state, .logs = all_logs});
 
                     flush(null, true);
                     set_msg(0, 0, false);
@@ -765,11 +835,184 @@ var buf: [samples * 4]u8 = [_]u8 {0} ** (samples * 4);
 var stream_start: u32 = 0;
 
 var last_time: i128 = 0;
+var savestates = std.ArrayList(Emu).init(alloc);
+
+fn savestate(emu: *Emu) void {
+    if (savestates.items.len < 600) { // 10 minutes is enough run ahead - stop here to avoid blowing up memory
+        const new_emu = Emu {
+            .s_dsp = SDSP.new(emu),
+            .s_smp = SSMP.new(emu, .{}),
+            .script700 = Script700.new(emu),
+            .singleton = null,
+        };
+
+        savestates.append(new_emu) catch {};
+        savestates.items[savestates.items.len - 1].load_from(emu, .{}) catch {
+            std.debug.print("Save memory error\n", .{});
+            std.process.exit(1);
+        };
+    }
+}
+
+fn run_ahead(emu: *Emu) void {
+    var cycles: u32 = samples * 64;
+    cycles = @divFloor(cycles, 8);
+
+    while (true) {
+        db.m_run_ahead.lock();
+
+        // No point in running ahead past the point where emu states are no longer saved
+        if (@divFloor(emu.s_dsp.cur_cycle(), 2048000) >= 600) {
+            db.m_run_ahead.unlock();
+            std.time.sleep(1 * std.time.ns_per_ms);
+            continue;
+        }
+
+        if (emu.script700.enabled) {
+            for (0..cycles) |_| {
+                if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
+                    m_save_buffer.lock();
+                    savestate(emu);
+                    m_save_buffer.unlock();
+                }
+
+                var retry = true;
+                while (retry) {
+                    retry = false;
+                    // If Script700 times out, sleep for a bit and try again
+                    emu.step_cycle_safe() catch {
+                        retry = true;
+                        db.m_run_ahead.unlock();
+                        std.time.sleep(2 * std.time.ns_per_ms);
+                        db.m_run_ahead.lock();
+                    };
+                }
+            }
+        }
+        else {
+            for (0..cycles) |_| {
+                if (emu.s_dsp.cur_cycle() % 2048000 == 0) {
+                    m_save_buffer.lock();
+                    savestate(emu);
+                    m_save_buffer.unlock();
+                }
+
+                emu.step_cycle_fast();
+            }
+        }
+
+        db.m_run_ahead.unlock();
+        std.time.sleep(10 * std.time.ns_per_us);
+    }
+}
 
 fn run_loop(emu: *Emu) !bool {
     const cycles = samples * 64;
 
     is_breakpoint.store(false, std.builtin.AtomicOrder.seq_cst);
+
+    const seek_amt = t_seek_signal.load(std.builtin.AtomicOrder.seq_cst);
+    const target_cycle = @as(i128, emu.s_dsp.cur_cycle()) + @as(i128, seek_amt) * @as(i128, 2048000);
+
+    const brk_on = t_breakpoints_enabled.load(std.builtin.AtomicOrder.seq_cst);
+
+    // Remove all saved emu states past this point if Script700 has been canceled.
+    if (t_script700_canceled.load(std.builtin.AtomicOrder.seq_cst)) {
+        db.m_run_ahead.lock();
+
+        var any_enabled = false;
+
+        var index: i32 = @intCast(savestates.items.len - 1);
+        while (index >= 0) {
+            const val = savestates.items[savestates.items.len - 1];
+            if (val.script700.enabled) {
+                any_enabled = true;
+                break;
+            }
+            index -= 1;
+        }
+
+        if (any_enabled) {
+            var top = savestates.items[savestates.items.len - 1];
+            while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
+                const res = savestates.pop();
+                if (res == null) {
+                    break;
+                }
+                top = res.?;
+            }
+            db.run_ahead_emu_.?.load_from(emu, .{}) catch {
+                std.debug.print("Save memory error\n", .{});
+                std.process.exit(1);
+            };
+            savestate(db.run_ahead_emu_.?);
+        }
+
+        db.m_run_ahead.unlock();
+
+        t_script700_canceled.store(false, std.builtin.AtomicOrder.seq_cst);
+    }
+
+    m_save_buffer.lock();
+
+    if (seek_amt < 0 and savestates.items.len > 0) {
+        var last_save: ?*Emu = null;
+        var i: u32 = @intCast(savestates.items.len - 1);
+
+        while (true) {
+            const save: ?*Emu = &savestates.items[i];
+
+            if (save != null) {
+                last_save = save;
+                if (last_save.?.s_dsp.cur_cycle() < target_cycle) {
+                    break;
+                }
+            }
+
+            if (i == 0) {
+                break;
+            }
+
+            i -= 1;
+        }
+
+        if (last_save) |ls| {
+            emu.load_from(ls, .{}) catch {
+                std.debug.print("Save memory error\n", .{});
+                std.process.exit(1);
+            };
+        }
+
+        t_seek_signal.store(0, std.builtin.AtomicOrder.seq_cst);
+    }
+    else if (seek_amt > 0) {
+        t_cur_clock.store(emu.s_dsp.cur_cycle(), std.builtin.AtomicOrder.seq_cst);
+        t_seek_signal.store(0, std.builtin.AtomicOrder.seq_cst);
+    }
+
+    const cur_clock = t_cur_clock.load(std.builtin.AtomicOrder.seq_cst);
+
+    if (cur_clock > 0 and savestates.items.len > 0) {
+        const last = &savestates.items[savestates.items.len - 1];
+        const cur_s = @divFloor(cur_clock, 2048000);
+
+        if ((cur_s + 5) * 2048000 <= last.s_dsp.cur_cycle()) {
+            const last_s = @divFloor(last.s_dsp.cur_cycle(), 2048000);
+            const diff_s = last_s - (cur_s + 5);
+
+            if (diff_s <= savestates.items.len - 1) {
+                const idx = savestates.items.len - 1 - diff_s;
+                emu.load_from(&savestates.items[idx], .{}) catch {
+                    std.debug.print("Save memory error\n", .{});
+                    std.process.exit(1);
+                };
+
+                t_cur_clock.store(0, std.builtin.AtomicOrder.seq_cst);
+            }
+        }
+    }
+    
+    m_save_buffer.unlock();
 
     if (emu.script700.enabled) {
         for (stream_start..cycles) |i| {
@@ -778,7 +1021,7 @@ fn run_loop(emu: *Emu) !bool {
                 return e;
             };
 
-            if (emu.break_check()) {
+            if (emu.break_check() and brk_on) {
                 is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
                 stream_start = @intCast(i);
                 return false;
@@ -788,7 +1031,7 @@ fn run_loop(emu: *Emu) !bool {
     else {
         for (stream_start..cycles) |i| {
             emu.step_cycle_fast();
-            if (emu.break_check()) {
+            if (emu.break_check() and brk_on) {
                 is_breakpoint.store(true, std.builtin.AtomicOrder.seq_cst);
                 stream_start = @intCast(i);
                 return false;
@@ -796,7 +1039,51 @@ fn run_loop(emu: *Emu) !bool {
         }
     }
 
-    const l1, const r1, const l2, const r2 = emu.view_dac_samples(samples);
+    // Remove all saved emu states past this point if Script700 has been restored.
+    if (t_script700_restored.load(std.builtin.AtomicOrder.seq_cst)) {
+        db.m_run_ahead.lock();
+
+        var any_disabled = false;
+
+        var index: i32 = @intCast(savestates.items.len - 1);
+        while (index >= 0) {
+            const val = savestates.items[savestates.items.len - 1];
+            if (!val.script700.enabled) {
+                any_disabled = true;
+                break;
+            }
+            index -= 1;
+        }
+
+        if (any_disabled) {
+            var top = savestates.items[savestates.items.len - 1];
+            while (top.s_dsp.cur_cycle() > emu.s_dsp.cur_cycle()) {
+                const res = savestates.pop();
+                if (res == null) {
+                    break;
+                }
+                top = res.?;
+            }
+
+            db.run_ahead_emu_.?.load_from(emu, .{}) catch {
+                std.debug.print("Save memory error\n", .{});
+                std.process.exit(1);
+            };
+            savestate(db.run_ahead_emu_.?);
+        }
+
+        db.m_run_ahead.unlock();
+
+        t_script700_restored.store(false, std.builtin.AtomicOrder.seq_cst);
+    }
+
+    stream_start = 0;
+
+    if (emu.singleton == null) {
+        return true;
+    }
+
+    const l1, const r1, const l2, const r2 = try emu.view_dac_samples(samples);
 
     for (0..l1.len) |x| {
         const l1_: []u16 = @ptrCast(l1);
@@ -835,7 +1122,9 @@ fn run_loop(emu: *Emu) !bool {
     const v_idx = t_voice_toggle.load(std.builtin.AtomicOrder.seq_cst);
     if (v_idx == 0) {
         for (0..8) |c| {
-            emu.pipeline_2.enable_voice(@intCast(c));
+            if (emu.singleton) |s| {
+                s.pipeline_2.enable_voice(@intCast(c));
+            }
         }
         t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
         set_msg(12, 0, false);
@@ -843,22 +1132,28 @@ fn run_loop(emu: *Emu) !bool {
     else if (v_idx <= 8) {
         const c = v_idx - 1;
         if (t_main_only.load(std.builtin.AtomicOrder.seq_cst)) {
-            emu.pipeline_2.toggle_main_voice(@intCast(c));
-            if (emu.pipeline_2.settings.channels_enabled[c]) {
-                emu.pipeline_2.enable_voice(@intCast(c));
+            if (emu.singleton) |s| {
+                s.pipeline_2.toggle_main_voice(@intCast(c));
+                if (s.pipeline_2.settings.channels_enabled[c]) {
+                    s.pipeline_2.enable_voice(@intCast(c));
+                }
             }
         }
         else {
-            emu.pipeline_2.toggle_voice(@intCast(c));
+            if (emu.singleton) |s| {
+                s.pipeline_2.toggle_voice(@intCast(c));
+            }
         }
 
         t_voice_toggle.store(9, std.builtin.AtomicOrder.seq_cst);
 
-        if (emu.pipeline_2.settings.channels_enabled[c]) {
-            set_msg(10, v_idx, false);
-        }
-        else {
-            set_msg(11, v_idx, false);
+        if (emu.singleton) |s| {
+            if (s.pipeline_2.settings.channels_enabled[c]) {
+                set_msg(10, v_idx, false);
+            }
+            else {
+                set_msg(11, v_idx, false);
+            }
         }
     }
     else if (v_idx == 10) {
@@ -873,12 +1168,12 @@ fn run_loop(emu: *Emu) !bool {
         std.time.sleep(2 * std.time.ns_per_s);
         std.process.exit(1);
     };
-    stream_start = 0;
 
     const expected_next_time = last_time + @as(i128, samples) * std.time.ns_per_s / 32000;
 
     const now = std.time.nanoTimestamp();
     const amt = expected_next_time - now - 1 * std.time.ns_per_ms;
+
     if (amt > 0) {
         const sleep_amt: u64 = @intCast(expected_next_time - now - 1 * std.time.ns_per_ms);
         std.time.sleep(sleep_amt);
@@ -911,11 +1206,14 @@ fn show_help_menu() void {
     db.print("    n  = View next page of ARAM \n", .{});
     db.print("    u  = Shift memory view up one row \n", .{});
     db.print("    d  = Shift memory view down one row \n", .{});
+    db.print("    l  = Skip back 5 seconds \n", .{});
+    db.print("    f  = Skip ahead 5 seconds \n", .{});
     db.print(" Other: \n", .{});
     db.print("    h  = Bring up this menu \n", .{});
     db.print("    m  = View ID666 metadata \n", .{});
     db.print("   1-8 = Toggle channel # output \n", .{});
     db.print("    0  = Enable all channels \n", .{});
+    db.print("    a  = Toggle all breakpoints on/off \n", .{});
     db.print("    q  = Quit \n", .{});
     db.print("----------------------------------------------------------------------------------------------------------------------------------\n\n", .{});
     db.print("Pressing enter without specifying the command repeats the previous action command. \n", .{});
@@ -936,6 +1234,20 @@ fn show_metadata() void {
     flush(null, false);
 }
 
+fn show_metadata_noclear() void {
+    var print_buf: [4096]u8 = [_]u8 {' '} ** 4096;
+    const result = metadata.?.print(&print_buf);
+
+    if (result) |metastring| {
+        db.print("{s}\n", .{metastring});
+    }
+    else |_| {
+        db.print("{s}\n", .{print_buf[0..]});
+    }
+
+    flush(null, true);
+}
+
 fn break_listener() void {
     var prev_input: u8 = 'k';
 
@@ -946,6 +1258,8 @@ fn break_listener() void {
             started = t_started.load(std.builtin.AtomicOrder.seq_cst);
         }
 
+        t_start_ack.store(true, std.builtin.AtomicOrder.seq_cst);
+
         var buffer: [8]u8 = undefined;
         const stdin = std.io.getStdIn().reader();
 
@@ -953,10 +1267,12 @@ fn break_listener() void {
             buffer[0] = ' ';
             _ = stdin.readUntilDelimiterOrEof(buffer[0..], '\n') catch "";
 
+            t_start_ack.store(false, std.builtin.AtomicOrder.seq_cst);
+
             if (is_breakpoint.load(std.builtin.AtomicOrder.seq_cst)) {
                 break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+                t_instr_clear.store(true, std.builtin.AtomicOrder.seq_cst);
                 set_msg(0, 0, false);
-                flush(null, true);
             }
             else {
                 switch (t_input_mode.load(std.builtin.AtomicOrder.seq_cst)) {
@@ -984,13 +1300,19 @@ fn break_listener() void {
                                 prev_input = buffer[0];
                                 set_msg(0, 0, false);
                             },
+                            'a' => {
+                                const brk_on = t_breakpoints_enabled.load(std.builtin.AtomicOrder.seq_cst);
+                                t_breakpoints_enabled.store(!brk_on, std.builtin.AtomicOrder.seq_cst);
+
+                                set_msg(if (!brk_on) 15 else 16, 0, false);
+                            },
                             '0' => {
                                 t_voice_toggle.store(0, std.builtin.AtomicOrder.seq_cst);
                             },
                             '1', '2', '3', '4', '5', '6', '7', '8' => {
                                 t_voice_toggle.store(@intCast(buffer[0] - '0'), std.builtin.AtomicOrder.seq_cst);
                             },
-                            'f' => {
+                            'g' => {
                                 const main_only = t_main_only.load(std.builtin.AtomicOrder.seq_cst);
                                 t_main_only.store(!main_only, std.builtin.AtomicOrder.seq_cst);
                             },
@@ -1004,9 +1326,26 @@ fn break_listener() void {
                             },
                             'k' => {
                                 break_signal.store(true, std.builtin.AtomicOrder.seq_cst);
+                                t_instr_clear.store(true, std.builtin.AtomicOrder.seq_cst);
                                 prev_input = buffer[0];
                                 
                                 set_msg(0, 0, false);
+                            },
+                            'l' => {
+                                t_seek_signal.store(-5, std.builtin.AtomicOrder.seq_cst);
+                                prev_input = buffer[0];
+                                
+                                set_msg(14, 0, false);
+                            },
+                            'f' => {
+                                const cc = t_cur_clock.load(std.builtin.AtomicOrder.seq_cst);
+
+                                if (cc == 0) {
+                                    t_seek_signal.store(5, std.builtin.AtomicOrder.seq_cst);
+                                    prev_input = buffer[0];
+                                }
+                                
+                                set_msg(13, 0, false);
                             },
                             else => {
                                 buffer[0] = prev_input;
@@ -1022,9 +1361,21 @@ fn break_listener() void {
                                 set_msg(3, 0, false);
                                 flush(null, true);
                                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
+                                t_script700_restored.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                                flush(null, false);
+
+                                show_metadata_noclear();
                             },
                             'c' => {
                                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
+                                t_script700_canceled.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                                flush(null, false);
+
+                                show_metadata_noclear();
                             },
                             'q' => {
                                 stdout_file.close();
@@ -1073,9 +1424,21 @@ fn report_timeout() void {
                 set_msg(3, 0, false);
                 flush(null, true);
                 t_timeout_wait.store(true, std.builtin.AtomicOrder.seq_cst);
+                t_script700_restored.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                flush(null, false);
+
+                show_metadata_noclear();
             },
             'c' => {
                 t_timeout_wait.store(false, std.builtin.AtomicOrder.seq_cst);
+                t_script700_canceled.store(true, std.builtin.AtomicOrder.seq_cst);
+                        
+                db.print("\x1B[2J\x1B[H", .{}); // Clear console and reset console position (may not work on Windows)
+                flush(null, false);
+
+                show_metadata_noclear();
             },
             'q' => {
                 stdout_file.close();
@@ -1137,7 +1500,7 @@ fn set_msg(msg_id: u8, sub_msg_id: u8, is_error: bool) void {
 }
 
 fn print_instruction(emu: *const Emu, state: *const SPCState) void {
-    db.print("\x1B[43m", .{}); // Yellow highlight
+    db.print("\x1B[45m", .{}); // Highlight
 
     db.print_pc(state.pc);
     db.print(" |  ", .{});
@@ -1247,7 +1610,7 @@ fn compile_script700() ![]const u8 {
 
         const mnemonic = peek_token(str.?);
     
-        if (mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
+        if (mnemonic != null and mnemonic.?.len >= 2 and mnemonic.?[0] == ':') {
             _ = next_token(str.?);
             var label_num = std.fmt.parseInt(i32, mnemonic.?[1..], 10) catch -1;
 
@@ -1529,7 +1892,7 @@ fn split_token(str: []const u8) struct { ?[]const u8,
             num_index +%= 1;
             is_hex = true;
         }
-        else if (str.len >= 2 and std.mem.eql(u8, str[split_index .. (split_index + 2)], "0x")) {
+        else if (str.len >= split_index + 2 and std.mem.eql(u8, str[split_index .. (split_index + 2)], "0x")) {
             num_index +%= 2;
             is_hex = true;
         }

@@ -9,6 +9,7 @@ public static class KnownHashes {
 		"35e9d392f7b5b859c5821f5a15d9c48da2e2fe8c8af323a70d7ae73cc25bc729", // v0.1.1 (x86-64)
 		"8c08bde90ecccb5daecd82019a1cac164f574bac0eb2621f81d917e8e0a13f30", // v0.1.2 (x86-64)
 		"3935805820990b7103a37bf27be5f7d58dbc18a0baff7491c57713d5b6b22e4a", // v0.2.0 (x86-64)
+		"503a3ba56c5150e4b6ea750b956f71ad4981ef49a6183ef97f83a66f664db2a5", // v0.3.0 (x86-64)
 	];
 	
 	static string[] linux = [
@@ -16,6 +17,7 @@ public static class KnownHashes {
 		"8c2e566e58692bebbc62d99fbdd3c995ff65d0079fe38772a740317470f54704", // v0.1.1 (x86-64)
 		"11c81e5e13120dcde833dc674542704c4537c08eda369ff9da23882b19ce2f34", // v0.1.2 (x86-64)
 		"c71a274dc355167a8b70ea613e1c957161b8ff452716fee2f3eadf4c749aeb9a", // v0.2.0 (x86-64)
+		"cde50c7c452425eb14cab0f4bf0a215729aa92a6b4fdca8aba5ff3e6a58fa159", // v0.3.0 (x86-64)
 	];
 	
 	public static string[] Set {

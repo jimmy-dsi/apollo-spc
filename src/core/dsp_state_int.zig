@@ -67,7 +67,7 @@ pub const DSPStateInternal = struct {
         __calc_final_right: i17 = 0,
     };
 
-    pipeline_2: *Pipeline2,
+    pipeline_2: ?*Pipeline2 = null,
 
     // Output
     _main_out_left:  i17 = 0,
@@ -97,6 +97,33 @@ pub const DSPStateInternal = struct {
     _pitch:  u15 = 0x0000,
     _output: i16 = 0x0000,
 
+    pub inline fn load_from(self: *DSPStateInternal, other: *const DSPStateInternal) void {
+        // Copy all but Pipeline 2 reference
+        self._main_out_left  = other._main_out_left;
+        self._main_out_right = other._main_out_right;
+        self._echo_out_left  = other._echo_out_left;
+        self._echo_out_right = other._echo_out_right;
+
+        self.__echo_out_left = other.__echo_out_left;
+
+        self._dac_left  = other._dac_left;
+        self._dac_right = other._dac_right;
+
+        self._brr        = other._brr;
+        self._echo       = other._echo;
+        self._noise_lfsr = other._noise_lfsr;
+        self._sample_clk = other._sample_clk;
+        self._counter    = other._counter;
+
+        self._voice = other._voice;
+        
+        self._adsr_0 = other._adsr_0;
+        self._envx   = other._envx;
+        self._outx   = other._outx;
+        self._pitch  = other._pitch;
+        self._output = other._output;
+    }
+
     inline fn voice_output(self: *DSPStateInternal, v_idx: u3, comptime channel: u1, vol: i8) void {
         const v = &self._voice[v_idx];
         
@@ -109,7 +136,9 @@ pub const DSPStateInternal = struct {
             else              &self._echo_out_right;
 
         const out = [3]i16{self._output, 0, 0};
-        self.pipeline_2.voice_output(v_idx, out[0..], vol, channel);
+        if (self.pipeline_2) |p| {
+            p.voice_output(v_idx, out[0..], vol, channel);
+        }
 
         // Apply left/right volume
         const amp: i17 = @intCast(@as(i24, self._output) * @as(i24, vol) >> 7);

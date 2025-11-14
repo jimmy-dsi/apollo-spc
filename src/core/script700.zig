@@ -25,6 +25,10 @@ pub const Script700 = struct {
         cmp, rcmp
     };
 
+    pub const LoadOptions = struct {
+        copy_everything: bool = false
+    };
+
     pub const default_bytecode: [1]u32 = [1]u32 {0x80FFFFFF}; // Preload with single Quit instruction
     pub var   default_data:     [0]u8  = [0]u8  { };
 
@@ -64,6 +68,35 @@ pub const Script700 = struct {
         self.label_remappings = null;
         self.initialized = false;
         self.data_area = &default_data;
+    }
+
+    pub inline fn load_from(self: *Script700, other: *const Script700, options: LoadOptions) !void {
+        self._finished = other._finished;
+
+        self.enabled = other.enabled;
+        self.compat_mode = other.compat_mode;
+        self.initialized = other.initialized;
+
+        if (options.copy_everything) {
+            self.label_addresses  = other.label_addresses;
+            self.label_remappings = other.label_remappings; // TODO: Handle this
+
+            self.script_bytecode = other.script_bytecode;
+
+            self.self_alloc_data = false;
+            self.data_area = other.data_area;
+            if (self.enabled) {
+                try self.expand_data_area(@intCast(other.data_area.len)); // Deep copy data
+            }
+        }
+        else {
+            self.data_area = other.data_area; // Copy pointer only
+            self.self_alloc_data = false;
+        }
+
+        //self.self_alloc_data = other.self_alloc_data;
+
+        self.state = other.state;
     }
 
     pub fn reset(self: *Script700) void {
@@ -1063,7 +1096,7 @@ pub const Script700 = struct {
                 return; // Cannot write to immediate or label - Treat as NOP
             },
             else => {
-                switch (info.src_data_size.?) {
+                switch (info.dest_data_size.?) {
                     0, 3 => {
                         try self.write_u8(info.dest_memtype, dest_address, @intCast(final_result & 0xFF));
                     },
@@ -1981,7 +2014,7 @@ pub const Script700 = struct {
         var new_data = allocator.alloc(u8, new_size) catch {
             return Runtime.out_of_memory;
         };
-        @memcpy(new_data, old_data);
+        @memcpy(new_data[0..old_data.len], old_data);
         // Fill the remainder with zeroes
         for (old_data.len..new_data.len) |i| {
             new_data[i] = 0x00;

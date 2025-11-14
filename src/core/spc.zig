@@ -59,6 +59,18 @@ pub const SPC = struct {
         };
     }
 
+    pub inline fn load_from(self: *SPC, other: *const SPC) void {
+        self.state = other.state;
+        self.interrupt_vector = other.interrupt_vector;
+
+        self.current_interrupt_vector = other.current_interrupt_vector;
+
+        self.data_u8  = other.data_u8;
+        self.data_i8  = other.data_i8;
+        self.data_u16 = other.data_u16;
+        self.data_u32 = other.data_u32;
+    }
+
     pub fn power_on(self: *SPC) void {
         _ = self;
     }
@@ -76,15 +88,17 @@ pub const SPC = struct {
     pub fn disable_shadow_execution(self: *SPC, force_exit: bool) void {
         self.shadow_exec = false;
 
-        if (force_exit and !self.emu.debug_return_on_force_exit and !self.s_smp().in_shadow_region(self.state.pc, 0)) {
-            // Don't restore either PC or state if the user has forced ending shadow execution and is set to not return PC (unless PC is still in the shadow region)
-            return;
-        }
-        else if (self.emu.debug_persist_spc_state) {
-            self.state.pc = self.return_state.pc; // Restore PC only if SPC state is set to persist
-        }
-        else {
-            self.state = self.return_state;
+        if (self.emu.singleton) |s| {
+            if (force_exit and !s.debug_return_on_force_exit and !self.s_smp().in_shadow_region(self.state.pc, 0)) {
+                // Don't restore either PC or state if the user has forced ending shadow execution and is set to not return PC (unless PC is still in the shadow region)
+                return;
+            }
+            else if (s.debug_persist_spc_state) {
+                self.state.pc = self.return_state.pc; // Restore PC only if SPC state is set to persist
+            }
+            else {
+                self.state = self.return_state;
+            }
         }
     }
 
@@ -111,7 +125,7 @@ pub const SPC = struct {
     }
 
     pub inline fn s_smp(self: *const SPC) *SSMP {
-        return &self.emu.*.s_smp;
+        return &self.emu.s_smp;
     }
 
     pub inline fn a(self: *const SPC) u8 {

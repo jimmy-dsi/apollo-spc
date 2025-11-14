@@ -1,5 +1,5 @@
 # Apollo-Specific Script700 Commands
-Along with all of the original Script700 commands mentioned on [dgrfactory's website](https://dgrfactory.jp/spcplay/script700.html), Apollo adds a few extra Script700 command of its own.
+Along with all of the original Script700 commands mentioned on [dgrfactory's website](https://dgrfactory.jp/spcplay/script700.html), Apollo adds a few extra Script700 commands of its own.
 
 These are briefly touched upon in the [Script700 bytecode](./script700-bytecode.txt) section, but I feel it deserves its own page for it as well.
 
@@ -11,7 +11,7 @@ One feature unique to apollo is that it supports the use of interrupts—a featu
 
 In theory, this means that if any device *were* to trigger an interrupt, the SPC700 should already have the capacity to handle it.
 
-While there is no way to trigger the interrupt from an SPC file itself, one of apollo's goals was to have this feature available via scripting and debugging.
+While there is no way to trigger the interrupt from an SPC file itself, one of apollo's goals is to have this feature available via scripting and debugging.
 
 ### Send interrupt signal command (i)
 
@@ -19,7 +19,7 @@ This sends the interrupt signal to the SPC700 using the current configured vecto
 
 If the interrupt is successful, a value of 1 will be stored in `[CMP2]` after this instruction.
 
-If unsuccessful (due to either interrupts being disabled or SPC700 is in the STOP state),
+If unsuccessful (due to either interrupts being disabled or if SPC700 is in the STOP state),
 then a value of 0 will be stored in `[CMP2]`.
 
 Usage:
@@ -83,8 +83,8 @@ sw
 
 Example scenario:
 ```
-iw 0     ; Send interrupt signal and wait for the SPC700 to write to APU IO port 0.
-m #?, w0 ; Number of clocks waited stored in [CMP1]. Save to w0.
-sw       ; Swap [CMP1] and [CMP2]
-m #?, w1 ; Interrupt success flag store in [CMP2] (Now [CMP1] because of the swap). Save to w1.
+iw 0    ; Send interrupt signal and wait for the SPC700 to write to APU IO port 0.
+m #? w0 ; Number of clocks waited stored in [CMP1]. Save to w0.
+sw      ; Swap [CMP1] and [CMP2]
+m #? w1 ; Interrupt success flag store in [CMP2] (Now [CMP1] because of the swap). Save to w1.
 ```

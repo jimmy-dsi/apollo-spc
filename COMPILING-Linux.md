@@ -37,7 +37,7 @@ echo 'export DOTNET_CLI_TELEMETRY_OPTOUT=1' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-Now you're ready to install the dotnet SDK for Linux. You can do so be running the following commands:
+Now you're ready to install the dotnet SDK for Linux. You can do so by running the following commands:
 ```bash
 curl -L https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
 chmod +x ./dotnet-install.sh

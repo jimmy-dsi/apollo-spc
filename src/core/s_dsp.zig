@@ -64,6 +64,21 @@ pub const SDSP = struct {
         return s_dsp;
     }
 
+    pub inline fn load_from(self: *SDSP, other: *const SDSP) void {
+        self.audio_ram = other.audio_ram;
+        self.dsp_map   = other.dsp_map;
+
+        self.state.load_from(&other.state);
+        self.co = other.co;
+
+        self.exec_state = other.exec_state;
+
+        self.last_processed_cycle = other.last_processed_cycle;
+        self.clock_counter        = other.clock_counter;
+
+        self.paused = false;
+    }
+
     pub fn power_on(self: *SDSP) void {
         self.exec_state = State.init;
 
@@ -85,7 +100,13 @@ pub const SDSP = struct {
         self.state.mute  = 1;
         self.state.echo.readonly = 1;
         self.state.noise_rate = 0x00;
-        self.state._internal = .{ .pipeline_2 = &self.emu.pipeline_2 };
+
+        if (self.emu.singleton) |s| {
+            self.state._internal = .{ .pipeline_2 = &s.pipeline_2 };
+        }
+        else {
+            self.state._internal = .{ .pipeline_2 = null };
+        }
     }
 
     pub fn step(self: *SDSP) void {
@@ -104,7 +125,7 @@ pub const SDSP = struct {
     }
 
     pub inline fn s_smp(self: *const SDSP) *SSMP {
-        return &self.emu.*.s_smp;
+        return &self.emu.s_smp;
     }
 
     pub fn main(self: *SDSP) !void {
@@ -974,26 +995,28 @@ pub const SDSP = struct {
         misc.step_a(s.int(), pmon);
         echo.step_f(s.int(), mvolr, evolr, mute_flg);
 
-        var p2 = s.int().pipeline_2;
+        const p2 = s.int().pipeline_2;
 
         // Calculate Pipeline 2 Output
-        p2.output();
+        if (p2) |p| {
+            p.output();
 
-        // Multiplex output from S-DSP DAC or Pipeline 2
-        const left: i17, const right: i17 =
-            sw: switch (p2.enabled) {
-                false => .{ s.int()._dac_left, s.int()._dac_right },
-                true  => {
-                    const ll, const rr = p2.get_output_i16(0);
-                    break :sw .{ @intCast(ll), @intCast(rr) };
-                }
-            };
+            // Multiplex output from S-DSP DAC or Pipeline 2
+            const left: i17, const right: i17 =
+                sw: switch (p.enabled) {
+                    false => .{ s.int()._dac_left, s.int()._dac_right },
+                    true  => {
+                        const ll, const rr = p.get_output_i16(0);
+                        break :sw .{ @intCast(ll), @intCast(rr) };
+                    }
+                };
 
-        // Send to emulator's audio buffer
-        s.emu.queue_dac_sample(
-            @intCast(left),
-            @intCast(right),
-        );
+            // Send to emulator's audio buffer
+            s.emu.queue_dac_sample(
+                @intCast(left),
+                @intCast(right),
+            );
+        }
 
         // Clear output for next sample
         s.int()._main_out_left  = 0;

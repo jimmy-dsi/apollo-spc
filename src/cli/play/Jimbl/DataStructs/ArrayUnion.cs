@@ -159,7 +159,7 @@ public class ArrayUnion<T1, T2>:
 	}
 	
 	public IEnumerator<union<T1, T2>> GetEnumerator() {
-		foreach (var x in (..Length).Enum()) {
+		foreach (var x in (..Length).Iter()) {
 			yield return this[x];
 		}
 	}
@@ -445,7 +445,7 @@ public class ArrayUnion<T1, T2, T3>:
 	}
 	
 	public IEnumerator<union<T1, T2, T3>> GetEnumerator() {
-		foreach (var x in (..Length).Enum()) {
+		foreach (var x in (..Length).Iter()) {
 			yield return this[x];
 		}
 	}

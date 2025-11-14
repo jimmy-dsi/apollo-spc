@@ -101,7 +101,7 @@ public static class Script700 {
 			
 			var argIndex = 0;
 			
-			var args = line.Trim().Split();
+			var    args = line.Trim().Split(new char[] {' ', '\t'}, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 			string mnemonic;
 			
 			while (argIndex < args.Length) {

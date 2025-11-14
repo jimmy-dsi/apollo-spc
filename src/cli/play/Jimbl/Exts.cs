@@ -78,7 +78,7 @@ public static class Exts {
 		}
 	}
 	
-	public static Range Enum(this SRange range, int step = 1) {
+	public static Range Iter(this SRange range, int step = 1) {
 		if (range.Start.IsFromEnd || range.End.IsFromEnd) {
 			throw new ArgumentException("Ranges with indexes specified from end cannot be enumerated");
 		}
