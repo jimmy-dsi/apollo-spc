@@ -1,5 +1,5 @@
 zig-out/
-src/core/data/*
+src/lib/core/data/*
 src/cli/play/.idea/*
 src/cli/play/*.user
 src/cli/play/Play/bin/*
@@ -11,8 +11,8 @@ src/cli/play/SPC/obj/*
 test/*
 doc/*.txt
 !doc/script700-bytecode.txt
-!src/core/data/bootrom.bin
-!src/core/data/gauss.bin
+!src/lib/core/data/bootrom.bin
+!src/lib/core/data/gauss.bin
 apollo
 apollo-spc-program
 /play

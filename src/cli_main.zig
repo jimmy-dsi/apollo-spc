@@ -4,15 +4,15 @@ const Atomic = std.atomic.Value;
 
 const db = @import("debug.zig");
 
-const Emu             = @import("core/emu.zig").Emu;
-const SDSP            = @import("core/s_dsp.zig").SDSP;
-const SSMP            = @import("core/s_smp.zig").SSMP;
-const SPCState        = @import("core/spc_state.zig").SPCState;
-const Script700       = @import("core/script700.zig").Script700;
-const Script700Loader = @import("core/script700_loader.zig").Script700Loader;
-const SongMetadata    = @import("core/song_metadata.zig").SongMetadata;
+const Emu             = @import("lib/core/emu.zig").Emu;
+const SDSP            = @import("lib/core/s_dsp.zig").SDSP;
+const SSMP            = @import("lib/core/s_smp.zig").SSMP;
+const SPCState        = @import("lib/core/spc_state.zig").SPCState;
+const Script700       = @import("lib/core/script700.zig").Script700;
+const Script700Loader = @import("lib/core/script700_loader.zig").Script700Loader;
+const SongMetadata    = @import("lib/core/song_metadata.zig").SongMetadata;
 
-const spc_loader = @import("core/spc_loader.zig");
+const spc_loader = @import("lib/core/spc_loader.zig");
 
 const max_consecutive_timeouts: u32 = 90;
 const busyloop_relief_ms:       u32 = 20;
