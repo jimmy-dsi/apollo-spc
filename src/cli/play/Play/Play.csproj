@@ -20,7 +20,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Jimbl\Jimbl.csproj" />
-      <ProjectReference Include="..\SPC\SPC.csproj" />
+      <ProjectReference Include="..\Apollo\Apollo.csproj" />
     </ItemGroup>
 
 </Project>
