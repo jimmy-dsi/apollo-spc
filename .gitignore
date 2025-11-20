@@ -8,6 +8,8 @@ src/cli/play/Jimbl/bin/*
 src/cli/play/Jimbl/obj/*
 src/cli/play/Apollo/bin/*
 src/cli/play/Apollo/obj/*
+src/cli/play/SDL2/bin/*
+src/cli/play/SDL2/obj/*
 test/*
 doc/*.txt
 !doc/script700-bytecode.txt

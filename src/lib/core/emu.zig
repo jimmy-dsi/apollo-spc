@@ -122,6 +122,19 @@ pub const Emu = struct {
             };
         }
 
+        pub inline fn get_render_buffer(self: *Singleton, channel: u1) []i16 {
+            if (channel == 0) {
+                return self.dac_buffer_left[0..];
+            }
+            else {
+                return self.dac_buffer_right[0..];
+            }
+        }
+
+        pub inline fn get_dac_buffer_offset(self: *Singleton) u32 {
+            return self.dac_buffer_offset;
+        }
+
         pub inline fn enable_shadow_mode(self: *Singleton, emu: *Emu, options: DebugModeOptions) void {
             if (options.set_as_master) {
                 switch (self.cur_debug_mode) {
@@ -321,6 +334,22 @@ pub const Emu = struct {
     pub fn view_dac_samples(self: *Emu, length: u32) !struct {[]i16, []i16, ?[]i16, ?[]i16} {
         if (self.singleton) |s| {
             return s.view_dac_samples(length);
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn get_render_buffer(self: *Emu, channel: u1) ![]i16 {
+        if (self.singleton) |s| {
+            return s.get_render_buffer(channel);
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn get_dac_buffer_offset(self: *Emu) !u32 {
+        if (self.singleton) |s| {
+            return s.get_dac_buffer_offset();
         }
 
         return Error.NoSingletonAttached;

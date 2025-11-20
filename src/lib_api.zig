@@ -60,6 +60,26 @@ pub export fn emu_step_n_cycles_fast(cycles: u32, emu_ptr: ?[*]Emu) u32 {
     return emu.step_n_cycles_fast(cycles, @ptrCast(emu_ptr));
 }
 
+pub export fn emu_get_render_buffer(channel: u8, emu_ptr: ?[*]Emu) ?[*]i16 {
+    const res = emu.get_render_buffer(@intCast(channel & 1), @ptrCast(emu_ptr)) catch null;
+    if (res) |r| {
+        return @ptrCast(r.ptr);
+    }
+    return null;
+}
+
+pub export fn emu_get_render_buffer_len(emu_ptr: ?[*]Emu) u32 {
+    const res = emu.get_render_buffer(0, @ptrCast(emu_ptr)) catch null;
+    if (res) |r| {
+        return @intCast(r.len);
+    }
+    return 0;
+}
+
+pub export fn emu_get_render_position(emu_ptr: ?[*]Emu) u32 {
+    return emu.get_render_position(@ptrCast(emu_ptr)) catch 0;
+}
+
 // DSP
 pub export fn dsp_get_aram_ptr(emu_ptr: ?[*]Emu) ?[*]u8 {
     return @ptrCast(dsp.get_aram_ptr(@ptrCast(emu_ptr)) catch null);

@@ -3,7 +3,7 @@ namespace Play;
 using Apollo;
 
 public static class LibTest {
-	public static void Test(string spcFilePath) {
+	public static Emulator Test(string spcFilePath) {
 		Lib.Init();
 		
 		try {
@@ -91,7 +91,7 @@ public static class LibTest {
 				Console.WriteLine();
 			}
 			
-			emu.SMP.State.RAMDisable = true;
+			//emu.SMP.State.RAMDisable = true;
 			
 			page0 = emu.SMP.DebugReadPage(0x0000);
 			
@@ -114,9 +114,11 @@ public static class LibTest {
 			//	emu.StepCycle();
 			//	cycles++;
 			//}
+		
+			return emu;
 		}
 		finally {
-			Lib.Deinit();
+			//Lib.Deinit();
 		}
 	}
 }

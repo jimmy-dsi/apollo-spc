@@ -120,6 +120,20 @@ pub inline fn step_n_cycles_fast(cycles: u32, emu_ptr: ?*Emu) u32 {
     return cycles;
 }
 
+pub inline fn get_render_buffer(channel: u1, emu_ptr: ?*Emu) ![]i16 {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.get_render_buffer(channel);
+}
+
+pub inline fn get_render_position(emu_ptr: ?*Emu) !u32 {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.get_dac_buffer_offset();
+}
+
 pub inline fn destroy(emu_ptr: ?*Emu) !void {
     try main.validate_ptr(Emu, emu_ptr);
 

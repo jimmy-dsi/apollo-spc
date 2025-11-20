@@ -39,7 +39,7 @@ cd "$SCRIPT_DIR"
 mkdir -p "$SCRIPT_DIR/bin"
 
 # Build zig app
-"$SCRIPT_DIR/src/zig-build.sh"
+#"$SCRIPT_DIR/src/zig-build.sh"
 rm -f "$SCRIPT_DIR"/bin/*.o 2> /dev/null || :
 
 # Generate additional hash from the output of zig build

@@ -142,4 +142,4 @@ This raw file can be imported into tools such as Audacity or ffmpeg and converte
 
 **Apollo** is licensed under the **Mozilla Public License**, version 2.0.
 
-This license applies to all source files included in this repo, with the exception of the ones under the [Jimbl](src/cli/play/Jimbl) directory, which are licensed under MIT.
+This license applies to all source files included in this repo, with the exception of the ones under the [Jimbl](src/cli/play/Jimbl) directory, which are licensed under MIT, as well as SDL2.cs — which is written by Ethan Lee and also licensed under MIT.

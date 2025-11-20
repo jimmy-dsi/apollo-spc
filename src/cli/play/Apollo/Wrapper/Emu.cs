@@ -34,4 +34,13 @@ internal partial class DLL {
 	
 	[LibraryImport("apollo", EntryPoint = "emu_step_n_cycles_fast")]
 	public static partial UInt32 EmuStepNCyclesFast(UInt32 cycles, Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_get_render_buffer")]
+	public static partial IntPtr EmuGetRenderBuffer(byte channel, Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_get_render_buffer_len")]
+	public static partial UInt32 EmuGetRenderBufferLen(Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_get_render_position")]
+	public static partial UInt32 EmuGetRenderPosition(Emulator.Handle emuPtr);
 }
