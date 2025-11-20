@@ -7,4 +7,5 @@ public class DeinitError:      Error { }
 public class StateError:       Error { }
 public class AllocError:       Error { }
 public class NullError:        Error { }
+public class SpcLoadError:     Error { }
 public class Script700Timeout: Error { }

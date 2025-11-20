@@ -98,8 +98,8 @@ public static class Exts {
 	// Integer Extension Methods
 	public static byte   SafeUnsigned(this sbyte value) => (byte)   sbyte.Clamp(value, 0, sbyte.MaxValue);
 	public static UInt16 SafeUnsigned(this Int16 value) => (UInt16) Int16.Clamp(value, 0, Int16.MaxValue);
-	public static UInt32 SafeUnsigned(this Int32 value) => (UInt32) Int32.Clamp(value, 0, Int16.MaxValue);
-	public static UInt64 SafeUnsigned(this Int64 value) => (UInt64) Int64.Clamp(value, 0, Int16.MaxValue);
+	public static UInt32 SafeUnsigned(this Int32 value) => (UInt32) Int32.Clamp(value, 0, Int32.MaxValue);
+	public static UInt64 SafeUnsigned(this Int64 value) => (UInt64) Int64.Clamp(value, 0, Int64.MaxValue);
 	
 	// Char Extension Methods
 	public static UnicodeCategory GetUnicodeCategory(this char c) => char.GetUnicodeCategory(c);

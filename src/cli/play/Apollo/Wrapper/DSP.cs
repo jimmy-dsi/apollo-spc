@@ -19,7 +19,7 @@ internal partial class DLL {
 	public static partial DspVoiceState DspGetVoiceState(Byte voiceIdx, Emulator.Handle? emuPtr);
 	
 	[StructLayout(LayoutKind.Sequential)]
-	public struct DspGlobalState {
+	internal struct DspGlobalState {
 		public IntPtr EchoFeedback;
 		public IntPtr EchoVolLeft;
 		public IntPtr EchoVolRight;
@@ -41,7 +41,7 @@ internal partial class DLL {
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
-	public struct DspVoiceState {
+	internal struct DspVoiceState {
 		public IntPtr VolLeft;
 		public IntPtr VolRight;
 		

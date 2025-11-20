@@ -1,6 +1,6 @@
-using Jimbl;
-
 namespace Apollo;
+
+using Jimbl;
 
 using System.Runtime.InteropServices;
 
@@ -49,6 +49,7 @@ public class Emulator {
 	}
 	
 	public   DSP    DSP    { get; init; }
+	public   SMP    SMP    { get; init; }
 	internal Handle handle { get;  set; }
 	
 	public static Emulator? MainInstance {
@@ -75,7 +76,25 @@ public class Emulator {
 		}
 		
 		DSP = new(this);
+		SMP = new(this);
 		handle.AddToCache(this);
+	}
+	
+	public void LoadSpcFile(string filePath) {
+		var data = File.ReadAllBytes(filePath);
+		LoadSpcFile(data);
+	}
+	
+	public void LoadSpcFile(byte[] fileData) {
+		Buffer buffer = new(fileData.Length);
+		for (var i = 0; i < fileData.Length; i++) {
+			buffer[i] = fileData[i];
+		}
+		
+		var result = DLL.SpcLoad(buffer.Ptr, buffer.Length.SafeUnsigned(), handle);
+		if (!result) {
+			throw new SpcLoadError(); // TODO: or StateError or NullError
+		}
 	}
 	
 	public void StepCycle() {

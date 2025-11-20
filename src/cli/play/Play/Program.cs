@@ -4,6 +4,11 @@ using System.Diagnostics;
 using Jimbl;
 using Apollo;
 
+if (args.Length >= 1) {
+	LibTest.Test(args[0]);
+}
+return;
+
 const bool VERIFY_HASH = true;
 
 const int WIDTH  = 133;
