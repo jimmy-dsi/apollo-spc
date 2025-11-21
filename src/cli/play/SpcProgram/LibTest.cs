@@ -1,4 +1,4 @@
-namespace Play;
+namespace SpcProgram;
 
 using Apollo;
 

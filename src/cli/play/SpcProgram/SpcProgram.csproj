@@ -5,10 +5,9 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>Play</RootNamespace>
         
         <PublishAot>true</PublishAot>
-        <AssemblyName>play</AssemblyName>
+        <AssemblyName>apollo-spc-program</AssemblyName>
         
         <DebugType>none</DebugType>
         <DebugSymbols>false</DebugSymbols>

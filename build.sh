@@ -38,26 +38,20 @@ cd "$SCRIPT_DIR"
 # Make sure bin directory exists before attempting to store files there
 mkdir -p "$SCRIPT_DIR/bin"
 
-# Build zig app
-#"$SCRIPT_DIR/src/zig-build.sh"
+# Build zig lib
+"$SCRIPT_DIR/src/zig-build-lib.sh"
 rm -f "$SCRIPT_DIR"/bin/*.o 2> /dev/null || :
 
-# Generate additional hash from the output of zig build
-hashval=$(sha256sum "$SCRIPT_DIR/bin/apollo-spc-program")
-hashval="${hashval%% *}"
-cp -f "$SCRIPT_DIR/src/cli/play/Play/_AdditionalHashes-Template.txt" "$SCRIPT_DIR/src/cli/play/Play/AdditionalHashes.cs"
-sed -i "s|\"\\[\\[\\[C#___play___apollo-spc-program___C735A0F9___!GenFromCode!\\]\\]\\]\"|\"$hashval\"|g" "$SCRIPT_DIR/src/cli/play/Play/AdditionalHashes.cs"
+# Copy resuling library to dotnet project folder
+cp "$SCRIPT_DIR/bin/apollo.so" "$SCRIPT_DIR/src/cli/play/Apollo/apollo.so" 
 
 # Build dotnet app
-dotnet publish "$SCRIPT_DIR/src/cli/play/Play/Play.csproj" -r linux-x64 -p:PublishAot=true -p:WarningLevel=0 --output "$SCRIPT_DIR/bin/"
-
-# Cleanup
-cp -f "$SCRIPT_DIR/src/cli/play/Play/_AdditionalHashes-Template.txt" "$SCRIPT_DIR/src/cli/play/Play/AdditionalHashes.cs" 2> /dev/null || :
+dotnet publish "$SCRIPT_DIR/src/cli/play/SpcProgram/SpcProgram.csproj" -r linux-x64 -p:PublishAot=true -p:WarningLevel=0 --output "$SCRIPT_DIR/bin/"
 
 echo ""
 echo "build.sh: Build successful"
 echo "To run:"
-echo "./bin/play <your-spc-file>"
+echo "./bin/apollo-spc-program <your-spc-file>"
 
 if [[ "$telemetry_verified_off" == 1 ]]; then
     bash # Have new env variable changes inherited when user is given back control of shell
