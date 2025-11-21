@@ -11,7 +11,9 @@ public class Emulator {
 		Handle? keepPrimaryAlive = null; // References the first creation of matching IntPtr handle - Can only be destroyed if all references to it are
 		bool    trueOwnsHandle   = true;
 		
-		public Handle(): base(IntPtr.Zero, true) {
+		public Handle(): base(IntPtr.Zero, true) { }
+		
+		public void PostConstruct() {
 			if (cache.ContainsKey(handle)) {
 				trueOwnsHandle   = false;
 				keepPrimaryAlive = cache[handle].Item1;
@@ -70,6 +72,8 @@ public class Emulator {
 	public static Emulator? MainInstance {
 		get {
 			var mainHandle = DLL.EmuGetMainInstance();
+			mainHandle.PostConstruct();
+			
 			if (mainHandle.IsInvalid) {
 				return null;
 			}
@@ -88,6 +92,8 @@ public class Emulator {
 	
 	public Emulator(bool setAsMain = false) {
 		handle = DLL.EmuCreate(setAsMain);
+		handle.PostConstruct();
+		
 		if (handle.IsInvalid) {
 			throw new StateError(); // TODO: or AllocError
 		}
@@ -96,7 +102,7 @@ public class Emulator {
 		SMP = new(this);
 		handle.AddToCache(this);
 		
-		if (setAsMain) {
+		if (IsMainInstance) {
 			lastRenderPosition = DLL.EmuGetRenderPosition(handle);
 		}
 	}
