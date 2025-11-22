@@ -4,10 +4,10 @@ using Apollo;
 
 public static class LibTest {
 	public static Emulator Test(string spcFilePath) {
-		Lib.Init();
+		//Lib.Init();
 		
 		try {
-			Emulator emu = new(setAsMain: true);
+			Emulator emu = new(setAsMain: true, makeShared: true);
 			emu.LoadSpcFile(spcFilePath);
 			
 			Console.WriteLine($"reset: {emu.DSP.State.Reset}");

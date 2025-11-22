@@ -7,67 +7,125 @@ public class SMP {
 		public class TimerProps {
 			public byte Stage0 {
 				get {
-					if      (index == 0) return *((byte*) state.Timer0Stage0);
-					else if (index == 1) return *((byte*) state.Timer1Stage0);
-					else                 return *((byte*) state.Timer2Stage0);
+					emu.MaybeAcquireLock();
+					try {
+						if      (index == 0) return *((byte*) state.Timer0Stage0);
+						else if (index == 1) return *((byte*) state.Timer1Stage0);
+						else                 return *((byte*) state.Timer2Stage0);
+					}
+					finally { emu.MaybeReleaseLock(); }
 				}
 				set {
-					if      (index == 0) *((byte*) state.Timer0Stage0) = value;
-					else if (index == 1) *((byte*) state.Timer1Stage0) = value;
-					else                 *((byte*) state.Timer2Stage0) = value;
+					emu.MaybeAcquireLock();
+					try {
+						if      (index == 0) *((byte*) state.Timer0Stage0) = value;
+						else if (index == 1) *((byte*) state.Timer1Stage0) = value;
+						else                 *((byte*) state.Timer2Stage0) = value;
+					}
+					finally { emu.MaybeReleaseLock(); }
 				}
 			}
 			
 			public byte Stage1 {
 				get {
-					if      (index == 0) return (byte) (*((byte*) state.Timer0Stage1) & 1);
-					else if (index == 1) return (byte) (*((byte*) state.Timer1Stage1) & 1);
-					else                 return (byte) (*((byte*) state.Timer2Stage1) & 1);
+					emu.MaybeAcquireLock();
+					try {
+						if      (index == 0) return (byte) (*((byte*) state.Timer0Stage1) & 1);
+						else if (index == 1) return (byte) (*((byte*) state.Timer1Stage1) & 1);
+						else                 return (byte) (*((byte*) state.Timer2Stage1) & 1);
+					}
+					finally { emu.MaybeReleaseLock(); }
 				}
 				set {
-					if      (index == 0) *((byte*) state.Timer0Stage1) = (byte) (value & 1);
-					else if (index == 1) *((byte*) state.Timer1Stage1) = (byte) (value & 1);
-					else                 *((byte*) state.Timer2Stage1) = (byte) (value & 1);
+					emu.MaybeAcquireLock();
+					try {
+						if      (index == 0) *((byte*) state.Timer0Stage1) = (byte) (value & 1);
+						else if (index == 1) *((byte*) state.Timer1Stage1) = (byte) (value & 1);
+						else                 *((byte*) state.Timer2Stage1) = (byte) (value & 1);
+					}
+					finally { emu.MaybeReleaseLock(); }
 				}
 			}
 			
 			public byte Stage2 {
 				get {
-					if      (index == 0) return *((byte*) state.Timer0Stage2);
-					else if (index == 1) return *((byte*) state.Timer1Stage2);
-					else                 return *((byte*) state.Timer2Stage2);
+					emu.MaybeAcquireLock();
+					try {
+						if      (index == 0) return *((byte*) state.Timer0Stage2);
+						else if (index == 1) return *((byte*) state.Timer1Stage2);
+						else                 return *((byte*) state.Timer2Stage2);
+					}
+					finally { emu.MaybeReleaseLock(); }
 				}
 				set {
-					if      (index == 0) *((byte*) state.Timer0Stage2) = value;
-					else if (index == 1) *((byte*) state.Timer1Stage2) = value;
-					else                 *((byte*) state.Timer2Stage2) = value;
+					emu.MaybeAcquireLock();
+					try {
+						if      (index == 0) *((byte*) state.Timer0Stage2) = value;
+						else if (index == 1) *((byte*) state.Timer1Stage2) = value;
+						else                 *((byte*) state.Timer2Stage2) = value;
+					}
+					finally { emu.MaybeReleaseLock(); }
 				}
 			}
 			
 			public byte Stage3 {
-				get => Output;
-				set => Output = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return Output; }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { Output = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool Enabled {
-				get => (*((byte*) (state.TimerOnFlags) + index % 3) & 1) != 0;
-				set =>  *((byte*) (state.TimerOnFlags) + index % 3) = (byte) (value ? 1 : 0);
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (*((byte*) (state.TimerOnFlags) + index % 3) & 1) != 0; }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) (state.TimerOnFlags) + index % 3) = (byte) (value ? 1 : 0); }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte Divider {
-				get => *((byte*) (state.TimerDividers) + index % 3);
-				set => *((byte*) (state.TimerDividers) + index % 3) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) (state.TimerDividers) + index % 3); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) (state.TimerDividers) + index % 3) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte Output {
-				get => (byte) (*((byte*) (state.TimerOutputs) + index % 3) & 0xF);
-				set => *((byte*) (state.TimerOutputs) + index % 3) = (byte) (value & 0xF);
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (byte) (*((byte*) (state.TimerOutputs) + index % 3) & 0xF); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) (state.TimerOutputs) + index % 3) = (byte) (value & 0xF); }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
+			Emulator     emu;
 			DLL.SmpState state;
 			int          index;
 		
-			internal TimerProps(DLL.SmpState state, int index) {
+			internal TimerProps(Emulator emu, DLL.SmpState state, int index) {
+				this.emu   = emu;
 				this.state = state;
 				this.index = index;
 			}
@@ -76,14 +134,24 @@ public class SMP {
 		public class APUIO {
 			public class Ports: IEnumerable<byte> {
 				public byte this[int index] {
-					get => *((byte*) basePtr + (index & 3));
-					set => *((byte*) basePtr + (index & 3)) = value;
+					get {
+						emu.MaybeAcquireLock();
+						try     { return *((byte*) basePtr + (index & 3)); }
+						finally { emu.MaybeReleaseLock(); }
+					}
+					set {
+						emu.MaybeAcquireLock();
+						try     { *((byte*) basePtr + (index & 3)) = value; }
+						finally { emu.MaybeReleaseLock(); }
+					}
 				}
 				
+				Emulator     emu;
 				DLL.SmpState state;
 				IntPtr       basePtr;
 		
-				internal Ports(DLL.SmpState state, IntPtr basePtr) {
+				internal Ports(Emulator emu, DLL.SmpState state, IntPtr basePtr) {
+					this.emu     = emu;
 					this.state   = state;
 					this.basePtr = basePtr;
 				}
@@ -102,11 +170,11 @@ public class SMP {
 			
 			DLL.SmpState state;
 		
-			internal APUIO(DLL.SmpState state) {
+			internal APUIO(Emulator emu, DLL.SmpState state) {
 				this.state = state;
 				
-				Input  = new(state, state .InputPorts);
-				Output = new(state, state.OutputPorts);
+				Input  = new(emu, state, state .InputPorts);
+				Output = new(emu, state, state.OutputPorts);
 			}
 		}
 		
@@ -115,43 +183,107 @@ public class SMP {
 		public UInt8Buffer  Aux   { get; }
 		
 		public bool GlobalTimerDisable {
-			get => (*((byte*) state.GlobalTimerDisable) & 1) != 0;
-			set =>  *((byte*) state.GlobalTimerDisable) = (byte) (value ? 1 : 0);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*((byte*) state.GlobalTimerDisable) & 1) != 0; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.GlobalTimerDisable) = (byte) (value ? 1 : 0); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 		
 		public bool RAMWriteEnable {
-			get => (*((byte*) state.RamWriteEnable) & 1) != 0;
-			set =>  *((byte*) state.RamWriteEnable) = (byte) (value ? 1 : 0);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*((byte*) state.RamWriteEnable) & 1) != 0; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.RamWriteEnable) = (byte) (value ? 1 : 0); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 		
 		public bool RAMDisable {
-			get => (*((byte*) state.RamDisable) & 1) != 0;
-			set =>  *((byte*) state.RamDisable) = (byte) (value ? 1 : 0);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*((byte*) state.RamDisable) & 1) != 0; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.RamDisable) = (byte) (value ? 1 : 0); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 		
 		public bool GlobalTimerEnable {
-			get => (*((byte*) state.GlobalTimerEnable) & 1) != 0;
-			set =>  *((byte*) state.GlobalTimerEnable) = (byte) (value ? 1 : 0);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*((byte*) state.GlobalTimerEnable) & 1) != 0; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.GlobalTimerEnable) = (byte) (value ? 1 : 0); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 			
 		public byte RAMWaitstates {
-			get => (byte) (*((byte*) state.RamWaitstates) & 3);
-			set => *((byte*) state.RamWaitstates) = (byte) (value & 3);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (byte) (*((byte*) state.RamWaitstates) & 3); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.RamWaitstates) = (byte) (value & 3); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 			
 		public byte IOWaitstates {
-			get => (byte) (*((byte*) state.IoWaitstates) & 3);
-			set => *((byte*) state.IoWaitstates) = (byte) (value & 3);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (byte) (*((byte*) state.IoWaitstates) & 3); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.IoWaitstates) = (byte) (value & 3); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 		
 		public bool UseBootROM {
-			get => (*((byte*) state.UseBootRom) & 1) != 0;
-			set =>  *((byte*) state.UseBootRom) = (byte) (value ? 1 : 0);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*((byte*) state.UseBootRom) & 1) != 0; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.UseBootRom) = (byte) (value ? 1 : 0); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 			
 		public byte DSPAddress {
-			get => *((byte*) state.DspAddress);
-			set => *((byte*) state.DspAddress) = value;
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *((byte*) state.DspAddress); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.DspAddress) = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 			
 		public byte DSPData {
@@ -166,9 +298,15 @@ public class SMP {
 			this.emu   = emu;
 			this.state = state;
 			
-			Timer = new TimerProps[] { new(state, 0), new(state, 1), new(state, 2) };
-			IO    = new(state);
-			Aux   = new((byte*) state.Aux, 2);
+			Timer = new TimerProps[] { new(emu, state, 0), new(emu, state, 1), new(emu, state, 2) };
+			IO    = new(emu, state);
+			
+			if (emu.MakeShared) {
+				Aux = new UInt8BufferShared(emu, (byte*) state.Aux, 2);
+			}
+			else {
+				Aux = new((byte*) state.Aux, 2);
+			}
 		}
 	}
 	
@@ -188,49 +326,93 @@ public class SMP {
 	public Properties State { get; }
 	
 	public byte ReadByte(UInt16 address) {
-		return DLL.SmpReadByte(address, Emulator.handle);
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.SmpReadByte(address, Emulator.handle);
+			Emulator.CheckForError();
+			return result;
+		}
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	public UInt16 ReadWord(UInt16 address) {
-		return DLL.SmpReadWord(address, Emulator.handle);
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.SmpReadWord(address, Emulator.handle);
+			Emulator.CheckForError();
+			return result;
+		}
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	public Buffer ReadPage(UInt16 address) {
-		var page = DLL.SmpReadPage(address, Emulator.handle);
-		if (page.IsError) {
-			throw new StateError(); // TODO: or NullError
+		Emulator.MaybeAcquireLock();
+		try {
+			var page = DLL.SmpReadPage(address, Emulator.handle);
+			if (page.IsError) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
+			return new(page);
 		}
-		return new(page);
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	public byte DebugReadByte(UInt16 address) {
-		return DLL.SmpDebugReadByte(address, Emulator.handle);
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.SmpDebugReadByte(address, Emulator.handle);
+			Emulator.CheckForError();
+			return result;
+		}
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	public UInt16 DebugReadWord(UInt16 address) {
-		return DLL.SmpDebugReadWord(address, Emulator.handle);
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.SmpDebugReadWord(address, Emulator.handle);
+			Emulator.CheckForError();
+			return result;
+		}
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	public Buffer DebugReadPage(UInt16 address) {
-		var page = DLL.SmpDebugReadPage(address, Emulator.handle);
-		if (page.IsError) {
-			throw new StateError(); // TODO: or NullError
+		Emulator.MaybeAcquireLock();
+		try {
+			var page = DLL.SmpDebugReadPage(address, Emulator.handle);
+			if (page.IsError) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
+			return new(page);
 		}
-		return new(page);
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	public void WriteByte(UInt16 address, byte value) {
-		var result = DLL.SmpWriteByte(address, value, Emulator.handle);
-		if (!result) {
-			throw new StateError(); // TODO: or NullError
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.SmpWriteByte(address, value, Emulator.handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
 		}
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	public void WriteWord(UInt16 address, UInt16 value) {
-		var result = DLL.SmpWriteWord(address, value, Emulator.handle);
-		if (!result) {
-			throw new StateError(); // TODO: or NullError
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.SmpWriteWord(address, value, Emulator.handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
 		}
+		finally { Emulator.MaybeReleaseLock(); }
 	}
 	
 	internal SMP(Emulator emulator) {

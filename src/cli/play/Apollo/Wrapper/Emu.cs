@@ -43,4 +43,18 @@ internal partial class DLL {
 	
 	[LibraryImport("apollo", EntryPoint = "emu_get_render_position")]
 	public static partial UInt32 EmuGetRenderPosition(Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_acquire_lock")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuAcquireLock(Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_release_lock")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuReleaseLock(Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_get_last_result")]
+	public static partial UInt32 EmuGetLastResult(Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_get_last_error")]
+	public static partial UInt32 EmuGetLastError(Emulator.Handle emuPtr);
 }

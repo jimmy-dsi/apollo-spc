@@ -1,7 +1,6 @@
 namespace Apollo;
 
 using Jimbl;
-
 using System.Runtime.InteropServices;
 
 public class Emulator {
@@ -11,24 +10,32 @@ public class Emulator {
 		Handle? keepPrimaryAlive = null; // References the first creation of matching IntPtr handle - Can only be destroyed if all references to it are
 		bool    trueOwnsHandle   = true;
 		
+		public object Lock = new();
+		
 		public Handle(): base(IntPtr.Zero, true) { }
 		
 		public void PostConstruct() {
-			if (cache.ContainsKey(handle)) {
-				trueOwnsHandle   = false;
-				keepPrimaryAlive = cache[handle].Item1;
+			lock (Lock) {
+				if (cache.ContainsKey(handle)) {
+					trueOwnsHandle   = false;
+					keepPrimaryAlive = cache[handle].Item1;
+				}
 			}
 		}
 		
 		public void AddToCache(Emulator emu) {
-			cache[handle] = (this, emu);
+			lock (Lock) {
+				cache[handle] = (this, emu);
+			}
 		}
 		
 		public Emulator? GetCachedEmu() {
-			if (!cache.ContainsKey(handle)) {
-				return null;
+			lock (Lock) {
+				if (!cache.ContainsKey(handle)) {
+					return null;
+				}
+				return cache[handle].Item2;
 			}
-			return cache[handle].Item2;
 		}
 		
 		public override bool IsInvalid => handle == IntPtr.Zero;
@@ -37,11 +44,14 @@ public class Emulator {
 			if (trueOwnsHandle) {
 				var status = DLL.EmuDestroy(this);
 				if (!status) {
-					throw new StateError();
+					var errorCode = DLL.GetLastError();
+					Error.Throw(errorCode);
 				}
 				
-				if (ReferenceEquals(cache[handle].Item1, this)) {
-					cache.Remove(handle);
+				lock (Lock) {
+					if (ReferenceEquals(cache[handle].Item1, this)) {
+						cache.Remove(handle);
+					}
 				}
 			}
 				
@@ -51,59 +61,104 @@ public class Emulator {
 	}
 	
 	uint lastRenderPosition = 0;
+	bool makeShared         = false;
 	
 	public   DSP    DSP    { get; init; }
 	public   SMP    SMP    { get; init; }
 	internal Handle handle { get;  set; }
 
+	public bool MakeShared => makeShared;
+
 	public int LastRenderPosition => (int) lastRenderPosition;
-	public int RenderPosition     => (int) DLL.EmuGetRenderPosition(handle);
+	public int RenderPosition {
+		get {
+			MaybeAcquireLock();
+			try {
+				var result = (int) DLL.EmuGetRenderPosition(handle);
+				CheckForError();
+				return result;
+			}
+			finally {
+				MaybeReleaseLock();
+			}
+		}
+	}
 	
 	public int SamplesQueued {
 		get {
-			var samples = RenderPosition - LastRenderPosition;
-			if (samples < 0) {
-				samples += (int) DLL.EmuGetRenderBufferLen(handle);
+			var samples = RenderPosition - LastRenderPosition; // Render position may obtain lock so leave this line out of the locked region
+			MaybeAcquireLock();
+			
+			try {
+				if (samples < 0) {
+					var fullBufLen = (int) DLL.EmuGetRenderBufferLen(handle);
+					samples += fullBufLen;
+				
+					if (fullBufLen == 0) {
+						var errorCode = DLL.EmuGetLastError(handle);
+						Error.Throw(errorCode);
+					}
+				}
+				
+				return samples;
 			}
-			return samples;
+			finally {
+				MaybeReleaseLock();
+			}
 		}
 	}
 
 	public static Emulator? MainInstance {
 		get {
 			var mainHandle = DLL.EmuGetMainInstance();
-			mainHandle.PostConstruct();
 			
+			// TODO: Error handling here (might legitimately just be null (unset))
 			if (mainHandle.IsInvalid) {
 				return null;
 			}
 			
+			mainHandle.PostConstruct();
 			return mainHandle.GetCachedEmu();
 		}
 		set {
 			var result = DLL.EmuReassignMainInstance(value?.handle);
 			if (!result) {
-				throw new StateError(); // TODO: or NullError or AllocError
+				var errorCode = DLL.GetLastError();
+				Error.Throw(errorCode);
 			}
 		}
 	}
 	
 	public bool IsMainInstance => ReferenceEquals(this, MainInstance);
 	
-	public Emulator(bool setAsMain = false) {
+	public UInt32 LastResultCode => DLL.EmuGetLastResult(handle); // Get the last result code, regardless of whether it has succeeded or failed
+	public UInt32 LastErrorCode  => DLL.EmuGetLastError(handle);  // Get the last result code of the previous operation which resulted in an error
+	
+	public Emulator(bool setAsMain = false, bool makeShared = false) {
 		handle = DLL.EmuCreate(setAsMain);
-		handle.PostConstruct();
 		
 		if (handle.IsInvalid) {
-			throw new StateError(); // TODO: or AllocError
+			var errorCode = DLL.GetLastError();
+			Error.Throw(errorCode);
 		}
+		
+		handle.PostConstruct();
 		
 		DSP = new(this);
 		SMP = new(this);
 		handle.AddToCache(this);
 		
+		this.makeShared = makeShared;
+		
 		if (IsMainInstance) {
-			lastRenderPosition = DLL.EmuGetRenderPosition(handle);
+			MaybeAcquireLock();
+			try {
+				lastRenderPosition = DLL.EmuGetRenderPosition(handle);
+				CheckForError();
+			}
+			finally {
+				MaybeReleaseLock();
+			}
 		}
 	}
 	
@@ -113,61 +168,139 @@ public class Emulator {
 	}
 	
 	public void LoadSpcFile(byte[] fileData) {
-		Buffer buffer = new(fileData.Length);
-		for (var i = 0; i < fileData.Length; i++) {
-			buffer[i] = fileData[i];
-		}
+		MaybeAcquireLock();
 		
-		var result = DLL.SpcLoad(buffer.Ptr, buffer.Length.SafeUnsigned(), handle);
-		if (!result) {
-			throw new SpcLoadError(); // TODO: or StateError or NullError
+		try {
+			Buffer buffer = new(fileData.Length);
+			for (var i = 0; i < fileData.Length; i++) {
+				buffer[i] = fileData[i];
+			}
+		
+			var result = DLL.SpcLoad(buffer.Ptr, buffer.Length.SafeUnsigned(), handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+		}
+		finally {
+			MaybeReleaseLock();
 		}
 	}
 	
 	public void StepCycle() {
-		var result = DLL.EmuStepCycle(handle);
-		if (!result) {
-			throw new StateError(); // TODO: or Script700Timeout
+		MaybeAcquireLock();
+		
+		try {
+			var result = DLL.EmuStepCycle(handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+		}
+		finally {
+			MaybeReleaseLock();
 		}
 	}
 	
 	public void StepCycleFast() {
-		var result = DLL.EmuStepCycleFast(handle);
-		if (!result) {
-			throw new StateError();
+		MaybeAcquireLock();
+		
+		try {
+			var result = DLL.EmuStepCycleFast(handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+		}
+		finally {
+			MaybeReleaseLock();
 		}
 	}
 	
 	public int StepNCycles(int cycles) {
-		return (int) DLL.EmuStepNCycles(cycles.SafeUnsigned(), handle);
+		MaybeAcquireLock();
+		try     { return (int) DLL.EmuStepNCycles(cycles.SafeUnsigned(), handle); }
+		finally { MaybeReleaseLock(); }
 	}
 	
 	public int StepNCyclesFast(int cycles) {
-		return (int) DLL.EmuStepNCyclesFast(cycles.SafeUnsigned(), handle);
+		MaybeAcquireLock();
+		try     { return (int) DLL.EmuStepNCyclesFast(cycles.SafeUnsigned(), handle); }
+		finally { MaybeReleaseLock(); }
+	}
+	
+	internal void CheckForError() {
+		var resultCode = DLL.EmuGetLastResult(handle);
+		if (resultCode != 0) {
+			Error.Throw(resultCode);
+		}
 	}
 	
 	public Int16[] GetBufferedSamples() {
 		unsafe {
-			var bufferLeft  = (Int16*) DLL.EmuGetRenderBuffer(0, handle);
-			var bufferRight = (Int16*) DLL.EmuGetRenderBuffer(1, handle);
-			var fullBufLen  = (int)    DLL.EmuGetRenderBufferLen(handle);
-		
-			var current     = DLL.EmuGetRenderPosition(handle);
-			var sampleCount = current - (int) lastRenderPosition;
-		
-			if (sampleCount < 0) {
-				sampleCount += (int) fullBufLen;
-			}
-		
-			var bufferedSamples = new Int16[sampleCount * 2];
-			for (var i = 0; i < sampleCount; i++) {
-				bufferedSamples[i * 2]     = *(bufferLeft  + (lastRenderPosition + i) % fullBufLen);
-				bufferedSamples[i * 2 + 1] = *(bufferRight + (lastRenderPosition + i) % fullBufLen);
-			}
+			MaybeAcquireLock();
 			
-			lastRenderPosition = current;
+			try {
+				var bufferLeft  = (Int16*) DLL.EmuGetRenderBuffer(0, handle);
+				var bufferRight = (Int16*) DLL.EmuGetRenderBuffer(1, handle);
+				var fullBufLen  = (int)    DLL.EmuGetRenderBufferLen(handle);
+				
+				if (fullBufLen == 0) {
+					var errorCode = DLL.EmuGetLastError(handle);
+					Error.Throw(errorCode);
+				}
+				else {
+					CheckForError();
+				}
+		
+				var current     = DLL.EmuGetRenderPosition(handle);
+				var sampleCount = current - (int) lastRenderPosition;
+				
+				CheckForError();
+		
+				if (sampleCount < 0) {
+					sampleCount += (int) fullBufLen;
+				}
+		
+				var bufferedSamples = new Int16[sampleCount * 2];
+				for (var i = 0; i < sampleCount; i++) {
+					bufferedSamples[i * 2]     = *(bufferLeft  + (lastRenderPosition + i) % fullBufLen);
+					bufferedSamples[i * 2 + 1] = *(bufferRight + (lastRenderPosition + i) % fullBufLen);
+				}
 			
-			return bufferedSamples;
+				lastRenderPosition = current;
+			
+				return bufferedSamples;
+			}
+			finally {
+				MaybeReleaseLock();
+			}
 		}
+	}
+	
+	internal void AcquireLock() {
+		var result = DLL.EmuAcquireLock(handle);
+		if (!result) {
+			var errorCode = DLL.EmuGetLastError(handle);
+			Error.Throw(errorCode);
+		}
+	}
+	
+	internal void ReleaseLock() {
+		var result = DLL.EmuReleaseLock(handle);
+		if (!result) {
+			var errorCode = DLL.EmuGetLastError(handle);
+			Error.Throw(errorCode);
+		}
+	}
+	
+	internal void MaybeAcquireLock() {
+		if (makeShared) return;
+		AcquireLock();
+	}
+	
+	internal void MaybeReleaseLock() {
+		if (makeShared) return;
+		ReleaseLock();
 	}
 }

@@ -44,9 +44,9 @@ internal unsafe class Buffer {
 }
 
 public unsafe class UInt8Buffer: IEnumerable<byte> {
-	byte* ptr;
-	uint  size;
-	bool  isReadonly;
+	protected byte* ptr;
+	protected uint  size;
+	protected bool  isReadonly;
 	
 	public int Length => (int) size;
 	
@@ -56,7 +56,7 @@ public unsafe class UInt8Buffer: IEnumerable<byte> {
 		this.isReadonly = isReadonly;
 	}
 	
-	public byte this[int index] {
+	public virtual byte this[int index] {
 		get => *(ptr + index % size);
 		set {
 			if (isReadonly) {
@@ -73,4 +73,29 @@ public unsafe class UInt8Buffer: IEnumerable<byte> {
 	}
 	
 	IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+public unsafe class UInt8BufferShared: UInt8Buffer {
+	Emulator emu;
+	
+	internal UInt8BufferShared(Emulator emu, byte* ptr, int size, bool isReadonly = false): base(ptr, size, isReadonly) {
+		this.emu = emu;
+	}
+	
+	public override byte this[int index] {
+		get {
+			emu.AcquireLock();
+			try     { return *(ptr + index % size); }
+			finally { emu.ReleaseLock(); }
+		}
+		set {
+			if (isReadonly) {
+				throw new InvalidOperationException("Cannot write to readonly buffer");
+			}
+			
+			emu.AcquireLock();
+			try     { *(ptr + index % size) = value; }
+			finally { emu.ReleaseLock(); }
+		}
+	}
 }

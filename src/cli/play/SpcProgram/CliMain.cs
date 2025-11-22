@@ -16,12 +16,13 @@ public static class CliMain {
 			
 			spcFilePath = args[0];
 			
-			emu = new(setAsMain: true);
+			emu = LibTest.Test(spcFilePath);
+			//emu = new(setAsMain: true, makeShared: true);
 			emu.LoadSpcFile(spcFilePath);
 			
 			AudioOutput.Setup(emu);
 		}
-		catch (SpcLoadError) {
+		catch (SpcMissingHeaderError) {
 			Console.Error.WriteLine($"error: An unknown error occurred while attempting to process SPC metadata");
 			return 1;
 		}

@@ -5,180 +5,405 @@ public class DSP {
 		public class EchoProps {
 			public class FirBuf {
 				public sbyte this[byte index] {
-					get => *((sbyte*) state.EchoFeedback + (index & 7));
-					set => *((sbyte*) state.EchoFeedback + (index & 7)) = value;
+					get {
+						emu.MaybeAcquireLock();
+						try     { return *((sbyte*) state.EchoFeedback + (index & 7)); }
+						finally { emu.MaybeReleaseLock(); }
+					}
+					set {
+						emu.MaybeAcquireLock();
+						try     { *((sbyte*) state.EchoFeedback + (index & 7)) = value; }
+						finally { emu.MaybeReleaseLock(); }
+					}
 				}
 				
+				Emulator emu;
 				DLL.DspGlobalState state;
 				
-				internal FirBuf(DLL.DspGlobalState state) {
+				internal FirBuf(Emulator emu, DLL.DspGlobalState state) {
+					this.emu   = emu;
 					this.state = state;
 				}
 			}
 			
+			Emulator emu;
 			DLL.DspGlobalState state;
 			
 			public sbyte Feedback {
-				get => *((sbyte*) state.EchoFeedback);
-				set => *((sbyte*) state.EchoFeedback) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((sbyte*) state.EchoFeedback); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((sbyte*) state.EchoFeedback) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public sbyte VolumeLeft {
-				get => *((sbyte*) state.EchoVolLeft);
-				set => *((sbyte*) state.EchoVolLeft) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((sbyte*) state.EchoVolLeft); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((sbyte*) state.EchoVolLeft) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public sbyte VolumeRight {
-				get => *((sbyte*) state.EchoVolRight);
-				set => *((sbyte*) state.EchoVolRight) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((sbyte*) state.EchoVolRight); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((sbyte*) state.EchoVolRight) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public FirBuf FIR { get; }
 			
 			public byte StartPage {
-				get => *((byte*) state.EsaPage);
-				set => *((byte*) state.EsaPage) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.EsaPage); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) state.EsaPage) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte Delay {
-				get => (byte) (*((byte*) state.EchoDelay) & 15);
-				set => *((byte*) state.EchoDelay) = (byte) (value & 15);
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (byte) (*((byte*) state.EchoDelay) & 15); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) state.EchoDelay) = (byte) (value & 15); }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool Readonly {
-				get => *((bool*) state.EchoReadonly);
-				set => *((bool*) state.EchoReadonly) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.EchoReadonly); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((bool*) state.EchoReadonly) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 				
-			internal EchoProps(DLL.DspGlobalState state) {
+			internal EchoProps(Emulator emu, DLL.DspGlobalState state) {
+				this.emu   = emu;
 				this.state = state;
-				FIR = new(state);
+				FIR = new(emu, state);
 			}
 		}
 		
 		public class VoiceProps {
+			Emulator emu;
 			DLL.DspVoiceState state;
 			
 			public sbyte VolumeLeft {
-				get => *((sbyte*) state.VolLeft);
-				set => *((sbyte*) state.VolLeft) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((sbyte*) state.VolLeft); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((sbyte*) state.VolLeft) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public sbyte VolumeRight {
-				get => *((sbyte*) state.VolRight);
-				set => *((sbyte*) state.VolRight) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((sbyte*) state.VolRight); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((sbyte*) state.VolRight) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public UInt16 Pitch {
-				get => (UInt16) (*((UInt16*) state.Pitch) & 0x3FFF);
-				set => *((UInt16*) state.Pitch) = (UInt16) (value & 0x3FFF);
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (UInt16) (*((UInt16*) state.Pitch) & 0x3FFF); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((UInt16*) state.Pitch) = (UInt16) (value & 0x3FFF); }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte Source {
-				get => *((byte*) state.Source);
-				set => *((byte*) state.Source) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.Source); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) state.Source) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte ADSR0 {
-				get => *((byte*) state.Adsr0);
-				set => *((byte*) state.Adsr0) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.Adsr0); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) state.Adsr0) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte ADSR1 {
-				get => *((byte*) state.Adsr1);
-				set => *((byte*) state.Adsr1) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.Adsr1); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) state.Adsr1) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte Gain {
-				get => *((byte*) state.Gain);
-				set => *((byte*) state.Gain) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.Gain); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) state.Gain) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public byte ENVX {
-				get => *((byte*) state.Envx);
-				set => *((byte*) state.Envx) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.Envx); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) state.Envx) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool KeyOn {
-				get => *((bool*) state.KeyOn);
-				set => *((bool*) state.KeyOn) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.KeyOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((bool*) state.KeyOn) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool KeyOff {
-				get => *((bool*) state.KeyOff);
-				set => *((bool*) state.KeyOff) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.KeyOff); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((bool*) state.KeyOff) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool PitchModOn {
-				get => *((bool*) state.PitchModOn);
-				set => *((bool*) state.PitchModOn) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.PitchModOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((bool*) state.PitchModOn) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool NoiseOn {
-				get => *((bool*) state.NoiseOn);
-				set => *((bool*) state.NoiseOn) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.NoiseOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((bool*) state.NoiseOn) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool EchoOn {
-				get => *((bool*) state.EchoOn);
-				set => *((bool*) state.EchoOn) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.EchoOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((bool*) state.EchoOn) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
 			public bool End {
-				get => *((bool*) state.End);
-				set => *((bool*) state.End) = value;
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.End); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((bool*) state.End) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
 			}
 			
-			internal VoiceProps(DLL.DspVoiceState state) {
+			internal VoiceProps(Emulator emu, DLL.DspVoiceState state) {
+				this.emu   = emu;
 				this.state = state;
 			}
 		}
 		
+		Emulator emu;
 		DLL.DspGlobalState state;
 			
 		public bool Reset {
-			get => *((bool*) state.Reset);
-			set => *((bool*) state.Reset) = value;
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *((bool*) state.Reset); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((bool*) state.Reset) = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
-			
+
 		public bool Mute {
-			get => *((bool*) state.Mute);
-			set => *((bool*) state.Mute) = value;
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *((bool*) state.Mute); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((bool*) state.Mute) = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 			
 		public byte NoiseRate {
-			get => (byte) (*((byte*) state.NoiseRate) & 0x1F);
-			set => *((byte*) state.NoiseRate) = (byte) (value & 0x1F);
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (byte) (*((byte*) state.NoiseRate) & 0x1F); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.NoiseRate) = (byte) (value & 0x1F); }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 			
 		public sbyte MainVolumeLeft {
-			get => *((sbyte*) state.MainVolLeft);
-			set => *((sbyte*) state.MainVolLeft) = value;
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *((sbyte*) state.MainVolLeft); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((sbyte*) state.MainVolLeft) = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 			
 		public sbyte MainVolumeRight {
-			get => *((sbyte*) state.MainVolRight);
-			set => *((sbyte*) state.MainVolRight) = value;
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *((sbyte*) state.MainVolRight); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((sbyte*) state.MainVolRight) = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 		
 		public byte SourceTablePage {
-			get => *((byte*) state.BrrBank);
-			set => *((byte*) state.BrrBank) = value;
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *((byte*) state.BrrBank); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *((byte*) state.BrrBank) = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
 		}
 		
 		public EchoProps    Echo  { get; }
 		public VoiceProps[] Voice { get; }
 				
-		internal Properties(DLL.DspGlobalState state, DLL.DspVoiceState[] voiceStates) {
+		internal Properties(Emulator emu, DLL.DspGlobalState state, DLL.DspVoiceState[] voiceStates) {
+			this.emu   = emu;
 			this.state = state;
-			Echo       = new(state);
-			Voice      = new VoiceProps[8];
+			
+			Echo  = new(emu, state);
+			Voice = new VoiceProps[8];
 			
 			for (var i = 0; i < 8; i++) {
 				if (i >= voiceStates.Length) {
 					break;
 				}
-				Voice[i] = new(voiceStates[i]);
+				Voice[i] = new(emu, voiceStates[i]);
 			}
 		}
 	}
@@ -192,12 +417,20 @@ public class DSP {
 	
 	public long CurrentCycle {
 		get {
-			var result = (long) DLL.DspGetCurrentCycle(Emulator.handle);
-			if (result == -1) {
-				throw new StateError(); // TODO: or NullError
-			}
+			Emulator.MaybeAcquireLock();
 			
-			return result;
+			try {
+				var result = (long) DLL.DspGetCurrentCycle(Emulator.handle);
+				if (result == -1) {
+					var errorCode = DLL.EmuGetLastError(Emulator.handle);
+					Error.Throw(errorCode);
+				}
+			
+				return result;
+			}
+			finally {
+				Emulator.MaybeReleaseLock();
+			}
 		}
 	}
 	
@@ -211,12 +444,19 @@ public class DSP {
 			var regMapPtr = DLL.DspGetRegMapPtr(Emulator.handle);
 			if (regMapPtr == IntPtr.Zero) { throw new StateError(); }
 			
-			ARAM     = new((byte*) aramPtr, 65536);
-			Register = new((byte*) regMapPtr, 128);
+			if (emulator.MakeShared) {
+				ARAM     = new UInt8BufferShared(emulator, (byte*) aramPtr, 65536);
+				Register = new UInt8BufferShared(emulator, (byte*) regMapPtr, 128);
+			}
+			else {
+				ARAM     = new((byte*) aramPtr, 65536);
+				Register = new((byte*) regMapPtr, 128);
+			}
 			
 			var globalState = DLL.DspGetGlobalState(Emulator.handle);
 			if (globalState.EchoFeedback == IntPtr.Zero) {
-				throw new StateError();
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
 			}
 			
 			List<DLL.DspVoiceState> voiceStates = new();
@@ -224,12 +464,13 @@ public class DSP {
 			for (var i = 0; i < 8; i++) {
 				var v = DLL.DspGetVoiceState((byte) i, Emulator.handle);
 				if (v.VolLeft == IntPtr.Zero) {
-					throw new StateError();
+					var errorCode = DLL.EmuGetLastError(Emulator.handle);
+					Error.Throw(errorCode);
 				}
 				voiceStates.Add(v);
 			}
 			
-			State = new(globalState, voiceStates.ToArray());
+			State = new(emulator, globalState, voiceStates.ToArray());
 		}
 	}
 }

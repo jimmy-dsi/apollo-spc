@@ -263,6 +263,11 @@ pub const Emu = struct {
 
     default_interrupt_vector: u16 = 0xFFDE,
 
+    lib_error_code:  u32 = 1,
+    lib_result_code: u32 = 0,
+
+    lock: std.Thread.Mutex = .{},
+
     pub fn static_init() void {
         prng = std.Random.DefaultPrng.init(blk: {
             var seed: u64 = undefined;

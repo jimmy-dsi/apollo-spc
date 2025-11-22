@@ -1,9 +1,10 @@
 const std = @import("std");
 
-const Emu       = @import("core/emu.zig").Emu;
-const SDSP      = @import("core/s_dsp.zig").SDSP;
-const SSMP      = @import("core/s_smp.zig").SSMP;
-const Script700 = @import("core/script700.zig").Script700;
+const Emu          = @import("core/emu.zig").Emu;
+const SDSP         = @import("core/s_dsp.zig").SDSP;
+const SSMP         = @import("core/s_smp.zig").SSMP;
+const Script700    = @import("core/script700.zig").Script700;
+const SPCLoadError = @import("core/spc_loader.zig").SPCLoadError;
 
 const main = @import("main.zig");
 
@@ -13,6 +14,8 @@ pub const Error = error {
 
 var _main_emu_instance: ?*Emu           = null;
 var _emu_singleton:     ?*Emu.Singleton = null;
+
+var _main_inst_lock = std.Thread.Mutex{};
 
 pub inline fn create(set_as_main_instance: bool) !*Emu {
     try main.validate();
@@ -25,6 +28,9 @@ pub inline fn create(set_as_main_instance: bool) !*Emu {
     emu.* = Emu.new();
 
     if (set_as_main_instance) {
+        _main_inst_lock.lock();
+        defer _main_inst_lock.unlock();
+
         if (_emu_singleton == null) {
             _emu_singleton = try main.alloc.create(Emu.Singleton);
         }
@@ -52,11 +58,19 @@ pub inline fn create(set_as_main_instance: bool) !*Emu {
 
 pub inline fn get_main_instance() !?*Emu {
     try main.validate();
-    return _main_emu_instance;
+
+    _main_inst_lock.lock();
+    const inst = _main_emu_instance;
+    _main_inst_lock.unlock();
+
+    return inst;
 }
 
 pub inline fn reassign_main_instance(emu_ptr: ?*Emu) !void {
     try main.validate_ptr(Emu, emu_ptr);
+
+    _main_inst_lock.lock();
+    defer _main_inst_lock.unlock();
 
     const old_main = _main_emu_instance;
 
@@ -134,6 +148,20 @@ pub inline fn get_render_position(emu_ptr: ?*Emu) !u32 {
     return ep.?.get_dac_buffer_offset();
 }
 
+pub inline fn acquire_lock(emu_ptr: ?*Emu) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    ep.?.lock.lock();
+}
+
+pub inline fn release_lock(emu_ptr: ?*Emu) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    ep.?.lock.unlock();
+}
+
 pub inline fn destroy(emu_ptr: ?*Emu) !void {
     try main.validate_ptr(Emu, emu_ptr);
 
@@ -147,9 +175,31 @@ pub inline fn destroy(emu_ptr: ?*Emu) !void {
     main.alloc.destroy(emu_ptr.?);
 }
 
+pub inline fn get_last_result(emu_ptr: ?*Emu) u32 {
+    if (emu_ptr == null) { return 0; }
+    const em = emu_ptr.?;
+
+    const last_result = em.lib_result_code;
+    em.lib_result_code = @intFromEnum(main.Result.success); // Prepare success result for next API call
+    return last_result;
+}
+
+pub inline fn get_last_error(emu_ptr: ?*Emu) u32 {
+    if (emu_ptr == null) { return 0; }
+    const em = emu_ptr.?;
+
+    const last_error = em.lib_error_code;
+    em.lib_result_code = @intFromEnum(main.Result.success); // Prepare success result for next API call
+    return last_error;
+}
+
 // Non export
 pub inline fn main_emu_instance() ?*Emu {
-    return _main_emu_instance;
+    _main_inst_lock.lock();
+    const inst = _main_emu_instance;
+    _main_inst_lock.unlock();
+    
+    return inst;
 }
 
 pub inline fn get_ptr(emu_ptr: ?*Emu) ?*Emu {
@@ -159,4 +209,68 @@ pub inline fn get_ptr(emu_ptr: ?*Emu) ?*Emu {
     else {
         return emu_ptr;
     }
+}
+
+pub inline fn set_last_result_code(code: main.Result, em: *Emu) void {
+    if (code == .success) {
+        return;
+    }
+
+    em.lib_result_code = @intFromEnum(code);
+    em.lib_error_code  = @intFromEnum(code);
+}
+
+pub inline fn err(e: anyerror, emu_ptr: ?*Emu) anyerror {
+    if (emu_ptr == null) { return e; }
+    const em = emu_ptr.?;
+
+    const code: main.Result =
+        switch (e) {
+            main.Error.multiple_deinit => .multiple_deinit,
+            main.Error.already_inited  => .already_inited,
+            main.Error.invalid_state   => .invalid_state,
+            main.Error.null_ptr        => .null_ptr,
+
+            Error.multiple_main_emu => .multiple_main_emu,
+
+            std.mem.Allocator.Error.OutOfMemory => .alloc_error,
+
+            SPCLoadError.MissingFileHeader => .spc_missing_file_header,
+            SPCLoadError.SizeTooShort      => .spc_size_too_short,
+
+            Emu.Error.Timeout => .script700_timeout,
+
+            Emu.Error.NoSingletonAttached => .emu_is_not_main,
+
+            else => .unknown_error
+        };
+
+    set_last_result_code(code, em);
+
+    return e;
+}
+
+pub inline fn ferr(e: anyerror, emu_ptr: ?*Emu) bool {
+    _ = @intFromError(err(e, emu_ptr)); // Need to convert error to something else to avoid compiler error about error discard
+    return false;
+}
+
+pub inline fn nerr(comptime T: type, e: anyerror, emu_ptr: ?*Emu) ?T {
+    _ = @intFromError(err(e, emu_ptr));
+    return null;
+}
+
+pub inline fn zerr(comptime T: type, e: anyerror, emu_ptr: ?*Emu) T {
+    _ = @intFromError(err(e, emu_ptr));
+    return 0;
+}
+
+pub inline fn lerr(e: anyerror, emu_ptr: ?*Emu) u64 {
+    _ = @intFromError(err(e, emu_ptr));
+    return 0xFFFF_FFFF_FFFF_FFFF;
+}
+
+pub inline fn derr(comptime T: type, e: anyerror, emu_ptr: ?*Emu) T {
+    _ = @intFromError(err(e, emu_ptr));
+    return .{};
 }

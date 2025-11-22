@@ -3,8 +3,6 @@
 using System.Diagnostics;
 using Jimbl;
 
-//emu = LibTest.Test(args[0]);
-
 const int WIDTH  = 133;
 const int HEIGHT = 34;
 
