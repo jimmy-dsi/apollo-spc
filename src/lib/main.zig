@@ -33,6 +33,8 @@ pub const Result = enum(u32) {
     script700_load_error    = 11,
 
     emu_is_not_main         = 12,
+
+    spc_not_loaded          = 13,
 };
 
 const State = enum {

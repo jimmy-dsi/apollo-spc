@@ -63,6 +63,8 @@ public class Emulator {
 	uint lastRenderPosition = 0;
 	bool makeShared         = false;
 	
+	SPC.Metadata? metadata = null;
+	
 	public   DSP    DSP    { get; init; }
 	public   SMP    SMP    { get; init; }
 	internal Handle handle { get;  set; }
@@ -130,6 +132,30 @@ public class Emulator {
 	}
 	
 	public bool IsMainInstance => ReferenceEquals(this, MainInstance);
+	
+	public SPC.Metadata SpcMetadata {
+		get {
+			if (metadata != null) {
+				return metadata;
+			}
+			
+			MaybeAcquireLock();
+		
+			try {
+				var md = DLL.SpcGetMetadata(handle);
+				if (md.IsValid == 0) {
+					var errorCode = DLL.EmuGetLastError(handle);
+					Error.Throw(errorCode);
+				}
+			
+				metadata = new(md);
+				return metadata;
+			}
+			finally {
+				MaybeReleaseLock();
+			}
+		}
+	}
 	
 	public UInt32 LastResultCode => DLL.EmuGetLastResult(handle); // Get the last result code, regardless of whether it has succeeded or failed
 	public UInt32 LastErrorCode  => DLL.EmuGetLastError(handle);  // Get the last result code of the previous operation which resulted in an error

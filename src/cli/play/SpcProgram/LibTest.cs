@@ -114,6 +114,12 @@ public static class LibTest {
 			//	emu.StepCycle();
 			//	cycles++;
 			//}
+			
+			Console.WriteLine($"Title:    {emu.SpcMetadata   .Title}");
+			Console.WriteLine($"Artist:   {emu.SpcMetadata  .Artist}");
+			Console.WriteLine($"Game:     {emu.SpcMetadata    .Game}");
+			Console.WriteLine($"Dumper:   {emu.SpcMetadata  .Dumper}");
+			Console.WriteLine($"Comments: {emu.SpcMetadata.Comments}");
 		
 			return emu;
 		}

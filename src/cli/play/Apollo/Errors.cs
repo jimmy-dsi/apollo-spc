@@ -23,6 +23,8 @@ public enum ResultType {
 	Script700LoadError   = 11,
 
 	EmuIsNotMain         = 12,
+	
+	SpcNotLoaded         = 13,
 }
 
 public class Error: Exception {
@@ -45,6 +47,7 @@ public class Error: Exception {
 			case ResultType.Script700Timeout:     throw new Script700Timeout();
 			case ResultType.Script700LoadError:   throw new Script700LoadError();
 			case ResultType.EmuIsNotMain:         throw new EmuNotMainError();
+			case ResultType.SpcNotLoaded:         throw new SpcNotLoadedError();
 		}
 	}
 }
@@ -61,3 +64,4 @@ public class SpcSizeTooShortError:  Error { }
 public class Script700Timeout:      Error { }
 public class Script700LoadError:    Error { }
 public class EmuNotMainError:       Error { }
+public class SpcNotLoadedError:     Error { }

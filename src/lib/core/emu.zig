@@ -1,9 +1,10 @@
 const std = @import("std");
 
-const SDSP      = @import("s_dsp.zig").SDSP;
-const SSMP      = @import("s_smp.zig").SSMP;
-const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
-const Script700 = @import("script700.zig").Script700;
+const SDSP         = @import("s_dsp.zig").SDSP;
+const SSMP         = @import("s_smp.zig").SSMP;
+const Pipeline2    = @import("pipeline_2.zig").Pipeline2;
+const Script700    = @import("script700.zig").Script700;
+const SongMetadata = @import("song_metadata.zig").SongMetadata;
 
 pub const Emu = struct {
     pub const Error = error { Timeout, NoSingletonAttached };
@@ -263,8 +264,10 @@ pub const Emu = struct {
 
     default_interrupt_vector: u16 = 0xFFDE,
 
+    // Storage for dynamic lib - Stored along with emu to avoid race conditions
     lib_error_code:  u32 = 1,
     lib_result_code: u32 = 0,
+    lib_metadata: ?SongMetadata = null,
 
     lock: std.Thread.Mutex = .{},
 

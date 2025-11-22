@@ -201,3 +201,7 @@ pub export fn spc_load(file_data: ?[*]const u8, len: u64, emu_ptr: ?[*]Emu) bool
     spcl.load_spc(file_data.?[0..len], @ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
     return true;
 }
+
+pub export fn spc_get_metadata(emu_ptr: ?[*]Emu) spcl.Metadata {
+    return spcl.get_metadata(@ptrCast(emu_ptr)) catch |e| emu.derr(spcl.Metadata, e, @ptrCast(emu_ptr));
+}
