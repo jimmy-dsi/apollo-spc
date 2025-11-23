@@ -10,6 +10,9 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "spc_get_metadata")]
 	public static partial SpcMetadata SpcGetMetadata(Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "spc_get_cpu_state")]
+	public static partial SpcCpuState SpcGetCpuState(Emulator.Handle? emuPtr);
+	
 	[StructLayout(LayoutKind.Sequential)]
 	internal unsafe struct SpcMetadata {
 		public byte IsValid;
@@ -47,5 +50,17 @@ internal partial class DLL {
 		public Int64 LoopTimes;
 		
 		public Int64 MixingLevel;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct SpcCpuState {
+		public IntPtr A;
+		public IntPtr X;
+		public IntPtr Y;
+		
+		public IntPtr SP;
+		public IntPtr PC;
+		
+		public IntPtr PSW;
 	}
 }

@@ -67,6 +67,7 @@ public class Emulator {
 	
 	public   DSP    DSP    { get; init; }
 	public   SMP    SMP    { get; init; }
+	public   SPC    SPC    { get; init; }
 	internal Handle handle { get;  set; }
 
 	public bool MakeShared => makeShared;
@@ -172,6 +173,7 @@ public class Emulator {
 		
 		DSP = new(this);
 		SMP = new(this);
+		SPC = new(this);
 		handle.AddToCache(this);
 		
 		this.makeShared = makeShared;

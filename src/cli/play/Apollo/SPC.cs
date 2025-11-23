@@ -1,6 +1,8 @@
-using System.Text;
+using Jimbl;
 
 namespace Apollo;
+
+using System.Text;
 
 public class SPC {
 	public class Metadata {
@@ -75,6 +77,231 @@ public class SPC {
 			LoopTimes                = metadata.LoopTimes                >= 0 ? (byte)   metadata.LoopTimes                : null;
 			
 			MixingLevel = metadata.MixingLevel >= 0 ? (byte) metadata.MixingLevel : null;
+		}
+	}
+	
+	public unsafe class CpuState {
+		public byte A {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *(byte*) state.A; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(byte*) state.A = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public byte X {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *(byte*) state.X; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(byte*) state.X = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public byte Y {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *(byte*) state.Y; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(byte*) state.Y = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public UInt16 YA {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (UInt16) (*(byte*) state.Y << 8 | *(byte*) state.A); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try {
+					*(byte*) state.Y = (byte) (value >>   8);
+					*(byte*) state.A = (byte) (value & 0xFF);
+				}
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public byte SP {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *(byte*) state.SP; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(byte*) state.SP = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public UInt16 PC {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *(UInt16*) state.PC; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(UInt16*) state.PC = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public byte PSW {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *(byte*) state.PSW; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(byte*) state.PSW = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool N {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(7); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(7, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool V {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(6); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(6, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool P {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(5); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(5, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool B {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(4); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(4, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool H {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(3); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(3, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool I {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(2); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(2, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool Z {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(1); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(1, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public bool C {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (*(byte*) state.PSW).GetBit(0); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { (*(byte*) state.PSW).SetBit(0, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		Emulator        emu;
+		DLL.SpcCpuState state;
+		
+		internal CpuState(Emulator emu, DLL.SpcCpuState state) {
+			this.emu   = emu;
+			this.state = state;
+		}
+	}
+	
+	public Emulator Emulator { get; init; }
+	public CpuState State    { get; }
+	
+	internal SPC(Emulator emulator) {
+		unsafe {
+			Emulator = emulator;
+			
+			var state = DLL.SpcGetCpuState(Emulator.handle);
+			if (state.A == IntPtr.Zero) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
+			
+			State = new(emulator, state);
 		}
 	}
 	

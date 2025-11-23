@@ -115,11 +115,98 @@ public static class LibTest {
 			//	cycles++;
 			//}
 			
-			Console.WriteLine($"Title:    {emu.SpcMetadata   .Title}");
-			Console.WriteLine($"Artist:   {emu.SpcMetadata  .Artist}");
-			Console.WriteLine($"Game:     {emu.SpcMetadata    .Game}");
-			Console.WriteLine($"Dumper:   {emu.SpcMetadata  .Dumper}");
-			Console.WriteLine($"Comments: {emu.SpcMetadata.Comments}");
+			Console.WriteLine($"Title:                   {emu.SpcMetadata   .Title}");
+			Console.WriteLine($"Artist:                  {emu.SpcMetadata  .Artist}");
+			Console.WriteLine($"Game:                    {emu.SpcMetadata    .Game}");
+			Console.WriteLine($"Dumper:                  {emu.SpcMetadata  .Dumper}");
+			Console.WriteLine($"Comments:                {emu.SpcMetadata.Comments}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"Month:                   {emu.SpcMetadata.Month}");
+			Console.WriteLine($"Day:                     {emu.SpcMetadata  .Day}");
+			Console.WriteLine($"Year:                    {emu.SpcMetadata .Year}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"Date Other:              {emu.SpcMetadata.DateOther}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"Length (s):              {emu.SpcMetadata.LengthInSeconds}");
+			Console.WriteLine($"Fade Length (ms):        {emu.SpcMetadata .FadeLengthInMS}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"Channels Disabled:       {
+				string.Join(' ', emu.SpcMetadata.ChannelsDisabled ?? [false, false, false, false, false, false, false, false])
+			}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"Emulator ID:             {emu.SpcMetadata.EmulatorID}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"OST Title:               {emu.SpcMetadata.OSTTitle}");
+			Console.WriteLine($"OST Disc:                {emu.SpcMetadata .OSTDisc}");
+			Console.WriteLine($"OST Track:               {(emu.SpcMetadata.OSTTrack != null ? string.Join(' ', emu.SpcMetadata.OSTTrack) : null)}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"Publisher:               {emu.SpcMetadata    .Publisher}");
+			Console.WriteLine($"Copyright Year:          {emu.SpcMetadata.CopyrightYear}");
+			Console.WriteLine();
+				
+			Console.WriteLine($"Intro Length (T2 steps): {emu.SpcMetadata.IntroLengthInTimer2Steps}");
+			Console.WriteLine($"Loop  Length (T2 steps): {emu.SpcMetadata .LoopLengthInTimer2Steps}");
+			Console.WriteLine($"End   Length (T2 steps): {emu.SpcMetadata  .EndLengthInTimer2Steps}");
+			Console.WriteLine($"Loop Times:              {emu.SpcMetadata               .LoopTimes}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"Mixing Level:            {emu.SpcMetadata.MixingLevel}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"A:   {emu.SPC.State.A :X2}");
+			Console.WriteLine($"X:   {emu.SPC.State.X :X2}");
+			Console.WriteLine($"Y:   {emu.SPC.State.Y :X2}");
+			Console.WriteLine($"YA:  {emu.SPC.State.YA:X4}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"SP:  {emu.SPC.State.SP:X2}");
+			Console.WriteLine($"PC:  {emu.SPC.State.PC:X4}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"PSW: {emu.SPC.State.PSW:X2}");
+			Console.WriteLine();
+			
+			Console.WriteLine($"N:   {emu.SPC.State.N}");
+			Console.WriteLine($"V:   {emu.SPC.State.V}");
+			Console.WriteLine($"P:   {emu.SPC.State.P}");
+			Console.WriteLine($"B:   {emu.SPC.State.B}");
+			Console.WriteLine($"H:   {emu.SPC.State.H}");
+			Console.WriteLine($"I:   {emu.SPC.State.I}");
+			Console.WriteLine($"Z:   {emu.SPC.State.Z}");
+			Console.WriteLine($"C:   {emu.SPC.State.C}");
+			Console.WriteLine();
+			
+			emu.SPC.State.I = true;
+			
+			Console.WriteLine($"PSW: {emu.SPC.State.PSW:X2}");
+			Console.WriteLine();
+			
+			emu.SPC.State.I = false;
+			
+			Console.WriteLine($"PSW: {emu.SPC.State.PSW:X2}");
+			Console.WriteLine();
+			
+			var oldYA = emu.SPC.State.YA;
+			emu.SPC.State.YA = 0x4269;
+			
+			Console.WriteLine($"A:   {emu.SPC.State.A :X2}");
+			Console.WriteLine($"Y:   {emu.SPC.State.Y :X2}");
+			Console.WriteLine($"YA:  {emu.SPC.State.YA:X4}");
+			Console.WriteLine();
+			
+			emu.SPC.State.YA = oldYA;
+			
+			Console.WriteLine($"A:   {emu.SPC.State.A :X2}");
+			Console.WriteLine($"Y:   {emu.SPC.State.Y :X2}");
+			Console.WriteLine($"YA:  {emu.SPC.State.YA:X4}");
+			Console.WriteLine();
 		
 			return emu;
 		}

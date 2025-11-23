@@ -101,6 +101,19 @@ public static class Exts {
 	public static UInt32 SafeUnsigned(this Int32 value) => (UInt32) Int32.Clamp(value, 0, Int32.MaxValue);
 	public static UInt64 SafeUnsigned(this Int64 value) => (UInt64) Int64.Clamp(value, 0, Int64.MaxValue);
 	
+	public static bool GetBit(this byte v, int b) {
+		return (v & (1 << b)) != 0;
+	}
+	
+	public static void SetBit(this ref byte v, int b, bool value) {
+		if (value) {
+			v |= (byte) (1 << b);
+		}
+		else {
+			v &= (byte) ~(1 << b);
+		}
+	}
+	
 	// Char Extension Methods
 	public static UnicodeCategory GetUnicodeCategory(this char c) => char.GetUnicodeCategory(c);
 	

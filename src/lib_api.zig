@@ -4,6 +4,7 @@ const main   = @import("lib/main.zig");
 const emu    = @import("lib/emu.zig");
 const dsp    = @import("lib/dsp.zig");
 const smp    = @import("lib/smp.zig");
+const spc    = @import("lib/spc.zig");
 const buffer = @import("lib/buffer.zig");
 const spcl   = @import("lib/spc_loader.zig");
 
@@ -180,6 +181,11 @@ pub export fn smp_get_boot_rom_ptr(emu_ptr: ?[*]Emu) ?[*]const u8 {
 
 pub export fn smp_get_state(emu_ptr: ?[*]Emu) smp.State {
     return smp.get_state(@ptrCast(emu_ptr)) catch |e| emu.derr(smp.State, e, @ptrCast(emu_ptr));
+}
+
+// SPC
+pub export fn spc_get_cpu_state(emu_ptr: ?[*]Emu) spc.State {
+    return spc.get_cpu_state(@ptrCast(emu_ptr)) catch |e| emu.derr(spc.State, e, @ptrCast(emu_ptr));
 }
 
 // Buffer
