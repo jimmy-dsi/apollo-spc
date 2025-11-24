@@ -183,6 +183,25 @@ pub export fn smp_get_state(emu_ptr: ?[*]Emu) smp.State {
     return smp.get_state(@ptrCast(emu_ptr)) catch |e| emu.derr(smp.State, e, @ptrCast(emu_ptr));
 }
 
+pub export fn smp_enable_logging(emu_ptr: ?[*]Emu) bool {
+    smp.enable_logging(@ptrCast(emu_ptr)) catch |e| { return main.ferr(e); };
+    return true;
+}
+
+pub export fn smp_disable_logging(emu_ptr: ?[*]Emu) bool {
+    smp.disable_logging(@ptrCast(emu_ptr)) catch |e| { return main.ferr(e); };
+    return true;
+}
+
+pub export fn smp_get_access_logs(start_cycle: u64, emu_ptr: ?[*]Emu) smp.LogSlice {
+    return smp.get_access_logs(start_cycle, @ptrCast(emu_ptr)) catch |e| emu.derr(smp.LogSlice, e, @ptrCast(emu_ptr));
+}
+
+pub export fn smp_free_logs(log_start_ptr: ?[*]smp.Log) bool {
+    smp.free_logs(@ptrCast(log_start_ptr)) catch |e| { return main.ferr(e); };
+    return true;
+}
+
 // SPC
 pub export fn spc_get_cpu_state(emu_ptr: ?[*]Emu) spc.State {
     return spc.get_cpu_state(@ptrCast(emu_ptr)) catch |e| emu.derr(spc.State, e, @ptrCast(emu_ptr));

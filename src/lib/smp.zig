@@ -45,6 +45,22 @@ pub const State = extern struct {
     timer_outputs:  ?[*]u8 = null
 };
 
+pub const LogSlice = extern struct {
+    ptr: ?[*]Log = null,
+    size: u32 = 0
+};
+
+pub const Log = extern struct {
+    type: u32 = 0,
+
+    dsp_cycle:  u64,
+    address:    u16,
+    
+    pre_data:   u8 = 0,
+    write_data: u8 = 0,
+    post_data:  u8 = 0,
+};
+
 pub inline fn read_byte(address: u16, emu_ptr: ?*Emu) !u8 {
     var ep = emu.get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);
@@ -174,4 +190,72 @@ pub inline fn get_state(emu_ptr: ?*Emu) !State {
         .timer_dividers = @ptrCast(&state.timer_dividers[0]),
         .timer_outputs  = @ptrCast(&state .timer_outputs[0])
     };
+}
+
+pub inline fn enable_logging(emu_ptr: ?*Emu) !void {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    ep.?.s_smp.enable_access_logs = true;
+}
+
+pub inline fn disable_logging(emu_ptr: ?*Emu) !void {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    ep.?.s_smp.enable_access_logs = false;
+}
+
+pub inline fn get_access_logs(start_cycle: u64, emu_ptr: ?*Emu) !LogSlice {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const logs_ = ep.?.s_smp.get_access_logs_range(start_cycle);
+
+    var logs = logs_;
+    var size: u32 = 0;
+
+    while (logs.step()) {
+        size += 1;
+    }
+
+    const array = if (size > 0)
+        try main.alloc.alloc(Log, size)
+    else
+        try main.alloc.alloc(Log, 1);
+
+    logs = logs_;
+    var i: u32 = 0;
+
+    while (logs.step()) {
+        const log = logs.value();
+
+        array[i] = .{
+            .type = switch (log.type) {
+                SSMP.AccessType.none       => @intFromEnum(main.LogType.none),
+                SSMP.AccessType.read       => @intFromEnum(main.LogType.read),
+                SSMP.AccessType.write      => @intFromEnum(main.LogType.write),
+                SSMP.AccessType.exec       => @intFromEnum(main.LogType.exec),
+                SSMP.AccessType.fetch      => @intFromEnum(main.LogType.fetch),
+                SSMP.AccessType.dummy_read => @intFromEnum(main.LogType.dummy_read),
+            },
+            .dsp_cycle  = log.dsp_cycle,
+            .address    = log.address,
+            .pre_data   = log.pre_data   orelse 0,
+            .write_data = log.write_data orelse 0,
+            .post_data  = log.post_data  orelse 0,
+        };
+
+        i += 1;
+    }
+
+    return .{
+        .ptr  = @ptrCast(array.ptr),
+        .size = size,
+    };
+}
+
+pub inline fn free_logs(log_ptr: ?*Log) !void {
+    try main.validate_ptr(Log, log_ptr);
+    main.alloc.destroy(log_ptr.?);
 }

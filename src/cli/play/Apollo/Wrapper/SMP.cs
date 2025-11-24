@@ -32,8 +32,23 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "smp_get_boot_rom_ptr")]
 	public static partial IntPtr SmpGetBootRomPtr(Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "smp_enable_logging")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool SmpEnableLogging(Emulator.Handle? emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "smp_disable_logging")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool SmpDisableLogging(Emulator.Handle? emuPtr);
+	
 	[LibraryImport("apollo", EntryPoint = "smp_get_state")]
 	public static partial SmpState SmpGetState(Emulator.Handle? emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "smp_get_access_logs")]
+	public static partial SmpLogSlice SmpGetAccessLogs(UInt64 startCycle, Emulator.Handle? emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "smp_free_logs")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool SmpFreeLogs(IntPtr logArrayPtr);
 	
 	[StructLayout(LayoutKind.Sequential, Pack = 1)]
 	internal unsafe struct SmpMemoryPage {
@@ -44,7 +59,7 @@ internal partial class DLL {
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
-	internal unsafe struct SmpState {
+	internal struct SmpState {
 		public IntPtr Timer0Stage0;
 		public IntPtr Timer0Stage1;
 		public IntPtr Timer0Stage2;
@@ -76,5 +91,23 @@ internal partial class DLL {
 		
 		public IntPtr TimerDividers;
 		public IntPtr TimerOutputs;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct SmpLogSlice {
+		public IntPtr LogArray;
+		public UInt32 Length;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct SmpLog {
+		public UInt32 Type;
+		
+		public UInt64 DspCycle;
+		public UInt16 Address;
+		
+		public byte PreData;
+		public byte WriteData;
+		public byte PostData;
 	}
 }

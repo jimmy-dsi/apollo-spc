@@ -245,6 +245,21 @@ public class Emulator {
 		}
 	}
 	
+	public void StepInstruction() {
+		MaybeAcquireLock();
+
+		try {
+			var result = DLL.EmuStepInstruction(handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
 	public int StepNCycles(int cycles) {
 		MaybeAcquireLock();
 		try     { return (int) DLL.EmuStepNCycles(cycles.SafeUnsigned(), handle); }

@@ -9,6 +9,7 @@ public static class LibTest {
 		try {
 			Emulator emu = new(setAsMain: true, makeShared: true);
 			emu.LoadSpcFile(spcFilePath);
+			emu.SMP.LoggingEnabled = true;
 			
 			Console.WriteLine($"reset: {emu.DSP.State.Reset}");
 			Console.WriteLine($"mute:  {emu.DSP.State.Mute }");
@@ -207,6 +208,31 @@ public static class LibTest {
 			Console.WriteLine($"Y:   {emu.SPC.State.Y :X2}");
 			Console.WriteLine($"YA:  {emu.SPC.State.YA:X4}");
 			Console.WriteLine();
+			
+			var lastCycle = emu.DSP.CurrentCycle;
+			for (var i = 0; i < 5; i++) {
+				if (i == 3) {
+					emu.SMP.LoggingEnabled = false;
+				}
+				
+				emu.StepInstruction();
+				Console.WriteLine($"Stepped instruction: {lastCycle} -> {emu.DSP.CurrentCycle}");
+				Console.WriteLine();
+				var logs = emu.SMP.GetAccessLogsDeduped(lastCycle);
+				
+				foreach (var log in logs) {
+					Console.WriteLine($"    Type:       {log    .Type}");
+					Console.WriteLine($"    Cycle:      {log.DSPCycle}");
+					Console.WriteLine($"    Address:    {log .Address:X4}");
+					
+					Console.WriteLine($"    Pre-Data:   {(log.PreData   != null ? log.PreData  .Value.ToString("X2") : "")}");
+					Console.WriteLine($"    Write-Data: {(log.WriteData != null ? log.WriteData.Value.ToString("X2") : "")}");
+					Console.WriteLine($"    Post-Data:  {(log.PostData  != null ? log.PostData .Value.ToString("X2") : "")}");
+					Console.WriteLine();
+				}
+				
+				lastCycle = emu.DSP.CurrentCycle;
+			}
 		
 			return emu;
 		}

@@ -45,7 +45,8 @@ pub const SSMP = struct {
         write_data: ?u8 = null,
         post_data:  ?u8 = null,
 
-        s700_consumed: bool = false,
+        debug_consumed: bool = false,
+        s700_consumed:  bool = false,
     };
 
     pub const TimerLogType = enum {
@@ -297,9 +298,10 @@ pub const SSMP = struct {
     pub fn get_access_logs_range(self: *SSMP, start_cycle: u64) LogBuffer.Iter {
         var iter = self.access_logs.iter(true);
         while (iter.step()) {
-            if (iter.value().dsp_cycle < start_cycle) {
+            if (iter.value().dsp_cycle < start_cycle or iter.value().dsp_cycle == start_cycle and iter.value().debug_consumed) {
                 break;
             }
+            iter.ref().debug_consumed = true;
         }
 
         var fw_iter = iter.get_reversed();
@@ -367,6 +369,11 @@ pub const SSMP = struct {
     }
 
     inline fn append_access_log(self: *SSMP, entry: AccessLog) void {
+        // Bug with ring buffer: doesn't seem to be able to iterate to the very first element
+        // Hack fix: append an extra if it's empty to compensate
+        if (self.access_logs.len == 0) {
+            self.access_logs.push(entry);
+        }
         self.access_logs.push(entry);
     }
 
@@ -849,7 +856,7 @@ pub const SSMP = struct {
     pub inline fn fetch(self: *SSMP, substate_offset: u32) !u8 {
         switch (substate_offset) {
             0, 1 => {
-                if (substate_offset == 1) {
+                if (substate_offset == 1 and (self.enable_access_logs or self.emu.script700.enabled)) {
                     self.append_fetch_log(self.spc.pc());
                 }
                 const result = self.read(self.spc.pc(), substate_offset);
@@ -956,7 +963,7 @@ pub const SSMP = struct {
     pub inline fn dummy_read(self: *SSMP, address: u16, substate_offset: u32) !void {
         switch (substate_offset) {
             0, 1 => {
-                if (substate_offset == 1) {
+                if (substate_offset == 1 and (self.enable_access_logs or self.emu.script700.enabled)) {
                     self.append_dummy_read_log(address);
                 }
                 const result = self.read(address, substate_offset);

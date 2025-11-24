@@ -37,6 +37,15 @@ pub const Result = enum(u32) {
     spc_not_loaded          = 13,
 };
 
+pub const LogType = enum(u32) {
+    none       = 0,
+    read       = 1,
+    write      = 2,
+    exec       = 3,
+    fetch      = 4,
+    dummy_read = 5,
+};
+
 const State = enum {
     uninited, active, deinited
 };

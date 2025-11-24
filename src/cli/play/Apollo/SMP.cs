@@ -1,3 +1,5 @@
+using Jimbl;
+
 namespace Apollo;
 
 using System.Collections;
@@ -320,10 +322,67 @@ public class SMP {
 		}
 	}
 	
+	public class MemAccessLog {
+		public enum LogType {
+			None      = 0,
+			Read      = 1,
+			Write     = 2,
+			Exec      = 3,
+			Fetch     = 4,
+			DummyRead = 5
+		}
+		
+		public LogType Type      { get; }
+		public UInt64  DSPCycle  { get; }
+		public UInt16  Address   { get; }
+		
+		public byte?   PreData   { get; }
+		public byte?   WriteData { get; }
+		public byte?   PostData  { get; }
+		
+		internal MemAccessLog(DLL.SmpLog log) {
+			Type      = (LogType) log.Type;
+			DSPCycle  = log.DspCycle;
+			Address   = log.Address;
+			
+			PreData   = Type == LogType.Write ? log.PreData   : null;
+			WriteData = Type == LogType.Write ? log.WriteData : null;
+			PostData  = Type == LogType.Write ? log.PostData  : null;
+		}
+	}
+	
+	bool loggingEnabled = false;
+	
 	public Emulator    Emulator { get; init; }
 	public UInt8Buffer BootROM  { get; init; }
 	
 	public Properties State { get; }
+	
+	public bool LoggingEnabled {
+		get => loggingEnabled;
+		set {
+			Emulator.MaybeAcquireLock();
+			
+			try {
+				bool result;
+				
+				if (value) {
+					result = DLL.SmpEnableLogging(Emulator.handle);
+				}
+				else {
+					result = DLL.SmpDisableLogging(Emulator.handle);
+				}
+				
+				if (!result) {
+					var errorCode = DLL.EmuGetLastError(Emulator.handle);
+					Error.Throw(errorCode);
+				}
+				
+				loggingEnabled = value;
+			}
+			finally { Emulator.MaybeReleaseLock(); }
+		}
+	}
 	
 	public byte ReadByte(UInt16 address) {
 		Emulator.MaybeAcquireLock();
@@ -413,6 +472,83 @@ public class SMP {
 			}
 		}
 		finally { Emulator.MaybeReleaseLock(); }
+	}
+	
+	public MemAccessLog[] GetAccessLogs(Int64 startCycle) {
+		Emulator.MaybeAcquireLock();
+		try {
+			unsafe {
+				var logSlice = DLL.SmpGetAccessLogs(startCycle.SafeUnsigned(), Emulator.handle);
+				if (logSlice.LogArray == IntPtr.Zero) {
+					var errorCode = DLL.EmuGetLastError(Emulator.handle);
+					Error.Throw(errorCode);
+				}
+				
+				try {
+					var arrayPtr = (DLL.SmpLog*) logSlice.LogArray;
+					var length   = (int) logSlice.Length;
+				
+					var logs = new MemAccessLog[length];
+					Span<DLL.SmpLog> span = new(arrayPtr, length);
+				
+					for (var i = 0; i < length; i++) {
+						var log = span[i];
+						logs[i] = new(log);
+					}
+					
+					return logs;
+				}
+				finally {
+					var result = DLL.SmpFreeLogs(logSlice.LogArray);
+					if (!result) {
+						var errorCode = DLL.GetLastError();
+						Error.Throw(errorCode);
+					}
+				}
+			}
+		}
+		finally { Emulator.MaybeReleaseLock(); }
+	}
+	
+	public MemAccessLog[] GetAccessLogsDeduped(Int64 startCycle) {
+		var allLogs = GetAccessLogs(startCycle);
+		List<MemAccessLog> deduped = new();
+		
+		List<MemAccessLog> curCycleLogs = new();
+		var lastCycle = startCycle.SafeUnsigned();
+		
+		void dedupe() {
+			// Check if any read logs are present on the last cycle
+			var hasReads = false;
+			
+			foreach (var curCycleLog in curCycleLogs) {
+				if (curCycleLog.Type is MemAccessLog.LogType.Fetch or MemAccessLog.LogType.DummyRead) {
+					hasReads = true;
+					break;
+				}
+			}
+			
+			// No need to keep 'Read' logs if another, more specific type of read was logged on the same cycle
+			if (hasReads) {
+				deduped.AddRange(curCycleLogs.Where(x => x.Type != MemAccessLog.LogType.Read));
+			}
+			else {
+				deduped.AddRange(curCycleLogs);
+			}
+		}
+		
+		foreach (var log in allLogs) {
+			if (log.DSPCycle != lastCycle) {
+				dedupe();
+			
+				lastCycle = log.DSPCycle;
+				curCycleLogs.Clear();
+			}
+			curCycleLogs.Add(log);
+		}
+		dedupe();
+		
+		return deduped.ToArray();
 	}
 	
 	internal SMP(Emulator emulator) {
