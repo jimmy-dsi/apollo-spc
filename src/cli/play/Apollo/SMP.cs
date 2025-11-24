@@ -359,7 +359,11 @@ public class SMP {
 	public Properties State { get; }
 	
 	public bool LoggingEnabled {
-		get => loggingEnabled;
+		get {
+			Emulator.MaybeAcquireLock();
+			try     { return loggingEnabled; }
+			finally { Emulator.MaybeReleaseLock(); }
+		}
 		set {
 			Emulator.MaybeAcquireLock();
 			
