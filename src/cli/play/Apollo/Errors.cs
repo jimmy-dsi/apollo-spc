@@ -1,6 +1,6 @@
-using System.Diagnostics;
-
 namespace Apollo;
+
+using System.Diagnostics;
 
 public enum ResultType {
 	Success              = 0,

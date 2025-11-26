@@ -3,7 +3,7 @@
 using System.Diagnostics;
 using Jimbl;
 
-const int WIDTH  = 133;
+const int WIDTH  = 130;
 const int HEIGHT = 34;
 
 var fwdArgs       = args.Where(x => x != "--force-no-resize").ToArray();
@@ -206,6 +206,7 @@ if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
 //	}
 //}
 
+Display.Init(WIDTH, HEIGHT);
 var exitCode = CliMain.Main(fwdArgs);
 
 if (!fileError && exitCode == 0) {

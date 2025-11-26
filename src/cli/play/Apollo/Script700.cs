@@ -1,7 +1,7 @@
-﻿using System.Reflection.Emit;
-using Jimbl;
+﻿namespace Apollo;
 
-namespace Apollo;
+using System.Reflection.Emit;
+using Jimbl;
 
 using Jimbl.DataStructs;
 using System.Text;

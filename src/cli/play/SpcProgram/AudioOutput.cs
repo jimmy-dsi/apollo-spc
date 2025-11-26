@@ -8,7 +8,73 @@ using SDL2;
 public static class AudioOutput {
 	static Emulator emu;
 	
-	public static void Setup(Emulator emulator) {
+	static volatile bool signal = false;
+	
+	static class Comm {
+		static object commLock = new();
+		
+		static bool uiUsingBufferA = false;
+		//static bool uiUsingBufferB = false;
+		
+		static bool emuUsingBufferA = false;
+		//static bool emuUsingBufferB = false;
+		
+		static object?[] buffers = new object?[] {null, null};
+		
+		public static void UseBufferUI(Action<object?> uiCallback) {
+			var bufferIndex = uiObtainBufferIndex();
+			try     { uiCallback(buffers[bufferIndex]); }
+			finally { uiReleaseBuffers(); }
+		}
+		
+		public static void UseBufferEmu(Action<object?> emuCallback) {
+			var bufferIndex = emuObtainBufferIndex();
+			try     { emuCallback(buffers[bufferIndex]); }
+			finally { emuReleaseBuffers(); }
+		}
+		
+		static int uiObtainBufferIndex() {
+			lock (commLock) {
+				if (!emuUsingBufferA) {
+					uiUsingBufferA = true;
+					return 0;
+				}
+				else {
+					//uiUsingBufferB = true;
+					return 1;
+				}
+			}
+		}
+		
+		static void uiReleaseBuffers() {
+			lock (commLock) {
+				uiUsingBufferA = false;
+				//uiUsingBufferB = false;
+			}
+		}
+		
+		static int emuObtainBufferIndex() {
+			lock (commLock) {
+				if (!uiUsingBufferA) {
+					emuUsingBufferA = true;
+					return 0;
+				}
+				else {
+					//emuUsingBufferB = true;
+					return 1;
+				}
+			}
+		}
+		
+		static void emuReleaseBuffers() {
+			lock (commLock) {
+				emuUsingBufferA = false;
+				//emuUsingBufferB = false;
+			}
+		}
+	}
+	
+	public static void Setup(Emulator emulator, Action uiCallback) {
 		emu = emulator;
 		
 		if (SDL.SDL_Init(SDL.SDL_INIT_AUDIO) < 0) {
@@ -20,7 +86,7 @@ public static class AudioOutput {
 		want.freq     = 32000;
 		want.format   = SDL.AUDIO_S16; // 16-bit signed
 		want.channels = 2;             // Stereo
-		want.samples  = 2048;          // Buffer size in samples
+		want.samples  = 512;           // Buffer size in samples
 		want.callback = Callback;
 
 		SDL.SDL_SetHint(SDL.SDL_HINT_AUDIO_RESAMPLING_MODE, "0"); // Trivial resampling
@@ -36,7 +102,18 @@ public static class AudioOutput {
 			SDL.SDL_PauseAudioDevice(device, 0); // Start playback
 	
 			while (true) {
-				Thread.Sleep(1000);
+				while (!signal) {
+					Thread.Sleep(1); // 1 millisecond sleep to reduce CPU load
+				}
+				
+				// TODO: Retrieve whichever data processed by emu in audio callback is available - Signal when done
+				Comm.UseBufferUI(buffer => {
+					// ...
+				});
+				
+				signal = false;
+				// Do UI display
+				uiCallback();
 			}
 		}
 		finally {
@@ -66,5 +143,13 @@ public static class AudioOutput {
 
 		// Copy managed array into unmanaged buffer
 		Marshal.Copy(buffer, 0, stream, samples * 2);
+		
+		// TODO: Transfer data from emu to main thread which the UI requests
+		Comm.UseBufferEmu(buffer => {
+			// ...
+		});
+		
+		// After that's done, give the main thread the go ahead signal to display said data
+		signal = true;
 	}
 }
