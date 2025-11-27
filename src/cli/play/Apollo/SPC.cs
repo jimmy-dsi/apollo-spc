@@ -21,7 +21,7 @@ public class SPC {
 		public UInt32? LengthInSeconds { get; set; }
 		public UInt32? FadeLengthInMS  { get; set; }
 		
-		public bool[]? ChannelsDisabled { get; set; }
+		public bool[] ChannelsDisabled { get; set; }
 		
 		public byte? EmulatorID { get; set; }
 		

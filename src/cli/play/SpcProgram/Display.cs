@@ -184,6 +184,7 @@ public static class Display {
 					if (cl != null) {
 						sb.Append(cl.AnsiString);
 					}
+					prevColor = cl;
 				}
 				
 				sb.Append(ch);

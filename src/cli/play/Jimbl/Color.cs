@@ -22,6 +22,8 @@ public class Color {
 		}
 	}
 	
+	public static Color CGreen = new(ansiCode: 32);
+	
 	public Color(byte ansiCode) {
 		value = (uint) ansiCode << 24;
 	}
