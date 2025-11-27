@@ -51,9 +51,10 @@ public static class CliMain {
 		Script700Viewer,
 	}
 	
-	static Menu currentMenu = Menu.Metadata;
+	static Menu   currentMenu = Menu.Metadata;
+	static string menuBarMsg  = "Press CTRL+H for help menu";
 	
-	static void handleUI() {
+	static void handleUI(EmuDataBuffer? buffer) {
 		switch (currentMenu) {
 			case Menu.Metadata: {
 				showMetadata();
@@ -64,6 +65,32 @@ public static class CliMain {
 				break;
 			}
 		}
+		
+		// Display Seek Bar
+		if (buffer is not null) {
+			Display.ClearLine(Display.Height - 2);
+			Display.Write(formatTime((int) (buffer.DSPCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
+			
+			var fullTimeInCycles = (long) (emu.SpcMetadata.LengthInSeconds ?? 600) * 2048000;
+			var barLength = Display.Width - 1 - 14;
+			
+			var cursorPos = (int) ((double) buffer.DSPCycle / fullTimeInCycles * barLength);
+			Display.Write(new string('=', cursorPos) + '|', 14, Display.Height - 3, Color.Cyan);
+		}
+		
+		Display.Write("[", 13,                Display.Height - 3, Color.Cyan);
+		Display.Write("]", Display.Width - 1, Display.Height - 3, Color.Cyan);
+		
+		// Display Menu Bar
+		Display.ClearLine(Display.Height - 1, Color.BGBlue);
+		Display.Write(menuBarMsg, 0, Display.Height - 1, Color.BGBlue);
+		
+		if (buffer is not null) {
+			var cycleCounter = $"DSP Cycle: {buffer.DSPCycle}";
+			Display.Write(cycleCounter, Display.Width - 1 - cycleCounter.Length, Display.Height - 1, Color.BGBlue);
+		}
+		
+		Console.Write(Display.Flush());
 	}
 	
 	static void showMetadata() {
@@ -236,8 +263,6 @@ public static class CliMain {
 		Display.Write(mlField,     17, y,     mlColor); y++;
 		
 		Display.DrawOutline(0, 0, Display.Width, bottom, removeSides: true);
-		
-		Console.Write(Display.Flush());
 	}
 	
 	enum TimeUnit {

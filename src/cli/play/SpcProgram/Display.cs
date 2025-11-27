@@ -195,6 +195,7 @@ public static class Display {
 			}
 		}
 		
+		sb.Append("\x1B[0m");
 		return sb.ToString();
 	}
 	

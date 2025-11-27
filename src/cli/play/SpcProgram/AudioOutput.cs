@@ -14,34 +14,48 @@ public static class AudioOutput {
 		static object commLock = new();
 		
 		static bool uiUsingBufferA = false;
-		//static bool uiUsingBufferB = false;
+		static bool uiUsingBufferB = false;
 		
 		static bool emuUsingBufferA = false;
-		//static bool emuUsingBufferB = false;
+		static bool emuUsingBufferB = false;
 		
-		static object?[] buffers = new object?[] {null, null};
+		static EmuDataContainer[] buffers = new EmuDataContainer[] { new(null), new(null) };
 		
-		public static void UseBufferUI(Action<object?> uiCallback) {
-			var bufferIndex = uiObtainBufferIndex();
-			try     { uiCallback(buffers[bufferIndex]); }
+		public static void UseBufferUI(Action<EmuDataContainer> uiCallback) {
+			var buffer = uiObtainBuffer();
+			try     { uiCallback(buffer); }
 			finally { uiReleaseBuffers(); }
 		}
 		
-		public static void UseBufferEmu(Action<object?> emuCallback) {
-			var bufferIndex = emuObtainBufferIndex();
-			try     { emuCallback(buffers[bufferIndex]); }
+		public static void UseBufferEmu(Action<EmuDataContainer> emuCallback) {
+			var buffer = emuObtainBuffer();
+			try     { emuCallback(buffer); }
 			finally { emuReleaseBuffers(); }
 		}
 		
-		static int uiObtainBufferIndex() {
+		static EmuDataContainer uiObtainBuffer() {
 			lock (commLock) {
-				if (!emuUsingBufferA) {
+				if (!emuUsingBufferA && !emuUsingBufferB) {
+					if (buffers[0].Buffer is null) {
+						uiUsingBufferB = true;
+						return buffers[1];
+					}
+					else if (buffers[1].Buffer is null) {
+						uiUsingBufferA = true;
+						return buffers[0];
+					}
+					else {
+						// Select the most recently computed buffer
+						return buffers[0].Buffer!.DSPCycle >= buffers[1].Buffer!.DSPCycle ? buffers[0] : buffers[1];
+					}
+				}
+				else if (!emuUsingBufferA) {
 					uiUsingBufferA = true;
-					return 0;
+					return buffers[0];
 				}
 				else {
-					//uiUsingBufferB = true;
-					return 1;
+					uiUsingBufferB = true;
+					return buffers[1];
 				}
 			}
 		}
@@ -49,19 +63,33 @@ public static class AudioOutput {
 		static void uiReleaseBuffers() {
 			lock (commLock) {
 				uiUsingBufferA = false;
-				//uiUsingBufferB = false;
+				uiUsingBufferB = false;
 			}
 		}
 		
-		static int emuObtainBufferIndex() {
+		static EmuDataContainer emuObtainBuffer() {
 			lock (commLock) {
-				if (!uiUsingBufferA) {
+				if (!uiUsingBufferA && !uiUsingBufferB) {
+					if (buffers[0].Buffer is null) {
+						emuUsingBufferB = true;
+						return buffers[1];
+					}
+					else if (buffers[1].Buffer is null) {
+						emuUsingBufferA = true;
+						return buffers[0];
+					}
+					else {
+						// Select the least recently computed buffer for overwriting
+						return buffers[0].Buffer!.DSPCycle <= buffers[1].Buffer!.DSPCycle ? buffers[0] : buffers[1];
+					}
+				}
+				else if (!uiUsingBufferA) {
 					emuUsingBufferA = true;
-					return 0;
+					return buffers[0];
 				}
 				else {
-					//emuUsingBufferB = true;
-					return 1;
+					emuUsingBufferB = true;
+					return buffers[1];
 				}
 			}
 		}
@@ -69,12 +97,12 @@ public static class AudioOutput {
 		static void emuReleaseBuffers() {
 			lock (commLock) {
 				emuUsingBufferA = false;
-				//emuUsingBufferB = false;
+				emuUsingBufferB = false;
 			}
 		}
 	}
 	
-	public static void Setup(Emulator emulator, Action uiCallback) {
+	public static void Setup(Emulator emulator, Action<EmuDataBuffer?> uiCallback) {
 		emu = emulator;
 		
 		if (SDL.SDL_Init(SDL.SDL_INIT_AUDIO) < 0) {
@@ -106,14 +134,17 @@ public static class AudioOutput {
 					Thread.Sleep(1); // 1 millisecond sleep to reduce CPU load
 				}
 				
-				// TODO: Retrieve whichever data processed by emu in audio callback is available - Signal when done
-				Comm.UseBufferUI(buffer => {
-					// ...
+				EmuDataBuffer? buffer = null;
+				
+				// Retrieve whichever data processed by emu in audio callback is available - Signal when done
+				Comm.UseBufferUI(container => {
+					if (container.Buffer is null) return;
+					buffer = container.Buffer.Clone();
 				});
 				
 				signal = false;
 				// Do UI display
-				uiCallback();
+				uiCallback(buffer);
 			}
 		}
 		finally {
@@ -144,9 +175,9 @@ public static class AudioOutput {
 		// Copy managed array into unmanaged buffer
 		Marshal.Copy(buffer, 0, stream, samples * 2);
 		
-		// TODO: Transfer data from emu to main thread which the UI requests
-		Comm.UseBufferEmu(buffer => {
-			// ...
+		// Transfer data from emu to main thread which the UI requests
+		Comm.UseBufferEmu(container => {
+			container.Buffer = new EmuGenericBuffer(emu.DSP.CurrentCycle);
 		});
 		
 		// After that's done, give the main thread the go ahead signal to display said data
