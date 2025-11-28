@@ -15,6 +15,7 @@
         
         <IlcGenerateDebugInfo>false</IlcGenerateDebugInfo>
         <StripSymbols>false</StripSymbols>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
@@ -22,5 +23,9 @@
       <ProjectReference Include="..\Apollo\Apollo.csproj" />
       <ProjectReference Include="..\SDL2\SDL2.csproj" />
     </ItemGroup>
+
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+        <DefineConstants>LINUX</DefineConstants>
+    </PropertyGroup>
 
 </Project>
