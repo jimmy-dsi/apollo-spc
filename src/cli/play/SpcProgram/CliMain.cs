@@ -22,10 +22,15 @@ public static partial class CliMain {
 			emu.LoadSpcFile(spcFilePath);
 			emu.SMP.LoggingEnabled = true;
 			
-			Console.Clear();
-			//Termios.EnableRawMode();
+			// Register Key Bindings
+			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
+			KeyBindings.Register(KeyBindings.Key.Char('H'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.ArrowRight, KeyBindings.Action.NavNextView);
+			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.NavPrevView);
 			
-			var keyListener = new Thread(KeyListener.Run);
+			Console.Clear();
+			
+			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
 			
 			AudioOutput.Setup(emu, handleUI);
@@ -61,27 +66,10 @@ public static partial class CliMain {
 	static string menuBarMsg  = "Press CTRL+H for help menu";
 	
 	static void handleUI(EmuDataBuffer? buffer) {
-		var isHelp = false;
+		var action = KeyBindings.GetAction();
 		
-		var key = KeyListener.GetKeyInfo();
-		
-		if (key is not null) {
-			var kv = key.Value;
-			
-			if (kv.HasCtrl() && kv.IsChar('H')) {
-				if (currentMenu == Menu.Help) {
-					currentMenu = realMenu;
-					Display.Clear();
-				}
-				else {
-					currentMenu = Menu.Help;
-					Display.Clear();
-				}
-			}
-			else if (kv.IsEscape()) {
-				currentMenu = realMenu;
-				Display.Clear();
-			}
+		if (action is not null) {
+			doAction(action!.Value);
 		}
 		
 		switch (currentMenu) {
@@ -102,11 +90,6 @@ public static partial class CliMain {
 		
 		// Display Seek Bar
 		if (buffer is not null) {
-			if (isHelp) {
-				Display.ClearBox(Display.Width - 16, 1, 16, Display.Height - 16);
-				Display.Write($"Last help press: {buffer.DSPCycle}", 0, Display.Height - 5);
-			}
-			
 			Display.ClearLine(Display.Height - 2);
 			Display.Write(formatTime((int) (buffer.DSPCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
 			
@@ -130,6 +113,37 @@ public static partial class CliMain {
 		}
 		
 		Console.Write(Display.Flush());
+	}
+	
+	static void doAction(KeyBindings.Action action) {
+		switch (action) {
+			case KeyBindings.Action.ExitCurrentMenu: {
+				changeCurrentMenu(realMenu, setAsRealMenu: false);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleHelpMenu: {
+				if (currentMenu == Menu.Help) {
+					changeCurrentMenu(realMenu, setAsRealMenu: false);
+				}
+				else {
+					realMenu = currentMenu;
+					changeCurrentMenu(Menu.Help, setAsRealMenu: false);
+				}
+				
+				break;
+			}
+		}
+	}
+	
+	static void changeCurrentMenu(Menu newMenu, bool setAsRealMenu = true) {
+		currentMenu = newMenu;
+		
+		if (setAsRealMenu) {
+			realMenu = newMenu;
+		}
+		
+		Display.Clear();
 	}
 	
 	enum TimeUnit {
