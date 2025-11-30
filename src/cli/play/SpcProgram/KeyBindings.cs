@@ -102,6 +102,7 @@ public static class KeyBindings {
 		ScrollPageDown,
 		ScrollStart,
 		ScrollEnd,
+		ToggleHeatMap,
 	}
 	
 	// Key bindings must be checked in the order they are listed here:

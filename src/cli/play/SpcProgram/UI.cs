@@ -25,7 +25,9 @@ public static partial class CliMain {
 	static string menuBarMsg  = "Press CTRL+H for help menu";
 	
 	static int viewIndex = 0;
-	static View[] views = [View.Metadata, View.MemoryViewer];
+	static View[] views = [View.Metadata, View.MemoryViewer, View.DSPViewer1];
+	
+	static bool heatMapEnabled = false;
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
 	
@@ -58,6 +60,11 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case View.DSPViewer1: {
+				showDSPViewer1(buffer!);
+				break;
+			}
+			
 			default: {
 				break;
 			}
@@ -65,7 +72,7 @@ public static partial class CliMain {
 		
 		// Display Seek Bar
 		if (buffer is not null) {
-			Display.ClearLine(Display.Height - 2);
+			Display.ClearLine(Display.Height - 3);
 			Display.Write(formatTime((int) (buffer.DSPCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
 			
 			var fullTimeInCycles = (long) (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 600) * 2048000;
@@ -190,6 +197,13 @@ public static partial class CliMain {
 				}
 				break;
 			}
+			
+			case KeyBindings.Action.ToggleHeatMap: {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2) {
+					heatMapEnabled = !heatMapEnabled;
+				}
+				break;
+			}
 		}
 	}
 	
@@ -200,6 +214,21 @@ public static partial class CliMain {
 		switch (nextView) {
 			case View.MemoryViewer: {
 				requestEmuData(Transfer.Requests.SMP_Bus);
+				break;
+			}
+			
+			case View.DSPViewer1: {
+				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1);
+				break;
+			}
+			
+			case View.DSPViewer2: {
+				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2);
+				break;
+			}
+			
+			case View.DSPViewer3: {
+				requestEmuData(Transfer.Requests.DSP_3);
 				break;
 			}
 			
@@ -223,51 +252,82 @@ public static partial class CliMain {
 		Bit8, Bit16, Bit24, Bit32
 	}
 	
-	static string[] memDisplayRows(AddressBusSize busSize, int startRow, int endRow, byte[] data, bool useHeatMap = false) {
-		List<string> rows = new();
+	static void memDisplayRows(AddressBusSize busSize,
+	                           int startRow,
+	                           int endRow,
+	                           byte[] data,
+	                           byte[]? dataForHeatmap = null,
+	                           Color?[]? colorData = null,
+	                           bool useHeatMap = false)
+	{
+		Display.X = 0;
+		Display.Y = 0;
 		
 		for (var i = startRow; i <= endRow; i++) {
-			StringBuilder sb = new();
-			
 			var startAddr = (uint) i * 16;
 			switch (busSize) {
 				case AddressBusSize.Bit8: {
-					sb.Append($"{startAddr:X2} | ");
+					Display.Write($"{startAddr:X2} | ");
 					break;
 				}
 				case AddressBusSize.Bit16: {
-					sb.Append($"{startAddr:X4} | ");
+					Display.Write($"{startAddr:X4} | ");
 					break;
 				}
 				case AddressBusSize.Bit24: {
-					sb.Append($"{startAddr:X6} | ");
+					Display.Write($"{startAddr:X6} | ");
 					break;
 				}
 				case AddressBusSize.Bit32: {
-					sb.Append($"{startAddr:X8} | ");
+					Display.Write($"{startAddr:X8} | ");
 					break;
 				}
 			}
 			
 			for (var c = 0; c < 16; c++) {
-				sb.Append($"{data[(i - startRow) * 16 + c]:X2} ");
+				var idx = (i - startRow) * 16 + c;
+				Display.Write($"{data[idx]:X2} ", col: colorData?[idx]);
 			}
-			sb.Append("| ");
+			Display.Write("| ");
 			
 			if (useHeatMap) {
-				// TODO
+				for (var c = 0; c < 16; c++) {
+					var idx = (i - startRow) * 16 + c;
+					var val = (byte) ((dataForHeatmap ?? data)[idx] * 5 / 9 + 40);
+					Display.Write("  ", col: new(val, val, val, bg: true));
+				}
 			}
 			else {
 				for (var c = 0; c < 16; c++) {
-					var val = data[(i - startRow) * 16 + c];
-					sb.Append($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}");
+					var idx = (i - startRow) * 16 + c;
+					var val = data[idx];
+					Display.Write($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}", col: colorData?[idx]);
 				}
+				Display.Write(new string(' ', 16));
 			}
 			
-			rows.Add(sb.ToString());
+			Display.Write("\n");
 		}
+	}
+	
+	static void softFadeHeatmap(byte[] dataBuffer, byte[] progBuffer) {
+		const int FadeStep = 72;
 		
-		return rows.ToArray();
+		// Smooth transition to avoid rapid flashing
+		for (var i = 0; i < progBuffer.Length; i++) {
+			var progVal = progBuffer[i];
+			var target  = dataBuffer[i];
+				
+			if (target > progVal + FadeStep) {
+				progBuffer[i] += FadeStep;
+			}
+			else if (target < progVal - FadeStep) {
+				progBuffer[i] -= FadeStep;
+			}
+			else if (target != progVal) {
+				progBuffer[i] = target;
+			}
+		}
 	}
 	
 	static void requestEmuData(Transfer.Requests reqs) {

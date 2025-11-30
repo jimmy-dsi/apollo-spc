@@ -22,19 +22,25 @@ public class Color {
 		}
 	}
 	
-	public static Color CRed    = new(ansiCode: 31);
-	public static Color CGreen  = new(ansiCode: 32);
-	public static Color Yellow  = new(ansiCode: 33);
-	public static Color CBlue   = new(ansiCode: 34);
-	public static Color Magenta = new(ansiCode: 35);
-	public static Color Cyan    = new(ansiCode: 36);
+	public static Color Black      = new(ansiCode: 30);
+	public static Color CRed       = new(ansiCode: 31);
+	public static Color CGreen     = new(ansiCode: 32);
+	public static Color Yellow     = new(ansiCode: 33);
+	public static Color CBlue      = new(ansiCode: 34);
+	public static Color Magenta    = new(ansiCode: 35);
+	public static Color Cyan       = new(ansiCode: 36);
 	
-	public static Color BGRed     = new(ansiCode: 41);
-	public static Color BGGreen   = new(ansiCode: 42);
-	public static Color BGYellow  = new(ansiCode: 43);
-	public static Color BGBlue    = new(ansiCode: 44);
-	public static Color BGMagenta = new(ansiCode: 45);
-	public static Color BGCyan    = new(ansiCode: 46);
+	public static Color DarkGrey   = new(ansiCode: 90);
+	
+	public static Color BGBlack    = new(ansiCode: 40);
+	public static Color BGRed      = new(ansiCode: 41);
+	public static Color BGGreen    = new(ansiCode: 42);
+	public static Color BGYellow   = new(ansiCode: 43);
+	public static Color BGBlue     = new(ansiCode: 44);
+	public static Color BGMagenta  = new(ansiCode: 45);
+	public static Color BGCyan     = new(ansiCode: 46);
+	
+	public static Color BGDarkGrey = new(ansiCode: 100);
 	
 	public Color(byte ansiCode) {
 		value = (uint) ansiCode << 24;

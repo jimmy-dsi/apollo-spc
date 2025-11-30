@@ -13,8 +13,9 @@ public class EmuDataContainer {
 public class EmuDataBuffer: ICloneable {
 	public long DSPCycle { get; private set; }
 	
-	public byte[]? ARAM_Data   { get; private set; }
-	public byte[]? SMP_BusData { get; private set; }
+	public byte[]? ARAM_Data       { get; private set; }
+	public byte[]? SMP_BusData     { get; private set; }
+	public byte[]? DSP_RegisterMem { get; private set; }
 	
 	public EmuDataBuffer(long dspCycle) {
 		DSPCycle = dspCycle;
@@ -57,11 +58,20 @@ public class EmuDataBuffer: ICloneable {
 				SMP_BusData[i] = srcData[startOffset + i];
 			}
 		}
+		
+		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) {
+			DSP_RegisterMem = new byte[0x80];
+			
+			for (var i = 0; i < 0x80; i++) {
+				DSP_RegisterMem[i] = emu.DSP.Register[i];
+			}
+		}
 	}
 	
 	public bool ExpectData(Transfer.Requests requests) {
-		if ((requests & Transfer.Requests.ARAM)    != 0) return ARAM_Data   is not null;
-		if ((requests & Transfer.Requests.SMP_Bus) != 0) return SMP_BusData is not null;
+		if ((requests & Transfer.Requests.ARAM)            != 0) return ARAM_Data       is not null;
+		if ((requests & Transfer.Requests.SMP_Bus)         != 0) return SMP_BusData     is not null;
+		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) return DSP_RegisterMem is not null;
 		return true;
 	}
 	
@@ -76,13 +86,18 @@ public class EmuDataBuffer: ICloneable {
 			clone.SMP_BusData = SMP_BusData.ToArray();
 		}
 		
+		if (DSP_RegisterMem is not null) {
+			clone.DSP_RegisterMem = DSP_RegisterMem.ToArray();
+		}
+		
 		return clone;
 	}
 	
 	object ICloneable.Clone() => Clone();
 	
 	void resetToNull() {
-		ARAM_Data   = null;
-		SMP_BusData = null;
+		ARAM_Data       = null;
+		SMP_BusData     = null;
+		DSP_RegisterMem = null;
 	}
 }

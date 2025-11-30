@@ -34,6 +34,7 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.PageDown,   KeyBindings.Action.ScrollPageDown);
 			KeyBindings.Register(KeyBindings.Key.Home,       KeyBindings.Action.ScrollStart);
 			KeyBindings.Register(KeyBindings.Key.End,        KeyBindings.Action.ScrollEnd);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Action.ToggleHeatMap, ctrl: true);
 			
 			Console.Clear();
 			
