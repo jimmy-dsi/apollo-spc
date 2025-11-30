@@ -207,7 +207,7 @@ if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
 //}
 
 Display.Init(WIDTH, HEIGHT);
-var exitCode = CliMain.Main(fwdArgs);
+var exitCode = CliMain.Start(fwdArgs);
 
 if (!fileError && exitCode == 0) {
 	Console.Clear();

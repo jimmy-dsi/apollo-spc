@@ -8,11 +8,11 @@ public static partial class CliMain {
 		Display.WriteBox(["Title:", "Artist:", "Game:", "Dumper:", "Comments:"], 1, 1);
 		var maxFieldWidth = Display.Width - 18;
 		
-		var titleField    = Display.WordWrap(emu.SpcMetadata.Title,    maxFieldWidth, 1);
-		var artistField   = Display.WordWrap(emu.SpcMetadata.Artist,   maxFieldWidth, 1);
-		var gameField     = Display.WordWrap(emu.SpcMetadata.Game,     maxFieldWidth, 1);
-		var dumperField   = Display.WordWrap(emu.SpcMetadata.Dumper,   maxFieldWidth, 1);
-		var commentsField = Display.WordWrap(emu.SpcMetadata.Comments, maxFieldWidth, 3);
+		var titleField    = Display.WordWrap(PrimaryEmu.SpcMetadata.Title,    maxFieldWidth, 1);
+		var artistField   = Display.WordWrap(PrimaryEmu.SpcMetadata.Artist,   maxFieldWidth, 1);
+		var gameField     = Display.WordWrap(PrimaryEmu.SpcMetadata.Game,     maxFieldWidth, 1);
+		var dumperField   = Display.WordWrap(PrimaryEmu.SpcMetadata.Dumper,   maxFieldWidth, 1);
+		var commentsField = Display.WordWrap(PrimaryEmu.SpcMetadata.Comments, maxFieldWidth, 3);
 		
 		if (titleField[0].TrimEnd() != "")  Display.WriteBox(titleField,  17, 1);
 		else                                Display.WriteBox(["<none>"],  17, 1, Color.CGreen);
@@ -54,99 +54,99 @@ public static partial class CliMain {
 		
 		// Display Date
 		string? dateText = null;
-		if (emu.SpcMetadata.DateOther != "") {
-			dateText = emu.SpcMetadata.DateOther;
+		if (PrimaryEmu.SpcMetadata.DateOther != "") {
+			dateText = PrimaryEmu.SpcMetadata.DateOther;
 		}
-		else if (emu.SpcMetadata.Year is not null && emu.SpcMetadata.Month is not null && emu.SpcMetadata.Day is not null) {
-			dateText = $"{emu.SpcMetadata.Year:D4}-{emu.SpcMetadata.Month:D2}-{emu.SpcMetadata.Day:D2}";
+		else if (PrimaryEmu.SpcMetadata.Year is not null && PrimaryEmu.SpcMetadata.Month is not null && PrimaryEmu.SpcMetadata.Day is not null) {
+			dateText = $"{PrimaryEmu.SpcMetadata.Year:D4}-{PrimaryEmu.SpcMetadata.Month:D2}-{PrimaryEmu.SpcMetadata.Day:D2}";
 		}
 		var (dateField, dateColor) = drawTextField(dateText);
 		
 		// Display Song Length
 		string? songLengthText = null;
-		if (emu.SpcMetadata.LengthInSeconds is not null) {
-			songLengthText = formatTime(emu.SpcMetadata.LengthInSeconds.Value.SafeSigned(), TimeUnit.Seconds);
+		if (PrimaryEmu.SpcMetadata.LengthInSeconds is not null) {
+			songLengthText = formatTime(PrimaryEmu.SpcMetadata.LengthInSeconds.Value.SafeSigned(), TimeUnit.Seconds);
 		}
 		var (slField, slColor) = drawTextField(songLengthText);
 		
 		// Display Fade Length
 		string? fadeLengthText = null;
-		if (emu.SpcMetadata.FadeLengthInMS is not null) {
-			fadeLengthText = formatTime(emu.SpcMetadata.FadeLengthInMS.Value.SafeSigned(), TimeUnit.MS);
+		if (PrimaryEmu.SpcMetadata.FadeLengthInMS is not null) {
+			fadeLengthText = formatTime(PrimaryEmu.SpcMetadata.FadeLengthInMS.Value.SafeSigned(), TimeUnit.MS);
 		}
 		var (flField, flColor) = drawTextField(fadeLengthText);
 		
 		// Display Emulator ID
 		string? emuIdText = null;
-		if (emu.SpcMetadata.EmulatorID is not null) {
-			emuIdText = $"{emu.SpcMetadata.EmulatorID}";
+		if (PrimaryEmu.SpcMetadata.EmulatorID is not null) {
+			emuIdText = $"{PrimaryEmu.SpcMetadata.EmulatorID}";
 		}
 		var (emuField, emuColor) = drawTextField(emuIdText);
 		
 		// Display OST Title
-		var (osttField, osttColor) = drawTextField(Display.WordWrap(emu.SpcMetadata.OSTTitle, maxFieldWidth, 1)[0].TrimEnd());
+		var (osttField, osttColor) = drawTextField(Display.WordWrap(PrimaryEmu.SpcMetadata.OSTTitle, maxFieldWidth, 1)[0].TrimEnd());
 		
 		// Display OST Disc
 		string? ostDiscText = null;
-		if (emu.SpcMetadata.OSTDisc is not null) {
-			ostDiscText = $"{emu.SpcMetadata.OSTDisc}";
+		if (PrimaryEmu.SpcMetadata.OSTDisc is not null) {
+			ostDiscText = $"{PrimaryEmu.SpcMetadata.OSTDisc}";
 		}
 		var (ostdField, ostdColor) = drawTextField(ostDiscText);
 		
 		// Display OST Track
 		string? ostTrackText = null;
-		if (emu.SpcMetadata.OSTTrack?[1] is not null) {
-			if (emu.SpcMetadata.OSTTrack?[0] is >= 0x21 and <= 0x7E) {
-				ostTrackText = $"{(char) emu.SpcMetadata.OSTTrack[0]}{emu.SpcMetadata.OSTTrack[1]}";
+		if (PrimaryEmu.SpcMetadata.OSTTrack?[1] is not null) {
+			if (PrimaryEmu.SpcMetadata.OSTTrack?[0] is >= 0x21 and <= 0x7E) {
+				ostTrackText = $"{(char) PrimaryEmu.SpcMetadata.OSTTrack[0]}{PrimaryEmu.SpcMetadata.OSTTrack[1]}";
 			}
 			else {
-				ostTrackText = $"{emu.SpcMetadata.OSTTrack![1]}";
+				ostTrackText = $"{PrimaryEmu.SpcMetadata.OSTTrack![1]}";
 			}
 		}
 		var (ostrField, ostrColor) = drawTextField(ostTrackText);
 		
 		// Display Publisher
-		var (pubField, pubColor) = drawTextField(Display.WordWrap(emu.SpcMetadata.Publisher, maxFieldWidth, 1)[0].TrimEnd());
+		var (pubField, pubColor) = drawTextField(Display.WordWrap(PrimaryEmu.SpcMetadata.Publisher, maxFieldWidth, 1)[0].TrimEnd());
 		
 		// Display Copyright Year
 		string? copyYearText = null;
-		if (emu.SpcMetadata.CopyrightYear is not null) {
-			copyYearText = $"{emu.SpcMetadata.CopyrightYear}";
+		if (PrimaryEmu.SpcMetadata.CopyrightYear is not null) {
+			copyYearText = $"{PrimaryEmu.SpcMetadata.CopyrightYear}";
 		}
 		var (cpyField, cpyColor) = drawTextField(copyYearText);
 		
 		// Display Intro Length
 		string? introLenText = null;
-		if (emu.SpcMetadata.IntroLengthInTimer2Steps is not null) {
-			introLenText = formatTime(emu.SpcMetadata.IntroLengthInTimer2Steps.Value.SafeSigned(), TimeUnit.Timer2s);
+		if (PrimaryEmu.SpcMetadata.IntroLengthInTimer2Steps is not null) {
+			introLenText = formatTime(PrimaryEmu.SpcMetadata.IntroLengthInTimer2Steps.Value.SafeSigned(), TimeUnit.Timer2s);
 		}
 		var (inlenField, inlenColor) = drawTextField(introLenText);
 		
 		// Display Loop Length
 		string? loopLenText = null;
-		if (emu.SpcMetadata.LoopLengthInTimer2Steps is not null) {
-			loopLenText = formatTime(emu.SpcMetadata.LoopLengthInTimer2Steps.Value.SafeSigned(), TimeUnit.Timer2s);
+		if (PrimaryEmu.SpcMetadata.LoopLengthInTimer2Steps is not null) {
+			loopLenText = formatTime(PrimaryEmu.SpcMetadata.LoopLengthInTimer2Steps.Value.SafeSigned(), TimeUnit.Timer2s);
 		}
 		var (lplenField, lplenColor) = drawTextField(loopLenText);
 		
 		// Display End Length
 		string? endLenText = null;
-		if (emu.SpcMetadata.EndLengthInTimer2Steps is not null) {
-			endLenText = formatTime(emu.SpcMetadata.EndLengthInTimer2Steps.Value.SafeSigned(), TimeUnit.Timer2s);
+		if (PrimaryEmu.SpcMetadata.EndLengthInTimer2Steps is not null) {
+			endLenText = formatTime(PrimaryEmu.SpcMetadata.EndLengthInTimer2Steps.Value.SafeSigned(), TimeUnit.Timer2s);
 		}
 		var (endlenField, endlenColor) = drawTextField(endLenText);
 		
 		// Display Loop Count
 		string? loopCountText = null;
-		if (emu.SpcMetadata.LoopTimes is not null) {
-			loopCountText = $"{emu.SpcMetadata.LoopTimes}";
+		if (PrimaryEmu.SpcMetadata.LoopTimes is not null) {
+			loopCountText = $"{PrimaryEmu.SpcMetadata.LoopTimes}";
 		}
 		var (lcField, lcColor) = drawTextField(loopCountText);
 		
 		// Display Mixing Level
 		string? MixingLevelText = null;
-		if (emu.SpcMetadata.MixingLevel is not null) {
-			MixingLevelText = $"{emu.SpcMetadata.MixingLevel}/255";
+		if (PrimaryEmu.SpcMetadata.MixingLevel is not null) {
+			MixingLevelText = $"{PrimaryEmu.SpcMetadata.MixingLevel}/255";
 		}
 		var (mlField, mlColor) = drawTextField(MixingLevelText);
 		
@@ -157,7 +157,7 @@ public static partial class CliMain {
 		for (var xx = 0; xx < 4; xx++) {
 			for (var yy = 0; yy < 2; yy++) {
 				var ci = yy * 4 + xx;
-				Display.Write(emu.SpcMetadata.ChannelsDisabled[ci] ? $"#{ci}: Disabled" : $"#{ci}:  Enabled", 17 + 16 * xx, y + yy);
+				Display.Write(PrimaryEmu.SpcMetadata.ChannelsDisabled[ci] ? $"#{ci}: Disabled" : $"#{ci}:  Enabled", 17 + 16 * xx, y + yy);
 			}
 		}
 		y += 2;

@@ -4,10 +4,11 @@ using Apollo;
 using Jimbl;
 
 public static partial class CliMain {
-	static Emulator emu;
+	public static Emulator PrimaryEmu { get; private set; }
+	
 	static string spcFilePath;
 	
-	public static int Main(string[] args) {
+	public static int Start(string[] args) {
 		Lib.Init();
 		try {
 			if (args.Length == 0) {
@@ -18,22 +19,28 @@ public static partial class CliMain {
 			spcFilePath = args[0];
 			
 			//emu = LibTest.Test(spcFilePath);
-			emu = new(setAsMain: true, makeShared: true);
-			emu.LoadSpcFile(spcFilePath);
-			emu.SMP.LoggingEnabled = true;
+			PrimaryEmu = new(setAsMain: true, makeShared: true);
+			PrimaryEmu.LoadSpcFile(spcFilePath);
+			PrimaryEmu.SMP.LoggingEnabled = true;
 			
 			// Register Key Bindings
 			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
 			KeyBindings.Register(KeyBindings.Key.Char('H'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowRight, KeyBindings.Action.NavNextView);
 			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.NavPrevView);
+			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.ScrollRowUp);
+			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.ScrollRowDown);
+			KeyBindings.Register(KeyBindings.Key.PageUp,     KeyBindings.Action.ScrollPageUp);
+			KeyBindings.Register(KeyBindings.Key.PageDown,   KeyBindings.Action.ScrollPageDown);
+			KeyBindings.Register(KeyBindings.Key.Home,       KeyBindings.Action.ScrollStart);
+			KeyBindings.Register(KeyBindings.Key.End,        KeyBindings.Action.ScrollEnd);
 			
 			Console.Clear();
 			
 			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
 			
-			AudioOutput.Setup(emu, handleUI);
+			AudioOutput.Setup(handleUI);
 		}
 		catch (SpcMissingHeaderError) {
 			Console.Error.WriteLine($"error: An unknown error occurred while attempting to process SPC metadata");
@@ -50,100 +57,33 @@ public static partial class CliMain {
 		return 0;
 	}
 	
-	enum Menu {
-		Metadata,
-		Help,
-		ASMViewer,
-		MemoryViewer,
-		DSPViewer1,
-		DSPViewer2,
-		DSPViewer3,
-		Script700Viewer,
-	}
-	
-	static Menu   realMenu    = Menu.Metadata;
-	static Menu   currentMenu = Menu.Metadata;
-	static string menuBarMsg  = "Press CTRL+H for help menu";
-	
-	static void handleUI(EmuDataBuffer? buffer) {
-		var action = KeyBindings.GetAction();
+	public static void MainLoop(Action<EmuDataBuffer?> uiCallback) {
+		var lastCycle = 0L;
 		
-		if (action is not null) {
-			doAction(action!.Value);
-		}
-		
-		switch (currentMenu) {
-			case Menu.Metadata: {
-				showMetadata();
-				break;
+		while (true) {
+			while (!Transfer.Signal) {
+				Thread.Sleep(1); // 1 millisecond sleep to reduce CPU load
 			}
-			
-			case Menu.Help: {
-				showHelpMenu();
-				break;
-			}
-			
-			default: {
-				break;
-			}
-		}
-		
-		// Display Seek Bar
-		if (buffer is not null) {
-			Display.ClearLine(Display.Height - 2);
-			Display.Write(formatTime((int) (buffer.DSPCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
-			
-			var fullTimeInCycles = (long) (emu.SpcMetadata.LengthInSeconds ?? 600) * 2048000;
-			var barLength = Display.Width - 1 - 14;
-			
-			var cursorPos = (int) ((double) buffer.DSPCycle / fullTimeInCycles * barLength);
-			Display.Write(new string('=', cursorPos) + '|', 14, Display.Height - 3, Color.Cyan);
-		}
-		
-		Display.Write("[", 13,                Display.Height - 3, Color.Cyan);
-		Display.Write("]", Display.Width - 1, Display.Height - 3, Color.Cyan);
-		
-		// Display Menu Bar
-		Display.ClearLine(Display.Height - 1, Color.BGBlue);
-		Display.Write(menuBarMsg, 0, Display.Height - 1, Color.BGBlue);
-		
-		if (buffer is not null) {
-			var cycleCounter = $"DSP Cycle: {buffer.DSPCycle}";
-			Display.Write(cycleCounter, Display.Width - 1 - cycleCounter.Length, Display.Height - 1, Color.BGBlue);
-		}
-		
-		Console.Write(Display.Flush());
-	}
-	
-	static void doAction(KeyBindings.Action action) {
-		switch (action) {
-			case KeyBindings.Action.ExitCurrentMenu: {
-				changeCurrentMenu(realMenu, setAsRealMenu: false);
-				break;
-			}
-			
-			case KeyBindings.Action.ToggleHelpMenu: {
-				if (currentMenu == Menu.Help) {
-					changeCurrentMenu(realMenu, setAsRealMenu: false);
-				}
-				else {
-					realMenu = currentMenu;
-					changeCurrentMenu(Menu.Help, setAsRealMenu: false);
-				}
 				
-				break;
+			EmuDataBuffer? buffer = null;
+				
+			// Retrieve whichever data processed by emu in audio callback is available - Signal when done
+			Transfer.Comm.UseBufferUI(container => {
+				if (container.Buffer is null) return;
+				buffer = container.Buffer.Clone();
+			});
+				
+			Transfer.Signal = false;
+			
+			if (buffer is null || buffer.DSPCycle < lastCycle) {
+				continue;
 			}
+			
+			lastCycle = buffer!.DSPCycle;
+			
+			// Do UI display
+			uiCallback(buffer);
 		}
-	}
-	
-	static void changeCurrentMenu(Menu newMenu, bool setAsRealMenu = true) {
-		currentMenu = newMenu;
-		
-		if (setAsRealMenu) {
-			realMenu = newMenu;
-		}
-		
-		Display.Clear();
 	}
 	
 	enum TimeUnit {

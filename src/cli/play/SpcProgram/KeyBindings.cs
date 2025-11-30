@@ -1,7 +1,7 @@
+namespace SpcProgram;
+
 using System.Diagnostics;
 using Jimbl;
-
-namespace SpcProgram;
 
 public static class KeyBindings {
 	public enum Code {
@@ -96,6 +96,12 @@ public static class KeyBindings {
 		ToggleHelpMenu,
 		NavNextView,
 		NavPrevView,
+		ScrollRowUp,
+		ScrollRowDown,
+		ScrollPageUp,
+		ScrollPageDown,
+		ScrollStart,
+		ScrollEnd,
 	}
 	
 	// Key bindings must be checked in the order they are listed here:
