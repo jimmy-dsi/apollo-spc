@@ -190,6 +190,7 @@ if (!autoResizeable && !forceNoResize) {
 }
 
 Console.CancelKeyPress += (_, args) => {
+	Console.CursorVisible = true;
 	Console.Clear();
 	Environment.Exit(0);
 };

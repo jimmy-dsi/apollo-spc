@@ -25,7 +25,7 @@ public static partial class CliMain {
 			
 			// Register Key Bindings
 			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
-			KeyBindings.Register(KeyBindings.Key.Char('H'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowRight, KeyBindings.Action.NavNextView);
 			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.NavPrevView);
 			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.ScrollRowUp);
@@ -37,6 +37,7 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('E'),  KeyBindings.Key.Char('T'), KeyBindings.Action.ToggleHeatMap);
 			
 			Console.Clear();
+			Console.CursorVisible = false;
 			
 			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
@@ -53,6 +54,7 @@ public static partial class CliMain {
 		}
 		finally {
 			Lib.Deinit();
+			Console.CursorVisible = true;
 		}
 		
 		return 0;

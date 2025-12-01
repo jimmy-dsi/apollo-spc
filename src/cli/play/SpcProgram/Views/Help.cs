@@ -11,7 +11,7 @@ public static partial class CliMain {
 		var x = 30;
 		
 		Display.Write("Exit current menu",       1, y); Display.Write("Escape", x, y); y++;
-		Display.Write("Toggle help menu",        1, y); Display.Write("CTRL+H", x, y); y++;
+		Display.Write("Toggle help menu",        1, y); Display.Write("CTRL+L", x, y); y++;
 		Display.Write("Switch to next view",     1, y); Display.Write("Right arrow key", x, y); y++;
 		Display.Write("Switch to previous view", 1, y); Display.Write("Left arrow key",  x, y); y++;
 		y++;

@@ -22,7 +22,7 @@ public static partial class CliMain {
 	static View   realView    = View.Metadata;
 	static View   currentView = View.Metadata;
 	static View   nextView    = View.Metadata;
-	static string menuBarMsg  = "Press CTRL+H for help menu";
+	static string menuBarMsg  = "Press CTRL+L for help menu";
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.MemoryViewer, View.DSPViewer1];
