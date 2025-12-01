@@ -104,25 +104,31 @@ public static class KeyBindings {
 		ScrollEnd,
 		ToggleHeatMap,
 	}
+		
+	static Key?      lastCtrlKey  = null;
+	static Stopwatch lastCtrlTime = new();
 	
 	// Key bindings must be checked in the order they are listed here:
-	public static Dictionary<Key, Action> CtrlShiftBindings = new();
-	public static Dictionary<Key, Action> CtrlBindings      = new();
-	public static Dictionary<Key, Action> SingleKeyBindings = new();
+	public static Dictionary<Key,        Action> CtrlBindings      = new();
+	public static Dictionary<(Key, Key), Action> Ctrl2KeyBindings  = new();
+	public static Dictionary<Key,        Action> SingleKeyBindings = new();
 	
-	public static void Register(Key key, Action action, bool ctrl = false, bool shift = false) {
-		if (ctrl && shift) {
-			CtrlShiftBindings.Add(key, action);
-		}
-		else if (ctrl) {
+	public static void ResetKeyBindingState() {
+		lastCtrlKey = null;
+		lastCtrlTime.Reset();
+	}
+	
+	public static void Register(Key key, Action action, bool ctrl = false) {
+		if (ctrl) {
 			CtrlBindings.Add(key, action);
-		}
-		else if (shift) {
-			throw new ArgumentException();
 		}
 		else {
 			SingleKeyBindings.Add(key, action);
 		}
+	}
+	
+	public static void Register(Key firstKey, Key secondKey, Action action) {
+		Ctrl2KeyBindings.Add((firstKey, secondKey), action);
 	}
 	
 	public static Action? GetAction() {
@@ -131,17 +137,25 @@ public static class KeyBindings {
 		
 		var ki = keyInfo.Value;
 		
-		if (ki.HasCtrl() && ki.HasShift()) {
-			foreach (var (k, v) in CtrlShiftBindings) {
+		if (ki.HasCtrl()) {
+			foreach (var (k, v) in CtrlBindings) {
 				if (k.IsPressed(ki)) {
+					ResetKeyBindingState();
 					return v;
 				}
 			}
-		}
-		else if (ki.HasCtrl()) {
-			foreach (var (k, v) in CtrlBindings) {
-				if (k.IsPressed(ki)) {
+			
+			foreach (var ((k1, k2), v) in Ctrl2KeyBindings) {
+				if (lastCtrlTime.ElapsedMilliseconds > 1000) {
+					lastCtrlTime.Reset();
+				}
+				else if (lastCtrlKey == k1 && k2.IsPressed(ki)) {
+					ResetKeyBindingState();
 					return v;
+				}
+				else if (k1.IsPressed(ki)) {
+					lastCtrlKey = k1;
+					lastCtrlTime.Restart();
 				}
 			}
 		}

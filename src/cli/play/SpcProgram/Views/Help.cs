@@ -24,7 +24,8 @@ public static partial class CliMain {
 		Display.Write("Scroll to bottom",    1, y); Display.Write("End",            x, y); y++;
 		y++;
 		
-		Display.Write("Toggle heat map", 1, y); Display.Write("CTRL+A", x, y); Display.Write("[Warning: rapid flashing]", x * 2, y, Color.Yellow);
+		Display.Write("Toggle heat map", 1, y); Display.Write("CTRL+E+T", x, y);
+		Display.Write("[Warning: may produce rapid flashing]", x * 2, y, Color.Yellow);
 		y++;
 		
 		Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
