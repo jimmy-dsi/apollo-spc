@@ -11,11 +11,80 @@ public class EmuDataContainer {
 }
 
 public class EmuDataBuffer: ICloneable {
+	public class DSP2State: ICloneable {
+		public sbyte  MainVolumeLeft  { get; internal set; }
+		public sbyte  MainVolumeRight { get; internal set; }
+		public sbyte  EchoVolumeLeft  { get; internal set; }
+		public sbyte  EchoVolumeRight { get; internal set; }
+		
+		public sbyte  EchoFeedback    { get; internal set; }
+		public byte   EchoStartPage   { get; internal set; }
+		public byte   SourceStartPage { get; internal set; }
+		public byte   EchoDelay       { get; internal set; }
+		
+		public byte   NoiseClock      { get; internal set; }
+		public bool   ReadonlyEcho    { get; internal set; }
+		public bool   Mute            { get; internal set; }
+		public bool   Reset           { get; internal set; }
+		
+		public sbyte[] FIR            { get; internal set; } = new sbyte[8];
+		public DSPVoice2[] Voice      { get; internal set; } = new DSPVoice2[8];
+		
+		public DSP2State Clone() {
+			var clone = (DSP2State) MemberwiseClone();
+			
+			clone.FIR   = FIR.ToArray();
+			clone.Voice = new DSPVoice2[8];
+			
+			for (var v = 0; v < 8; v++) {
+				clone.Voice[v] = Voice[v].Clone();
+			}
+			
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
+	public class DSPVoice1: ICloneable {
+		public sbyte  VolumeLeft  { get; internal set; }
+		public sbyte  VolumeRight { get; internal set; }
+		public UInt16 Pitch       { get; internal set; }
+		public byte   Source      { get; internal set; }
+		public byte   ADSR0       { get; internal set; }
+		public byte   ADSR1       { get; internal set; }
+		public byte   Gain        { get; internal set; }
+		public byte   ENVX        { get; internal set; }
+		
+		public DSPVoice1 Clone() {
+			return (DSPVoice1) MemberwiseClone();
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
+	public class DSPVoice2: ICloneable {
+		public bool KeyOn      { get; internal set; }
+		public bool KeyOff     { get; internal set; }
+		public bool PitchModOn { get; internal set; }
+		public bool NoiseOn    { get; internal set; }
+		public bool EchoOn     { get; internal set; }
+		public bool End        { get; internal set; }
+		
+		public DSPVoice2 Clone() {
+			return (DSPVoice2) MemberwiseClone();
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
 	public long DSPCycle { get; private set; }
 	
-	public byte[]? ARAM_Data       { get; private set; }
-	public byte[]? SMP_BusData     { get; private set; }
-	public byte[]? DSP_RegisterMem { get; private set; }
+	public byte[]?      ARAM_Data       { get; private set; }
+	public byte[]?      SMP_BusData     { get; private set; }
+	public byte[]?      DSP_RegisterMem { get; private set; }
+	public DSPVoice1[]? DSP_Voice       { get; private set; }
+	public DSP2State?   DSP_State       { get; private set; }
 	
 	public EmuDataBuffer(long dspCycle) {
 		DSPCycle = dspCycle;
@@ -66,13 +135,64 @@ public class EmuDataBuffer: ICloneable {
 				DSP_RegisterMem[i] = emu.DSP.Register[i];
 			}
 		}
+		
+		if ((requests & Transfer.Requests.DSP_1) != 0) {
+			DSP_Voice = new DSPVoice1[8];
+			
+			for (var v = 0; v < 8; v++) {
+				DSP_Voice[v] = new() {
+					VolumeLeft  = emu.DSP.State.Voice[v].VolumeLeft,
+					VolumeRight = emu.DSP.State.Voice[v].VolumeRight,
+					Pitch       = emu.DSP.State.Voice[v].Pitch,
+					Source      = emu.DSP.State.Voice[v].Source,
+					ADSR0       = emu.DSP.State.Voice[v].ADSR0,
+					ADSR1       = emu.DSP.State.Voice[v].ADSR1,
+					Gain        = emu.DSP.State.Voice[v].Gain,
+					ENVX        = emu.DSP.State.Voice[v].ENVX,
+				};
+			}
+		}
+		
+		if ((requests & Transfer.Requests.DSP_2) != 0) {
+			DSP_State = new() {
+				MainVolumeLeft  = emu.DSP.State.MainVolumeLeft,
+				MainVolumeRight = emu.DSP.State.MainVolumeRight,
+				EchoVolumeLeft  = emu.DSP.State.Echo.VolumeLeft,
+				EchoVolumeRight = emu.DSP.State.Echo.VolumeRight,
+				EchoFeedback    = emu.DSP.State.Echo.Feedback,
+				EchoStartPage   = emu.DSP.State.Echo.StartPage,
+				SourceStartPage = emu.DSP.State.SourceTablePage,
+				EchoDelay       = emu.DSP.State.Echo.Delay,
+				NoiseClock      = emu.DSP.State.NoiseRate,
+				ReadonlyEcho    = emu.DSP.State.Echo.Readonly,
+				Mute            = emu.DSP.State.Mute,
+				Reset           = emu.DSP.State.Reset,
+				FIR             = emu.DSP.State.Echo.FIR.ToArray(),
+			};
+			
+			for (var v = 0; v < 8; v++) {
+				DSP_State.Voice[v] = new() {
+					KeyOn       = emu.DSP.State.Voice[v].KeyOn,
+					KeyOff      = emu.DSP.State.Voice[v].KeyOff,
+					PitchModOn  = emu.DSP.State.Voice[v].PitchModOn,
+					NoiseOn     = emu.DSP.State.Voice[v].NoiseOn,
+					EchoOn      = emu.DSP.State.Voice[v].EchoOn,
+					End         = emu.DSP.State.Voice[v].End,
+				};
+			}
+		}
 	}
 	
 	public bool ExpectData(Transfer.Requests requests) {
-		if ((requests & Transfer.Requests.ARAM)            != 0) return ARAM_Data       is not null;
-		if ((requests & Transfer.Requests.SMP_Bus)         != 0) return SMP_BusData     is not null;
-		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) return DSP_RegisterMem is not null;
-		return true;
+		var result = true;
+		
+		if ((requests & Transfer.Requests.ARAM)            != 0) result = result && ARAM_Data       is not null;
+		if ((requests & Transfer.Requests.SMP_Bus)         != 0) result = result && SMP_BusData     is not null;
+		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) result = result && DSP_RegisterMem is not null;
+		if ((requests & Transfer.Requests.DSP_1)           != 0) result = result && DSP_Voice       is not null;
+		if ((requests & Transfer.Requests.DSP_2)           != 0) result = result && DSP_State       is not null;
+		
+		return result;
 	}
 	
 	public EmuDataBuffer Clone() {
@@ -90,6 +210,17 @@ public class EmuDataBuffer: ICloneable {
 			clone.DSP_RegisterMem = DSP_RegisterMem.ToArray();
 		}
 		
+		if (DSP_Voice is not null) {
+			clone.DSP_Voice = new DSPVoice1[8];
+			for (var v = 0; v < 8; v++) {
+				clone.DSP_Voice[v] = DSP_Voice[v].Clone();
+			}
+		}
+		
+		if (DSP_State is not null) {
+			clone.DSP_State = DSP_State.Clone();
+		}
+		
 		return clone;
 	}
 	
@@ -99,5 +230,7 @@ public class EmuDataBuffer: ICloneable {
 		ARAM_Data       = null;
 		SMP_BusData     = null;
 		DSP_RegisterMem = null;
+		DSP_Voice       = null;
+		DSP_State       = null;
 	}
 }

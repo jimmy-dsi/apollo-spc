@@ -207,11 +207,19 @@ if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
 //	}
 //}
 
-Display.Init(WIDTH, HEIGHT);
-var exitCode = CliMain.Start(fwdArgs);
+try {
+	Display.Init(WIDTH, HEIGHT);
+	var exitCode = CliMain.Start(fwdArgs);
 
-if (!fileError && exitCode == 0) {
-	Console.Clear();
+	if (!fileError && exitCode == 0) {
+		Console.Clear();
+	}
+
+	Environment.Exit(exitCode);
 }
-
-Environment.Exit(exitCode);
+catch (Exception e) {
+	Console.Clear();
+	Console.Error.WriteLine(e);
+	Console.CursorVisible = true;
+	Environment.Exit(1);
+}

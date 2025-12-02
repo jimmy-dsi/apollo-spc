@@ -25,7 +25,7 @@ public static partial class CliMain {
 	static string menuBarMsg  = "Press CTRL+L for help menu";
 	
 	static int viewIndex = 0;
-	static View[] views = [View.Metadata, View.MemoryViewer, View.DSPViewer1];
+	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.MemoryViewer];
 	
 	static bool heatMapEnabled = false;
 	
@@ -62,6 +62,11 @@ public static partial class CliMain {
 			
 			case View.DSPViewer1: {
 				showDSPViewer1(buffer!);
+				break;
+			}
+			
+			case View.DSPViewer2: {
+				showDSPViewer2(buffer!);
 				break;
 			}
 			

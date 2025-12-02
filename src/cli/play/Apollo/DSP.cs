@@ -1,18 +1,20 @@
 namespace Apollo;
 
+using System.Collections;
+
 public class DSP {
 	public unsafe class Properties {
 		public class EchoProps {
-			public class FirBuf {
+			public class FirBuf: IEnumerable<sbyte> {
 				public sbyte this[byte index] {
 					get {
 						emu.MaybeAcquireLock();
-						try     { return *((sbyte*) state.EchoFeedback + (index & 7)); }
+						try     { return *((sbyte*) state.EchoFIR + (index & 7)); }
 						finally { emu.MaybeReleaseLock(); }
 					}
 					set {
 						emu.MaybeAcquireLock();
-						try     { *((sbyte*) state.EchoFeedback + (index & 7)) = value; }
+						try     { *((sbyte*) state.EchoFIR + (index & 7)) = value; }
 						finally { emu.MaybeReleaseLock(); }
 					}
 				}
@@ -24,6 +26,14 @@ public class DSP {
 					this.emu   = emu;
 					this.state = state;
 				}
+				
+				public IEnumerator<sbyte> GetEnumerator() {
+					for (byte i = 0; i < 8; i++) {
+						yield return this[i];
+					}
+				}
+				
+				IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 			}
 			
 			Emulator emu;
