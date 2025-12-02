@@ -103,9 +103,9 @@ public static partial class CliMain {
 		
 		Display.WriteBox([
 			$"{buffer.DSP_State!.NoiseClock:X2}",
-			$"{buffer.DSP_State!.ReadonlyEcho}",
-			$"{buffer.DSP_State! .Mute}",
-			$"{buffer.DSP_State!.Reset}",
+			$"{buffer.DSP_State!.ReadonlyEcho} ",
+			$"{buffer.DSP_State! .Mute} ",
+			$"{buffer.DSP_State!.Reset} ",
 		], xo1, y);
 		
 		// Section 4

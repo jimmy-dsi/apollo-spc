@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace SpcProgram;
 
 using System.Text;
@@ -19,10 +21,23 @@ public static partial class CliMain {
 		Script700Viewer,
 	}
 	
-	static View   realView    = View.Metadata;
-	static View   currentView = View.Metadata;
-	static View   nextView    = View.Metadata;
-	static string menuBarMsg  = "Press CTRL+L for help menu";
+	enum StatusMSG {
+		Default,
+		HeatMapOff, HeatMapOn,
+		
+		ChannelX_Enabled,  MainChannelX_Enabled,  EchoChannelX_Enabled,
+		ChannelX_Disabled, MainChannelX_Disabled, EchoChannelX_Disabled,
+		
+		AllChannelsEnabled,  AllMainChannelsEnabled,  AllEchoChannelsEnabled,
+		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
+	}
+	
+	static View       realView       = View.Metadata;
+	static View       currentView    = View.Metadata;
+	static View       nextView       = View.Metadata;
+	static string     menuBarMsg     = "Press CTRL+L for help menu";
+	static string?    tempMenuBarMsg = null;
+	static Stopwatch? tempMsgTime    = null;
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.MemoryViewer];
@@ -92,7 +107,16 @@ public static partial class CliMain {
 		
 		// Display Menu Bar
 		Display.ClearLine(Display.Height - 1, Color.BGBlue);
-		Display.Write(menuBarMsg, 0, Display.Height - 1, Color.BGBlue);
+		
+		if (tempMsgTime is not null && tempMsgTime.ElapsedMilliseconds >= 3000) {
+			resetMenuBar();
+		}
+		else if (tempMenuBarMsg is not null) {
+			Display.Write(tempMenuBarMsg, 0, Display.Height - 1, Color.BGBlue);
+		}
+		else {
+			Display.Write(menuBarMsg,     0, Display.Height - 1, Color.BGBlue);
+		}
 		
 		if (buffer is not null) {
 			var cycleCounter = $"DSP Cycle: {buffer.DSPCycle}";
@@ -206,6 +230,13 @@ public static partial class CliMain {
 			case KeyBindings.Action.ToggleHeatMap: {
 				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2) {
 					heatMapEnabled = !heatMapEnabled;
+					
+					if (heatMapEnabled) {
+						setTempStatusMsg(StatusMSG.HeatMapOn);
+					}
+					else {
+						setTempStatusMsg(StatusMSG.HeatMapOff);
+					}
 				}
 				break;
 			}
@@ -251,6 +282,31 @@ public static partial class CliMain {
 	static void commitCurrentView() {
 		currentView = nextView;
 		Display.Clear();
+	}
+	
+	static void setStatusMsg(StatusMSG msg) {
+		menuBarMsg = statusMsg(msg);
+	}
+	
+	static void setTempStatusMsg(StatusMSG msg) {
+		tempMenuBarMsg = statusMsg(msg);
+		tempMsgTime    = new();
+		
+		tempMsgTime.Start();
+	}
+	
+	static string statusMsg(StatusMSG msg) {
+		return msg switch {
+			StatusMSG.Default    => "Press CTRL+L for help menu",
+			StatusMSG.HeatMapOff => "Heat map disabled",
+			StatusMSG.HeatMapOn  => "Heat map enabled",
+			_ => throw new NotImplementedException()
+		};
+	}
+	
+	static void resetMenuBar() {
+		tempMenuBarMsg = null;
+		tempMsgTime    = null;
 	}
 	
 	enum AddressBusSize {
