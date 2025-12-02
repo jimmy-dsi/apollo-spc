@@ -244,6 +244,7 @@ public static partial class CliMain {
 	}
 	
 	static void changeCurrentView(View newView, bool setAsRealView = true) {
+		if (currentView != nextView) return;
 		nextView = newView;
 		
 		// Make requests
