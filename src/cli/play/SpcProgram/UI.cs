@@ -1,7 +1,6 @@
-using System.Diagnostics;
-
 namespace SpcProgram;
 
+using System.Diagnostics;
 using System.Text;
 
 using Apollo;
@@ -230,6 +229,7 @@ public static partial class CliMain {
 			case KeyBindings.Action.ToggleHeatMap: {
 				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2) {
 					heatMapEnabled = !heatMapEnabled;
+					Display.Clear();
 					
 					if (heatMapEnabled) {
 						setTempStatusMsg(StatusMSG.HeatMapOn);
@@ -310,11 +310,11 @@ public static partial class CliMain {
 		tempMsgTime    = null;
 	}
 	
-	enum AddressBusSize {
+	enum BusSize {
 		Bit8, Bit16, Bit24, Bit32
 	}
 	
-	static void memDisplayRows(AddressBusSize busSize,
+	static void memDisplayRows(BusSize addrBusSize,
 	                           int startRow,
 	                           int endRow,
 	                           byte[] data,
@@ -327,20 +327,20 @@ public static partial class CliMain {
 		
 		for (var i = startRow; i <= endRow; i++) {
 			var startAddr = (uint) i * 16;
-			switch (busSize) {
-				case AddressBusSize.Bit8: {
+			switch (addrBusSize) {
+				case BusSize.Bit8: {
 					Display.Write($"{startAddr:X2} | ");
 					break;
 				}
-				case AddressBusSize.Bit16: {
+				case BusSize.Bit16: {
 					Display.Write($"{startAddr:X4} | ");
 					break;
 				}
-				case AddressBusSize.Bit24: {
+				case BusSize.Bit24: {
 					Display.Write($"{startAddr:X6} | ");
 					break;
 				}
-				case AddressBusSize.Bit32: {
+				case BusSize.Bit32: {
 					Display.Write($"{startAddr:X8} | ");
 					break;
 				}
@@ -355,8 +355,9 @@ public static partial class CliMain {
 			if (useHeatMap) {
 				for (var c = 0; c < 16; c++) {
 					var idx = (i - startRow) * 16 + c;
-					var val = (byte) ((dataForHeatmap ?? data)[idx] * 5 / 9 + 40);
-					Display.Write("  ", col: new(val, val, val, bg: true));
+					var val = (dataForHeatmap ?? data)[idx];
+					var col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
+					Display.Write("  ", col: col);
 				}
 			}
 			else {
@@ -370,6 +371,184 @@ public static partial class CliMain {
 			
 			Display.Write("\n");
 		}
+	}
+	
+	static void showColorCoding() {
+		if (heatMapEnabled) {
+			var i = 0;
+			
+			var legX = Display.Width - 20;
+			var legY = Display.Height - 10;
+			
+			Display.Write("00 ..Unsigned..  FF", legX, legY + 1);
+			Display.Write("00 ..Positive.. +7F", legX, legY + 3);
+			Display.Write("00 ..Negative.. -80", legX, legY + 5);
+			
+			for (var v = 2; v <= 0x102; v += 0x20) {
+				v = Math.Clamp(v, 0, 0x101);
+				
+				Display.Write("  ", legX + i * 2, legY,     col: heatMapColor(BusSize.Bit8, signed: false, scale: 1,  v   - 2));
+				Display.Write("  ", legX + i * 2, legY + 2, col: heatMapColor(BusSize.Bit8, signed:  true, scale: 1,  v/2 - 1));
+				Display.Write("  ", legX + i * 2, legY + 4, col: heatMapColor(BusSize.Bit8, signed:  true, scale: 1, -v/2 + 1));
+				
+				i++;
+			}
+		}
+	}
+	
+	static Color heatMapColor(BusSize dataSize, bool signed, double scale, long value) {
+		double interp;
+		
+		switch (dataSize) {
+			case BusSize.Bit8: {
+				value = signed ? (sbyte) value : (byte) value;
+				if (signed) {
+					interp = (double) value / -sbyte.MinValue;
+				}
+				else {
+					interp = (double) value / byte.MaxValue;
+				}
+				break;
+			}
+			
+			case BusSize.Bit16: {
+				value = signed ? (Int16) value : (UInt16) value;
+				if (signed) {
+					interp = (double) value / -Int16.MinValue;
+				}
+				else {
+					interp = (double) value / UInt16.MaxValue;
+				}
+				break;
+			}
+			
+			case BusSize.Bit24: {
+				var v = (ulong) value & 0xFFFFFF;
+				
+				if (signed) {
+					if (v < 0x800000) {
+						value = (long) v;
+					}
+					else {
+						value = (long) v - 0x1000000;
+					}
+				}
+				
+				if (signed) {
+					interp = (double) value / 0x800000;
+				}
+				else {
+					interp = (double) value / 0xFFFFFF;
+				}
+				
+				break;
+			}
+			
+			case BusSize.Bit32: {
+				value = signed ? (Int32) value : (UInt32) value;
+				if (signed) {
+					interp = (double) value / -((long) Int32.MinValue);
+				}
+				else {
+					interp = (double) value / UInt32.MaxValue;
+				}
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
+			}
+		}
+		
+		interp *= scale;
+		var origInterp = interp;
+		
+		if (interp >= 0) {
+			interp = Math.Pow(interp, 1 / 1.9);
+		}
+		else {
+			interp = -Math.Pow(-interp, 1 / 1.9);
+		}
+		
+		Color zero = Color.FromLCH(0.1, 70, (280 - 360) * 2 * Math.PI / 360); //new(0, 31, 82);
+		
+		Color maxUns = Color.FromLCH(85.5, 47, 4.8     * Math.PI /   3); //new(242, 222, 255);
+		Color maxPos = Color.FromLCH(94.0, 97, 125 * 2 * Math.PI / 360); //new(225, 249, 122);
+		Color maxNeg = Color.FromLCH(89.0, 87, 2.0     * Math.PI /   6); //new(255, 201,  93);
+		
+		double L;
+		double C;
+		double H;
+		
+		double rm;
+		double gm;
+		double bm;
+		
+		if (signed) {
+			if (interp >= 0) {
+				var h = maxPos.H;
+				
+				if (maxPos.H - zero.H > Math.PI) {
+					h -= 2 * Math.PI;
+				}
+				else if (zero.H - maxPos.H < -Math.PI) {
+					h += 2 * Math.PI;
+				}
+				
+				L = maxPos.L *  interp + zero.L * (1 -  interp);
+				C = maxPos.C *  interp + zero.C * (1 -  interp);
+				H = h        *  interp + zero.H * (1 -  interp);
+				
+				rm = 1.0; //1.0 + origInterp * 0.4;
+				gm = 1.0; //1.1;
+				bm = 1.0; //1.0 + origInterp * 0.45;
+			}
+			else {
+				var h = maxNeg.H;
+				
+				if (maxNeg.H - zero.H > Math.PI) {
+					h -= 2 * Math.PI;
+				}
+				else if (zero.H - maxNeg.H < -Math.PI) {
+					h += 2 * Math.PI;
+				}
+				
+				L = maxNeg.L * -interp + zero.L * (1 - -interp);
+				C = maxNeg.C * -interp + zero.C * (1 - -interp);
+				H = h        * -interp + zero.H * (1 - -interp);
+				
+				rm = 1.0; //1.0 + -origInterp * 0.4;
+				gm = 1.0; //1.1;
+				bm = 1.0; //1.0 + -origInterp * 0.45;
+			}
+		}
+		else {
+			var h = maxUns.H;
+				
+			if (maxUns.H - zero.H > Math.PI) {
+				h -= 2 * Math.PI;
+			}
+			else if (zero.H - maxUns.H < -Math.PI) {
+				h += 2 * Math.PI;
+			}
+			
+			L = maxUns.L * interp + zero.L * (1 - interp);
+			C = maxUns.C * interp + zero.C * (1 - interp);
+			H = h        * interp + zero.H * (1 - interp);
+				
+			rm = 1.0; //1.0 + origInterp * 0.3;
+			gm = 1.0; //1.1;
+			bm = 1.0; //1.1; //1.0 + origInterp * 0.35;
+		}
+		
+		var col = Color.FromLCH(L, C, H);
+		
+		return new(
+			(byte) Math.Clamp(col.Red   * rm, 0, 255),
+			(byte) Math.Clamp(col.Green * gm, 0, 255),
+			(byte) Math.Clamp(col.Blue  * bm, 0, 255),
+			bg: true
+		);
 	}
 	
 	static void softFadeHeatmap(byte[] dataBuffer, byte[] progBuffer) {

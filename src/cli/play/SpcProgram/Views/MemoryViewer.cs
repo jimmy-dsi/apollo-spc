@@ -16,12 +16,14 @@ public static partial class CliMain {
 		}
 		
 		memDisplayRows(
-			AddressBusSize.Bit16,
+			BusSize.Bit16,
 			startAddr >> 4,
 			(startAddr >> 4) + (ScrollAreaRows - 1),
 			buffer.SMP_BusData!,
 			progressiveMemBuffer,
 			useHeatMap: heatMapEnabled
 		);
+		
+		showColorCoding();
 	}
 }
