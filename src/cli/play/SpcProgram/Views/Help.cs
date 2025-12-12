@@ -8,7 +8,7 @@ public static partial class CliMain {
 		var topY = 0;
 		
 		var y = 1;
-		var x = 30;
+		var x = 38;
 		
 		Display.Write("Exit current menu",       1, y); Display.Write("Escape", x, y); y++;
 		Display.Write("Toggle help menu",        1, y); Display.Write("CTRL+L", x, y); y++;
@@ -27,6 +27,7 @@ public static partial class CliMain {
 		Display.Write("Toggle heat map", 1, y); Display.Write("CTRL+E+T", x, y);
 		Display.Write("[Warning: may produce rapid flashing]", x * 2, y, Color.Yellow);
 		y++;
+		Display.Write($"Display cycle count in {(cyclesInSpcClocks ? "DSP" : "SPC")} clocks", 1, y); Display.Write("CTRL+D", x, y); y++;
 		
 		Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
 	}

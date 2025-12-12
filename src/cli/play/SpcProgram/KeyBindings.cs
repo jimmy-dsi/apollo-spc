@@ -103,6 +103,7 @@ public static class KeyBindings {
 		ScrollStart,
 		ScrollEnd,
 		ToggleHeatMap,
+		ToggleCycleUnit,
 	}
 		
 	static Key?      lastCtrlKey  = null;

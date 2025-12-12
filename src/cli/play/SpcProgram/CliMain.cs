@@ -5,6 +5,7 @@ using Jimbl;
 
 public static partial class CliMain {
 	public static Emulator PrimaryEmu { get; private set; }
+	public static bool     TerminateRequest { get; set; } = false;
 	
 	static string spcFilePath;
 	
@@ -35,6 +36,7 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Home,       KeyBindings.Action.ScrollStart);
 			KeyBindings.Register(KeyBindings.Key.End,        KeyBindings.Action.ScrollEnd);
 			KeyBindings.Register(KeyBindings.Key.Char('E'),  KeyBindings.Key.Char('T'), KeyBindings.Action.ToggleHeatMap);
+			KeyBindings.Register(KeyBindings.Key.Char('D'),  KeyBindings.Action.ToggleCycleUnit, ctrl: true);
 			
 			Console.Clear();
 			Console.CursorVisible = false;
@@ -64,8 +66,15 @@ public static partial class CliMain {
 		var lastCycle = 0L;
 		
 		while (true) {
+			if (TerminateRequest) {
+				return;
+			}
+			
 			while (!Transfer.Signal) {
 				Thread.Sleep(1); // 1 millisecond sleep to reduce CPU load
+				if (TerminateRequest) {
+					return;
+				}
 			}
 				
 			EmuDataBuffer? buffer = null;

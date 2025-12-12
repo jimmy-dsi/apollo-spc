@@ -190,9 +190,8 @@ if (!autoResizeable && !forceNoResize) {
 }
 
 Console.CancelKeyPress += (_, args) => {
-	Console.CursorVisible = true;
-	Console.Clear();
-	Environment.Exit(0);
+	args.Cancel = true;
+	CliMain.TerminateRequest = true;
 };
 
 if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
@@ -207,19 +206,24 @@ if (OS.Get() == OS.Windows && autoResizeable && !forceNoResize) {
 //	}
 //}
 
+var exitCode = 0;
+
 try {
 	Display.Init(WIDTH, HEIGHT);
-	var exitCode = CliMain.Start(fwdArgs);
+	exitCode = CliMain.Start(fwdArgs);
 
-	if (!fileError && exitCode == 0) {
-		Console.Clear();
+	if (fileError) {
+		exitCode = 1;
 	}
-
-	Environment.Exit(exitCode);
 }
 catch (Exception e) {
-	Console.Clear();
 	Console.Error.WriteLine(e);
+	exitCode = 1;
+}
+finally {
+	Console.Clear();
+	Console.ResetColor();
 	Console.CursorVisible = true;
-	Environment.Exit(1);
+
+	Environment.Exit(exitCode);
 }

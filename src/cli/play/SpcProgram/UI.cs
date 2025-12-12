@@ -41,7 +41,8 @@ public static partial class CliMain {
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.MemoryViewer];
 	
-	static bool heatMapEnabled = false;
+	static bool heatMapEnabled    = false;
+	static bool cyclesInSpcClocks = false;
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
 	
@@ -118,7 +119,7 @@ public static partial class CliMain {
 		}
 		
 		if (buffer is not null) {
-			var cycleCounter = $"DSP Cycle: {buffer.DSPCycle}";
+			var cycleCounter = cyclesInSpcClocks ? $"SPC Cycle: {buffer.DSPCycle / 2}" : $"DSP Cycle: {buffer.DSPCycle}";
 			Display.Write(cycleCounter, Display.Width - 1 - cycleCounter.Length, Display.Height - 1, Color.BGBlue);
 		}
 		
@@ -238,6 +239,11 @@ public static partial class CliMain {
 						setTempStatusMsg(StatusMSG.HeatMapOff);
 					}
 				}
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleCycleUnit: {
+				cyclesInSpcClocks = !cyclesInSpcClocks;
 				break;
 			}
 		}
@@ -377,7 +383,7 @@ public static partial class CliMain {
 		if (heatMapEnabled) {
 			var i = 0;
 			
-			var legX = Display.Width - 20;
+			var legX = Display.Width  - 20;
 			var legY = Display.Height - 10;
 			
 			Display.Write("00 ..Unsigned..  FF", legX, legY + 1);
