@@ -246,6 +246,10 @@ pub const Emu = struct {
             self.break_exec = false;
             return res;
         }
+
+        pub fn toggle_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.toggle_voice(index);
+        }
     };
 
     const StepTimeout = 100;
@@ -358,6 +362,15 @@ pub const Emu = struct {
     pub fn get_dac_buffer_offset(self: *Emu) !u32 {
         if (self.singleton) |s| {
             return s.get_dac_buffer_offset();
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn toggle_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.toggle_voice(index);
+            return;
         }
 
         return Error.NoSingletonAttached;

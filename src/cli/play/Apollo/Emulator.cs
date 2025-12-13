@@ -63,6 +63,11 @@ public class Emulator {
 	uint lastRenderPosition = 0;
 	bool makeShared         = false;
 	
+	bool[] voiceOnStates = new bool[8] {
+		true, true, true, true,
+		true, true, true, true
+	};
+	
 	SPC.Metadata? metadata = null;
 	
 	public   DSP    DSP    { get; init; }
@@ -71,6 +76,18 @@ public class Emulator {
 	internal Handle handle { get;  set; }
 
 	public bool MakeShared => makeShared;
+	
+	public bool[] VoiceOnStates {
+		get {
+			MaybeAcquireLock();
+			try {
+				return (bool[]) voiceOnStates.Clone();
+			}
+			finally {
+				MaybeReleaseLock();
+			}
+		}
+	}
 
 	public int LastRenderPosition => (int) lastRenderPosition;
 	public int RenderPosition {
@@ -318,6 +335,80 @@ public class Emulator {
 			finally {
 				MaybeReleaseLock();
 			}
+		}
+	}
+	
+	public bool ToggleVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			var result = DLL.EmuToggleVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			voiceOnStates[voiceIndex] = !voiceOnStates[voiceIndex];
+			return voiceOnStates[voiceIndex];
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool EnableVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			if (voiceOnStates[voiceIndex]) {
+				return false;
+			}
+			
+			var result = DLL.EmuToggleVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			voiceOnStates[voiceIndex] = true;
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool DisableVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			if (!voiceOnStates[voiceIndex]) {
+				return false;
+			}
+			
+			var result = DLL.EmuToggleVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			voiceOnStates[voiceIndex] = false;
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
 		}
 	}
 	

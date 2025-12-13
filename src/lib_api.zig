@@ -89,6 +89,11 @@ pub export fn emu_get_render_position(emu_ptr: ?[*]Emu) u32 {
     return emu.get_render_position(@ptrCast(emu_ptr)) catch |e| emu.zerr(u32, e, @ptrCast(emu_ptr));
 }
 
+pub export fn emu_toggle_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.toggle_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
 pub export fn emu_acquire_lock(emu_ptr: ?[*]Emu) bool {
     emu.acquire_lock(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
     return true;

@@ -9,3 +9,4 @@ cd "$SCRIPT_DIR"
 mkdir -p "$SCRIPT_DIR/../bin"
 
 zig build-lib -dynamic lib_api.zig -O ReleaseFast -femit-bin="$SCRIPT_DIR/../bin/apollo.so"
+#zig build-lib -dynamic lib_api.zig -femit-bin="$SCRIPT_DIR/../bin/apollo.so"

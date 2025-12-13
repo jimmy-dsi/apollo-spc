@@ -38,6 +38,8 @@ public static partial class CliMain {
 	static string?    tempMenuBarMsg = null;
 	static Stopwatch? tempMsgTime    = null;
 	
+	static int channelToToggle = 0;
+	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.MemoryViewer];
 	
@@ -160,6 +162,55 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.EnableAllChannels: {
+				for (var i = 0; i < 8; i++) {
+					PrimaryEmu.EnableVoice(i);
+				}
+				
+				setTempStatusMsg(StatusMSG.AllChannelsEnabled);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_1: {
+				toggleChannel(0);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_2: {
+				toggleChannel(1);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_3: {
+				toggleChannel(2);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_4: {
+				toggleChannel(3);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_5: {
+				toggleChannel(4);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_6: {
+				toggleChannel(5);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_7: {
+				toggleChannel(6);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleChannel_8: {
+				toggleChannel(7);
+				break;
+			}
+			
 			case KeyBindings.Action.ScrollRowUp: {
 				if (currentView == View.MemoryViewer) {
 					if (startAddr >= 0x10) {
@@ -249,6 +300,13 @@ public static partial class CliMain {
 		}
 	}
 	
+	static void toggleChannel(int channelIndex) {
+		var newOnState = PrimaryEmu.ToggleVoice(channelIndex);
+		channelToToggle = channelIndex + 1;
+		
+		setTempStatusMsg(newOnState ? StatusMSG.ChannelX_Enabled : StatusMSG.ChannelX_Disabled);
+	}
+	
 	static void changeCurrentView(View newView, bool setAsRealView = true) {
 		if (currentView != nextView) return;
 		nextView = newView;
@@ -304,11 +362,28 @@ public static partial class CliMain {
 	
 	static string statusMsg(StatusMSG msg) {
 		return msg switch {
-			StatusMSG.Default    => "Press CTRL+L for help menu",
-			StatusMSG.HeatMapOff => "Heat map disabled",
-			StatusMSG.HeatMapOn  => "Heat map enabled",
+			StatusMSG.Default            => "Press CTRL+L for help menu",
+			StatusMSG.HeatMapOff         => "Heat map disabled",
+			StatusMSG.HeatMapOn          => "Heat map enabled",
+			StatusMSG.ChannelX_Disabled  => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
+			StatusMSG.ChannelX_Enabled   => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
+			StatusMSG.AllChannelsEnabled => $"All channels enabled    {showActiveChannels()}",
 			_ => throw new NotImplementedException()
 		};
+	}
+	
+	static string showActiveChannels() {
+		var enabled = PrimaryEmu.VoiceOnStates;
+		
+		StringBuilder sb = new();
+		sb.Append('[');
+		
+		foreach (var voice in enabled) {
+			sb.Append(voice ? '+' : '-');
+		}
+		
+		sb.Append(']');
+		return sb.ToString();
 	}
 	
 	static void resetMenuBar() {

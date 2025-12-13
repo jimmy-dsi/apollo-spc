@@ -215,14 +215,18 @@ try {
 	if (fileError) {
 		exitCode = 1;
 	}
+	else {
+		Console.Clear();
+		Console.ResetColor();
+	}
 }
 catch (Exception e) {
+	Console.Clear();
+	Console.ResetColor();
 	Console.Error.WriteLine(e);
 	exitCode = 1;
 }
 finally {
-	Console.Clear();
-	Console.ResetColor();
 	Console.CursorVisible = true;
 
 	Environment.Exit(exitCode);

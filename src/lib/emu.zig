@@ -33,6 +33,7 @@ pub inline fn create(set_as_main_instance: bool) !*Emu {
 
         if (_emu_singleton == null) {
             _emu_singleton = try main.alloc.create(Emu.Singleton);
+            _emu_singleton.?.* = .{};
         }
 
         emu.init(
@@ -146,6 +147,13 @@ pub inline fn get_render_position(emu_ptr: ?*Emu) !u32 {
     try main.validate_ptr(Emu, ep);
 
     return ep.?.get_dac_buffer_offset();
+}
+
+pub inline fn toggle_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.toggle_voice(index);
 }
 
 pub inline fn acquire_lock(emu_ptr: ?*Emu) !void {

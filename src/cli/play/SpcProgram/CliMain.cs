@@ -29,6 +29,15 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowRight, KeyBindings.Action.NavNextView);
 			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.NavPrevView);
+			KeyBindings.Register(KeyBindings.Key.Char('0'),  KeyBindings.Action.EnableAllChannels);
+			KeyBindings.Register(KeyBindings.Key.Char('1'),  KeyBindings.Action.ToggleChannel_1);
+			KeyBindings.Register(KeyBindings.Key.Char('2'),  KeyBindings.Action.ToggleChannel_2);
+			KeyBindings.Register(KeyBindings.Key.Char('3'),  KeyBindings.Action.ToggleChannel_3);
+			KeyBindings.Register(KeyBindings.Key.Char('4'),  KeyBindings.Action.ToggleChannel_4);
+			KeyBindings.Register(KeyBindings.Key.Char('5'),  KeyBindings.Action.ToggleChannel_5);
+			KeyBindings.Register(KeyBindings.Key.Char('6'),  KeyBindings.Action.ToggleChannel_6);
+			KeyBindings.Register(KeyBindings.Key.Char('7'),  KeyBindings.Action.ToggleChannel_7);
+			KeyBindings.Register(KeyBindings.Key.Char('8'),  KeyBindings.Action.ToggleChannel_8);
 			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.ScrollRowUp);
 			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.ScrollRowDown);
 			KeyBindings.Register(KeyBindings.Key.PageUp,     KeyBindings.Action.ScrollPageUp);
