@@ -10,6 +10,13 @@ public static partial class CliMain {
 	static string spcFilePath;
 	
 	public static int Start(string[] args) {
+		try {
+			ConsoleWin32.EnableCmdAnsiCodes();
+		}
+		catch (Exception) {
+			// Allow program to continue even if Win32 call fails
+		}
+		
 		Lib.Init();
 		try {
 			if (args.Length == 0) {

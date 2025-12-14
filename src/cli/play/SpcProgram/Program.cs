@@ -90,8 +90,20 @@ if (!autoResizeable && !forceNoResize) {
 				autoResizeable = true;
 				break;
 			}
+			else if (Env.Var["WT_SESSION"] is null) { // Windows Terminal cannot resize itself, but Console.WindowWidth/Height thinks it did when tried
+				// Whitelist cmd.exe for this only
+				if (Env.Var["ComSpec"]?.ToLower()?.Trim() == @"c:\windows\system32\cmd.exe") {
+					Console.SetWindowSize(WIDTH, HEIGHT);
+					(width, height) = Env.WindowSize;
+				
+					if (height >= HEIGHT && width >= WIDTH) {
+						autoResizeable = true;
+						break;
+					}
+				}
+			}
 			
-			string[] terminalEmulators = ["wt", "mintty", @"C:\msys64\usr\bin\mintty"];
+			string[] terminalEmulators = ["wt", "mintty", @"C:\msys64\usr\bin\mintty", "cmd"];
 			string?  selectedTerminal  = null;
 			
 			foreach (var terminal in terminalEmulators) {
