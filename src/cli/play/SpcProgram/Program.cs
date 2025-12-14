@@ -24,6 +24,19 @@ bool autoResizeable = false;
 
 if (OS.Get() == OS.Windows) {
 	autoResizeable = false;
+	
+	// Windows Terminal cannot resize itself, but Console.WindowWidth/Height thinks it did when tried
+	if (Env.Var["WT_SESSION"] is null) {
+		// Whitelist cmd.exe for this only
+		if (Env.Var["ComSpec"]?.ToLower()?.Trim() == @"c:\windows\system32\cmd.exe") {
+			Console.SetWindowSize(WIDTH, HEIGHT);
+			var (width, height) = Env.WindowSize;
+				
+			if (height >= HEIGHT && width >= WIDTH) {
+				autoResizeable = true;
+			}
+		}
+	}
 }
 else if (OS.Get() == OS.Linux && !forceNoResize && Shell.CommandExists("resize") && Env.ParentTerminal != "konsole") {
 	var success = Try.Catch(
@@ -131,6 +144,11 @@ if (!autoResizeable && !forceNoResize) {
 				               .Concat(["-e"])
 				               .Concat([$"{Path.Join(Env.ProgramDirectory, "apollo-spc-program.exe")}"])
 				               .Concat(fwdArgs).Concat(["--force-no-resize"]).ToArray());
+				return;
+			}
+			else if (selectedTerminal == "cmd") {
+				Shell.ExecNewWindowInBG($"{Path.Join(Env.ProgramDirectory, "apollo-spc-program.exe")}",
+				                        new string[]{}.Concat(fwdArgs).Concat(["--force-no-resize"]).ToArray());
 				return;
 			}
 			else {

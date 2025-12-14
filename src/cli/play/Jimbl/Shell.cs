@@ -52,6 +52,12 @@ public static class Shell {
 		return true;
 	}
 	
+	public static bool ExecNewWindowInBG(string command, params string[] args) {
+		var fullCommand = $"{GetFullCommand(command, args)}";
+		tryRun(fullCommand, runInBG: true, newWindow: true);
+		return true;
+	}
+	
 	/// <summary>
 	/// Spawns two commands: One producer and one consumer. The producer's stdout is piped into the consumer's stdin.
 	/// </summary>
@@ -136,8 +142,8 @@ public static class Shell {
 		}
 	}
 	
-	static void tryRun(string fullCommand, bool runInBG = false) {
-		var process = createProcess(fullCommand);
+	static void tryRun(string fullCommand, bool runInBG = false, bool newWindow = false) {
+		var process = createProcess(fullCommand, newWindow: newWindow);
 		
 		try {
 			process.Start();
@@ -237,20 +243,35 @@ public static class Shell {
 		return output;
 	}
 	
-	static Process createProcess(string fullCommand, bool redirectStandardOutput = false, bool redirectStandardInput = false) {
+	static Process createProcess(string fullCommand, bool redirectStandardOutput = false, bool redirectStandardInput = false, bool newWindow = false) {
 		ProcessStartInfo psi;
 		
 		switch (OS.Get()) {
 			case OS.Windows: {
-				psi = new() {
-					FileName               = "cmd.exe",
-					Arguments              = $"/d /s /c \"{fullCommand}\"",
-					RedirectStandardInput  = redirectStandardInput,
-					RedirectStandardOutput = redirectStandardOutput,
-					RedirectStandardError  = false,
-					UseShellExecute        = false,
-					CreateNoWindow         = false,
-				};
+				if (newWindow) {
+					var trueFullCommand = $"start cmd.exe /d /s /k \"{fullCommand}\"";
+					
+					psi = new() {
+						FileName               = "cmd.exe",
+						Arguments              = $"/d /s /c \"{trueFullCommand}\"",
+						RedirectStandardInput  = redirectStandardInput,
+						RedirectStandardOutput = redirectStandardOutput,
+						RedirectStandardError  = false,
+						UseShellExecute        = false,
+						CreateNoWindow         = false,
+					};
+				}
+				else {
+					psi = new() {
+						FileName               = "cmd.exe",
+						Arguments              = $"/d /s /c \"{fullCommand}\"",
+						RedirectStandardInput  = redirectStandardInput,
+						RedirectStandardOutput = redirectStandardOutput,
+						RedirectStandardError  = false,
+						UseShellExecute        = false,
+						CreateNoWindow         = false,
+					};
+				}
 				break;
 			}
 			case OS.Linux: {
