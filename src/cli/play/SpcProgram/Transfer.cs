@@ -69,7 +69,14 @@ public static class Transfer {
 					}
 					else {
 						// Select the most recently computed buffer
-						return buffers[0].Buffer!.DSPCycle >= buffers[1].Buffer!.DSPCycle ? buffers[0] : buffers[1];
+						if (buffers[0].Buffer!.DSPCycle >= buffers[1].Buffer!.DSPCycle) {
+							uiUsingBufferA = true;
+							return buffers[0];
+						}
+						else {
+							uiUsingBufferB = true;
+							return buffers[1];
+						}
 					}
 				}
 				else if (!emuUsingBufferA) {
@@ -103,7 +110,14 @@ public static class Transfer {
 					}
 					else {
 						// Select the least recently computed buffer for overwriting
-						return buffers[0].Buffer!.DSPCycle <= buffers[1].Buffer!.DSPCycle ? buffers[0] : buffers[1];
+						if (buffers[0].Buffer!.DSPCycle <= buffers[1].Buffer!.DSPCycle) {
+							emuUsingBufferA = true;
+							return buffers[0];
+						}
+						else {
+							emuUsingBufferB = true;
+							return buffers[1];
+						}
 					}
 				}
 				else if (!uiUsingBufferA) {
