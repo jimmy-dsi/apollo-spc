@@ -211,6 +211,86 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.ToggleMainChannel_1: {
+				toggleMainChannel(0);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleMainChannel_2: {
+				toggleMainChannel(1);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleMainChannel_3: {
+				toggleMainChannel(2);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleMainChannel_4: {
+				toggleMainChannel(3);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleMainChannel_5: {
+				toggleMainChannel(4);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleMainChannel_6: {
+				toggleMainChannel(5);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleMainChannel_7: {
+				toggleMainChannel(6);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleMainChannel_8: {
+				toggleMainChannel(7);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_1: {
+				toggleEchoChannel(0);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_2: {
+				toggleEchoChannel(1);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_3: {
+				toggleEchoChannel(2);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_4: {
+				toggleEchoChannel(3);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_5: {
+				toggleEchoChannel(4);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_6: {
+				toggleEchoChannel(5);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_7: {
+				toggleEchoChannel(6);
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleEchoChannel_8: {
+				toggleEchoChannel(7);
+				break;
+			}
+			
 			case KeyBindings.Action.ScrollRowUp: {
 				if (currentView == View.MemoryViewer) {
 					if (startAddr >= 0x10) {
@@ -307,6 +387,20 @@ public static partial class CliMain {
 		setTempStatusMsg(newOnState ? StatusMSG.ChannelX_Enabled : StatusMSG.ChannelX_Disabled);
 	}
 	
+	static void toggleMainChannel(int channelIndex) {
+		var newOnState = PrimaryEmu.ToggleMainVoice(channelIndex);
+		channelToToggle = channelIndex + 1;
+		
+		setTempStatusMsg(newOnState ? StatusMSG.MainChannelX_Enabled : StatusMSG.MainChannelX_Disabled);
+	}
+	
+	static void toggleEchoChannel(int channelIndex) {
+		var newOnState = PrimaryEmu.ToggleEchoVoice(channelIndex);
+		channelToToggle = channelIndex + 1;
+		
+		setTempStatusMsg(newOnState ? StatusMSG.EchoChannelX_Enabled : StatusMSG.EchoChannelX_Disabled);
+	}
+	
 	static void changeCurrentView(View newView, bool setAsRealView = true) {
 		if (currentView != nextView) return;
 		nextView = newView;
@@ -362,12 +456,16 @@ public static partial class CliMain {
 	
 	static string statusMsg(StatusMSG msg) {
 		return msg switch {
-			StatusMSG.Default            => "Press CTRL+L for help menu",
-			StatusMSG.HeatMapOff         => "Heat map disabled",
-			StatusMSG.HeatMapOn          => "Heat map enabled",
-			StatusMSG.ChannelX_Disabled  => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
-			StatusMSG.ChannelX_Enabled   => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
-			StatusMSG.AllChannelsEnabled => $"All channels enabled    {showActiveChannels()}",
+			StatusMSG.Default               => "Press CTRL+L for help menu",
+			StatusMSG.HeatMapOff            => "Heat map disabled",
+			StatusMSG.HeatMapOn             => "Heat map enabled",
+			StatusMSG.ChannelX_Disabled     => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
+			StatusMSG.ChannelX_Enabled      => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
+			StatusMSG.MainChannelX_Disabled => $"Main channel {channelToToggle} disabled {showActiveChannels()}",
+			StatusMSG.MainChannelX_Enabled  => $"Main channel {channelToToggle} enabled  {showActiveChannels()}",
+			StatusMSG.EchoChannelX_Disabled => $"Echo channel {channelToToggle} disabled {showActiveChannels()}",
+			StatusMSG.EchoChannelX_Enabled  => $"Echo channel {channelToToggle} enabled  {showActiveChannels()}",
+			StatusMSG.AllChannelsEnabled    => $"All channels enabled    {showActiveChannels()}",
 			_ => throw new NotImplementedException()
 		};
 	}
@@ -376,13 +474,19 @@ public static partial class CliMain {
 		var enabled = PrimaryEmu.VoiceOnStates;
 		
 		StringBuilder sb = new();
-		sb.Append('[');
 		
-		foreach (var voice in enabled) {
+		sb.Append('[');
+		foreach (var (voice, _) in enabled) {
 			sb.Append(voice ? '+' : '-');
 		}
+		sb.Append(']').Append(' ');
 		
+		sb.Append('[');
+		foreach (var (_, voice) in enabled) {
+			sb.Append(voice ? '+' : '-');
+		}
 		sb.Append(']');
+		
 		return sb.ToString();
 	}
 	

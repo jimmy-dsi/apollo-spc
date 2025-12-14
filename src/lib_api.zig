@@ -94,6 +94,46 @@ pub export fn emu_toggle_voice(emu_ptr: ?[*]Emu, index: u8) bool {
     return true;
 }
 
+pub export fn emu_enable_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.enable_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_disable_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.disable_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_toggle_main_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.toggle_main_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_enable_main_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.enable_main_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_disable_main_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.disable_main_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_toggle_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.toggle_echo_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_enable_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.enable_echo_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_disable_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
+    emu.disable_echo_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
 pub export fn emu_acquire_lock(emu_ptr: ?[*]Emu) bool {
     emu.acquire_lock(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
     return true;

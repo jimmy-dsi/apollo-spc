@@ -48,6 +48,38 @@ internal partial class DLL {
 	[return: MarshalAs(UnmanagedType.I1)]
 	public static partial bool EmuToggleVoice(Emulator.Handle emuPtr, byte voiceIndex);
 	
+	[LibraryImport("apollo", EntryPoint = "emu_enable_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuEnableVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_disable_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuDisableVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_toggle_main_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuToggleMainVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_enable_main_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuEnableMainVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_disable_main_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuDisableMainVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_toggle_echo_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuToggleEchoVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_enable_echo_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuEnableEchoVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
+	[LibraryImport("apollo", EntryPoint = "emu_disable_echo_voice")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuDisableEchoVoice(Emulator.Handle emuPtr, byte voiceIndex);
+	
 	[LibraryImport("apollo", EntryPoint = "emu_acquire_lock")]
 	[return: MarshalAs(UnmanagedType.I1)]
 	public static partial bool EmuAcquireLock(Emulator.Handle emuPtr);

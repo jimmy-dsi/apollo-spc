@@ -156,6 +156,62 @@ pub inline fn toggle_voice(emu_ptr: ?*Emu, index: u3) !void {
     return ep.?.toggle_voice(index);
 }
 
+pub inline fn enable_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.enable_voice(index);
+}
+
+pub inline fn disable_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.disable_voice(index);
+}
+
+pub inline fn toggle_main_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.toggle_main_voice(index);
+}
+
+pub inline fn enable_main_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.enable_main_voice(index);
+}
+
+pub inline fn disable_main_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.disable_main_voice(index);
+}
+
+pub inline fn toggle_echo_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.toggle_echo_voice(index);
+}
+
+pub inline fn enable_echo_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.enable_echo_voice(index);
+}
+
+pub inline fn disable_echo_voice(emu_ptr: ?*Emu, index: u3) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.disable_echo_voice(index);
+}
+
 pub inline fn acquire_lock(emu_ptr: ?*Emu) !void {
     var ep = get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);

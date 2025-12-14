@@ -13,7 +13,7 @@ public static partial class CliMain {
 		var y = 0;
 		var x = 0;
 		
-		var voiceOnStates = PrimaryEmu.VoiceOnStates;
+		var voiceOnStates = PrimaryEmu.MainVoiceOnStates;
 		
 		for (var v = 0; v < 8; v++) {
 			x = 27 * (v % 4);
@@ -242,6 +242,15 @@ public static partial class CliMain {
 			coloring[c * 0x10 + 0xB] = color;
 			coloring[c * 0x10 + 0xE] = color;
 			coloring[0x1D]           = color;
+		}
+		
+		for (var v = 0; v < 8; v++) {
+			var on = PrimaryEmu.MainVoiceOnStates[v];
+			if (!on) {
+				for (var i = 0; i <= 9; i++) {
+					coloring[v * 0x10 + i] = color;
+				}
+			}
 		}
 		
 		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, progressiveBuffer, coloring, useHeatMap: heatMapEnabled);

@@ -250,6 +250,38 @@ pub const Emu = struct {
         pub fn toggle_voice(self: *Singleton, index: u3) void {
             self.pipeline_2.toggle_voice(index);
         }
+
+        pub fn enable_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.enable_voice(index);
+        }
+
+        pub fn disable_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.disable_voice(index);
+        }
+
+        pub fn toggle_main_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.toggle_main_voice(index);
+        }
+
+        pub fn enable_main_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.enable_main_voice(index);
+        }
+
+        pub fn disable_main_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.disable_main_voice(index);
+        }
+
+        pub fn toggle_echo_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.toggle_echo_voice(index);
+        }
+
+        pub fn enable_echo_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.enable_echo_voice(index);
+        }
+
+        pub fn disable_echo_voice(self: *Singleton, index: u3) void {
+            self.pipeline_2.disable_echo_voice(index);
+        }
     };
 
     const StepTimeout = 100;
@@ -370,6 +402,78 @@ pub const Emu = struct {
     pub fn toggle_voice(self: *Emu, index: u3) !void {
         if (self.singleton) |s| {
             s.toggle_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn enable_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.enable_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn disable_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.disable_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn toggle_main_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.toggle_main_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn enable_main_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.enable_main_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn disable_main_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.disable_main_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn toggle_echo_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.toggle_echo_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn enable_echo_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.enable_echo_voice(index);
+            return;
+        }
+
+        return Error.NoSingletonAttached;
+    }
+
+    pub fn disable_echo_voice(self: *Emu, index: u3) !void {
+        if (self.singleton) |s| {
+            s.disable_echo_voice(index);
             return;
         }
 

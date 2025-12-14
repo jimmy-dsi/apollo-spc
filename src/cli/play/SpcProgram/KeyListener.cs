@@ -53,6 +53,20 @@ public static class KeyListener {
 	public static bool    IsUpArrow(this ConsoleKeyInfo info) => info.Key == ConsoleKey.UpArrow;
 	public static bool  IsDownArrow(this ConsoleKeyInfo info) => info.Key == ConsoleKey.DownArrow;
 	
+	// Function keys
+	public static bool IsF1 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F1;
+	public static bool IsF2 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F2;
+	public static bool IsF3 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F3;
+	public static bool IsF4 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F4;
+	public static bool IsF5 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F5;
+	public static bool IsF6 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F6;
+	public static bool IsF7 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F7;
+	public static bool IsF8 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F8;
+	public static bool IsF9 (this ConsoleKeyInfo info) => info.Key == ConsoleKey.F9;
+	public static bool IsF10(this ConsoleKeyInfo info) => info.Key == ConsoleKey.F10;
+	public static bool IsF11(this ConsoleKeyInfo info) => info.Key == ConsoleKey.F11;
+	public static bool IsF12(this ConsoleKeyInfo info) => info.Key == ConsoleKey.F12;
+	
 	// Others
 	public static bool    IsInsert(this ConsoleKeyInfo info) => info.Key == ConsoleKey.Insert;
 	public static bool    IsDelete(this ConsoleKeyInfo info) => info.Key == ConsoleKey.Delete;

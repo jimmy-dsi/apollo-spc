@@ -6,9 +6,10 @@ using Jimbl;
 public static class KeyBindings {
 	public enum Code {
 		ArrowLeft, ArrowUp, ArrowRight, ArrowDown,
+		F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
 		Insert, Delete, Home, End, PageUp, PageDown,
 		Enter, Backspace, Escape, Tab,
-		Printable
+		Printable,
 	}
 	
 	public class Key {
@@ -22,6 +23,19 @@ public static class KeyBindings {
 		public static Key ArrowUp    { get; } = new(Code.ArrowUp);
 		public static Key ArrowRight { get; } = new(Code.ArrowRight);
 		public static Key ArrowDown  { get; } = new(Code.ArrowDown);
+		// Function Keys
+		public static Key F1         { get; } = new(Code.F1);
+		public static Key F2         { get; } = new(Code.F2);
+		public static Key F3         { get; } = new(Code.F3);
+		public static Key F4         { get; } = new(Code.F4);
+		public static Key F5         { get; } = new(Code.F5);
+		public static Key F6         { get; } = new(Code.F6);
+		public static Key F7         { get; } = new(Code.F7);
+		public static Key F8         { get; } = new(Code.F8);
+		public static Key F9         { get; } = new(Code.F9);
+		public static Key F10        { get; } = new(Code.F10);
+		public static Key F11        { get; } = new(Code.F11);
+		public static Key F12        { get; } = new(Code.F12);
 		// Other
 		public static Key Insert     { get; } = new(Code.Insert);
 		public static Key Delete     { get; } = new(Code.Delete);
@@ -56,6 +70,19 @@ public static class KeyBindings {
 					Code.ArrowUp    => keyInfo.IsUpArrow(),
 					Code.ArrowRight => keyInfo.IsRightArrow(),
 					Code.ArrowDown  => keyInfo.IsDownArrow(),
+					// Function keys
+					Code.F1         => keyInfo.IsF1(),
+					Code.F2         => keyInfo.IsF2(),
+					Code.F3         => keyInfo.IsF3(),
+					Code.F4         => keyInfo.IsF4(),
+					Code.F5         => keyInfo.IsF5(),
+					Code.F6         => keyInfo.IsF6(),
+					Code.F7         => keyInfo.IsF7(),
+					Code.F8         => keyInfo.IsF8(),
+					Code.F9         => keyInfo.IsF9(),
+					Code.F10        => keyInfo.IsF10(),
+					Code.F11        => keyInfo.IsF11(),
+					Code.F12        => keyInfo.IsF12(),
 					// Other
 					Code.Insert     => keyInfo.IsInsert(),
 					Code.Delete     => keyInfo.IsDelete(),
@@ -73,7 +100,7 @@ public static class KeyBindings {
 		}
 		
 		public Key(char printable) {
-			if (!printable.IsAsciiLetterOrDigit()) {
+			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')') && !printable.IsAsciiLetterOrDigit()) {
 				throw new ArgumentException();
 			}
 			
@@ -105,6 +132,22 @@ public static class KeyBindings {
 		ToggleChannel_6,
 		ToggleChannel_7,
 		ToggleChannel_8,
+		ToggleMainChannel_1,
+		ToggleMainChannel_2,
+		ToggleMainChannel_3,
+		ToggleMainChannel_4,
+		ToggleMainChannel_5,
+		ToggleMainChannel_6,
+		ToggleMainChannel_7,
+		ToggleMainChannel_8,
+		ToggleEchoChannel_1,
+		ToggleEchoChannel_2,
+		ToggleEchoChannel_3,
+		ToggleEchoChannel_4,
+		ToggleEchoChannel_5,
+		ToggleEchoChannel_6,
+		ToggleEchoChannel_7,
+		ToggleEchoChannel_8,
 		ScrollRowUp,
 		ScrollRowDown,
 		ScrollPageUp,

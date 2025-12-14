@@ -63,7 +63,12 @@ public class Emulator {
 	uint lastRenderPosition = 0;
 	bool makeShared         = false;
 	
-	bool[] voiceOnStates = new bool[8] {
+	bool[] mainVoiceOnStates = new bool[8] {
+		true, true, true, true,
+		true, true, true, true
+	};
+	
+	bool[] echoVoiceOnStates = new bool[8] {
 		true, true, true, true,
 		true, true, true, true
 	};
@@ -77,11 +82,40 @@ public class Emulator {
 
 	public bool MakeShared => makeShared;
 	
-	public bool[] VoiceOnStates {
+	public (bool Main, bool Echo)[] VoiceOnStates {
 		get {
 			MaybeAcquireLock();
 			try {
-				return (bool[]) voiceOnStates.Clone();
+				return new[] {
+					(Main: mainVoiceOnStates[0], Echo: echoVoiceOnStates[0]), (Main: mainVoiceOnStates[1], Echo: echoVoiceOnStates[1]),
+					(Main: mainVoiceOnStates[2], Echo: echoVoiceOnStates[2]), (Main: mainVoiceOnStates[3], Echo: echoVoiceOnStates[3]),
+					(Main: mainVoiceOnStates[4], Echo: echoVoiceOnStates[4]), (Main: mainVoiceOnStates[5], Echo: echoVoiceOnStates[5]),
+					(Main: mainVoiceOnStates[6], Echo: echoVoiceOnStates[6]), (Main: mainVoiceOnStates[7], Echo: echoVoiceOnStates[7]),
+				};
+			}
+			finally {
+				MaybeReleaseLock();
+			}
+		}
+	}
+	
+	public bool[] MainVoiceOnStates {
+		get {
+			MaybeAcquireLock();
+			try {
+				return (bool[]) mainVoiceOnStates.Clone();
+			}
+			finally {
+				MaybeReleaseLock();
+			}
+		}
+	}
+	
+	public bool[] EchoVoiceOnStates {
+		get {
+			MaybeAcquireLock();
+			try {
+				return (bool[]) echoVoiceOnStates.Clone();
 			}
 			finally {
 				MaybeReleaseLock();
@@ -352,8 +386,10 @@ public class Emulator {
 				Error.Throw(errorCode);
 			}
 			
-			voiceOnStates[voiceIndex] = !voiceOnStates[voiceIndex];
-			return voiceOnStates[voiceIndex];
+			mainVoiceOnStates[voiceIndex] = !mainVoiceOnStates[voiceIndex];
+			echoVoiceOnStates[voiceIndex] =  mainVoiceOnStates[voiceIndex];
+			
+			return mainVoiceOnStates[voiceIndex];
 		}
 		finally {
 			MaybeReleaseLock();
@@ -368,17 +404,15 @@ public class Emulator {
 				throw new ArgumentOutOfRangeException();
 			}
 			
-			if (voiceOnStates[voiceIndex]) {
-				return false;
-			}
-			
-			var result = DLL.EmuToggleVoice(handle, (byte) voiceIndex);
+			var result = DLL.EmuEnableVoice(handle, (byte) voiceIndex);
 			if (!result) {
 				var errorCode = DLL.EmuGetLastError(handle);
 				Error.Throw(errorCode);
 			}
 			
-			voiceOnStates[voiceIndex] = true;
+			mainVoiceOnStates[voiceIndex] = true;
+			echoVoiceOnStates[voiceIndex] = true;
+			
 			return true;
 		}
 		finally {
@@ -394,17 +428,147 @@ public class Emulator {
 				throw new ArgumentOutOfRangeException();
 			}
 			
-			if (!voiceOnStates[voiceIndex]) {
-				return false;
-			}
-			
-			var result = DLL.EmuToggleVoice(handle, (byte) voiceIndex);
+			var result = DLL.EmuDisableVoice(handle, (byte) voiceIndex);
 			if (!result) {
 				var errorCode = DLL.EmuGetLastError(handle);
 				Error.Throw(errorCode);
 			}
 			
-			voiceOnStates[voiceIndex] = false;
+			mainVoiceOnStates[voiceIndex] = false;
+			echoVoiceOnStates[voiceIndex] = false;
+			
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool ToggleMainVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			var result = DLL.EmuToggleMainVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			mainVoiceOnStates[voiceIndex] = !mainVoiceOnStates[voiceIndex];
+			return mainVoiceOnStates[voiceIndex];
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool EnableMainVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			var result = DLL.EmuEnableMainVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			mainVoiceOnStates[voiceIndex] = true;
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool DisableMainVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			var result = DLL.EmuDisableMainVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			mainVoiceOnStates[voiceIndex] = false;
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool ToggleEchoVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			var result = DLL.EmuToggleEchoVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			echoVoiceOnStates[voiceIndex] = !echoVoiceOnStates[voiceIndex];
+			return echoVoiceOnStates[voiceIndex];
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool EnableEchoVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			var result = DLL.EmuEnableEchoVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			echoVoiceOnStates[voiceIndex] = true;
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool DisableEchoVoice(int voiceIndex) {
+		MaybeAcquireLock();
+		
+		try {
+			if (voiceIndex is < 0 or >= 8) {
+				throw new ArgumentOutOfRangeException();
+			}
+			
+			var result = DLL.EmuDisableEchoVoice(handle, (byte) voiceIndex);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			echoVoiceOnStates[voiceIndex] = false;
 			return true;
 		}
 		finally {
