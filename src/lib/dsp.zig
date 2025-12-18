@@ -49,6 +49,31 @@ pub const VoiceState = extern struct {
     end:          ?[*]u8 = null
 };
 
+pub const DebugGlobalState = extern struct {
+
+};
+
+pub const DebugVoiceState = extern struct {
+    buffer:          ?[*]const i16 = null,
+    buffer_offset:   ?[*]const u8  = null,
+    gaussian_offset: ?[*]const u16 = null,
+    brr_address:     ?[*]const u16 = null,
+    brr_offset:      ?[*]const u8  = null,
+    key_on_delay:    ?[*]const u8  = null,
+    env_mode:        ?[*]const u8  = null,
+    env_level:       ?[*]const u16 = null,
+
+    gain_env_level:  ?[*]const u8  = null,
+    key_latch:       ?[*]const u8  = null,
+    key_on:          ?[*]const u8  = null,
+    key_off:         ?[*]const u8  = null,
+    pitch_mod_on:    ?[*]const u8  = null,
+    noise_on:        ?[*]const u8  = null,
+    echo_on:         ?[*]const u8  = null,
+    end:             ?[*]const u8  = null,
+    looped:          ?[*]const u8  = null,
+};
+
 pub inline fn get_aram_ptr(emu_ptr: ?*Emu) !?[]u8 {
     var ep = emu.get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);
@@ -124,5 +149,33 @@ pub inline fn get_voice_state(voice_idx: u3, emu_ptr: ?*Emu) !VoiceState {
         .noise_on     = @ptrCast(&voice.noise_on),
         .echo_on      = @ptrCast(&voice.echo_on),
         .end          = @ptrCast(&voice.end)
+    };
+}
+
+pub inline fn get_voice_debug_state(voice_idx: u3, emu_ptr: ?*Emu) !DebugVoiceState {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const voice = &ep.?.s_dsp.state._internal._voice[voice_idx];
+
+    return .{
+        .buffer          = @ptrCast(&voice._buffer),
+        .buffer_offset   = @ptrCast(&voice._buffer_offset),
+        .gaussian_offset = @ptrCast(&voice._gaussian_offset),
+        .brr_address     = @ptrCast(&voice._brr_address),
+        .brr_offset      = @ptrCast(&voice._brr_offset),
+        .key_on_delay    = @ptrCast(&voice._key_on_delay),
+        .env_mode        = @ptrCast(&voice._env_mode),
+        .env_level       = @ptrCast(&voice._env_level),
+
+        .gain_env_level  = @ptrCast(&voice.__env_level),
+        .key_latch       = @ptrCast(&voice.__key_latch),
+        .key_on          = @ptrCast(&voice.__key_on),
+        .key_off         = @ptrCast(&voice.__key_off),
+        .pitch_mod_on    = @ptrCast(&voice.__pitch_mod_on),
+        .noise_on        = @ptrCast(&voice.__noise_on),
+        .echo_on         = @ptrCast(&voice.__echo_on),
+        .end             = @ptrCast(&voice.__end),
+        .looped          = @ptrCast(&voice.__looped),
     };
 }

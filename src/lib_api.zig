@@ -173,6 +173,10 @@ pub export fn dsp_get_voice_state(voice_idx: u8, emu_ptr: ?[*]Emu) dsp.VoiceStat
     return dsp.get_voice_state(@intCast(voice_idx & 7), @ptrCast(emu_ptr)) catch |e| emu.derr(dsp.VoiceState, e, @ptrCast(emu_ptr));
 }
 
+pub export fn dsp_get_voice_debug_state(voice_idx: u8, emu_ptr: ?[*]Emu) dsp.DebugVoiceState {
+    return dsp.get_voice_debug_state(@intCast(voice_idx & 7), @ptrCast(emu_ptr)) catch |e| emu.derr(dsp.DebugVoiceState, e, @ptrCast(emu_ptr));
+}
+
 // SMP
 pub export fn smp_read_byte(address: u16, emu_ptr: ?[*]Emu) u8 {
     return smp.read_byte(address, @ptrCast(emu_ptr)) catch |e| emu.zerr(u8, e, @ptrCast(emu_ptr));

@@ -40,11 +40,14 @@ public static class AudioOutput {
 		}
 	}
 	
+	static Random rng = new();
+	static int cycleSpillOver = 0;
+	
 	// This will be called by SDL when it needs more audio data
 	static void Callback(IntPtr userdata, IntPtr stream, int len) {
 		var samples = len / sizeof(Int16) / 2;
 	
-		var approxCycles = (samples - 1) * 64;
+		var approxCycles = (samples - 1) * 64 - cycleSpillOver;
 		var cycles       = emu.StepNCyclesFast(approxCycles);
 	
 		if (cycles < approxCycles) {
@@ -53,8 +56,13 @@ public static class AudioOutput {
 		}
 	
 		while (emu.SamplesQueued < samples) {
-			emu.StepCycleFast();
+			emu.StepCycleFast(); // TODO: Check for errors
 		}
+		
+		// Run a random extra number of cycles, between 0 and 63
+		// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
+		cycleSpillOver = rng.Next(0, 64);
+		emu.StepNCyclesFast(cycleSpillOver); // TODO: Check for errors
 	
 		var buffer = emu.GetBufferedSamples();
 

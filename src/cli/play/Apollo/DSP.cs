@@ -3,6 +3,10 @@ namespace Apollo;
 using System.Collections;
 
 public class DSP {
+	public enum EnvelopeMode {
+		KeyOff = 0, Attack = 1, Decay = 2, Release = 3
+	}
+	
 	public unsafe class Properties {
 		public class EchoProps {
 			public class FirBuf: IEnumerable<sbyte> {
@@ -318,6 +322,152 @@ public class DSP {
 			}
 		}
 		
+		public class DebugVoiceProps {
+			Emulator emu;
+			DLL.DspDebugVoiceState state;
+			
+			public Int16[] Buffer {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return new Span<Int16>((Int16*) state.Buffer, 12).ToArray(); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public byte BufferOffset {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (byte) (*((byte*) state.BufferOffset) & 0xF); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt16 GaussianOffset {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) state.GaussianOffset); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt16 BRRAddress {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) state.BrrAddress); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public byte BRROffset {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (byte) (*((byte*) state.BrrOffset) & 0xF); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public byte KeyOnDelay {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (byte) (*((byte*) state.KeyOnDelay) & 7); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public EnvelopeMode EnvMode {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (EnvelopeMode) (byte) (*((byte*) state.EnvMode) % 4); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt16 EnvLevel {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return (UInt16) (*((UInt16*) state.EnvLevel) & 0x7FF); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public Int16 GAINEnvLevel {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((Int16*) state.GainEnvLevel); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool KeyLatch {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.KeyLatch); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool KeyOn {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.KeyOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool KeyOff {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.KeyOff); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool PitchModOn {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.PitchModOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool NoiseOn {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.NoiseOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool EchoOn {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.EchoOn); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool End {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.End); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public bool Looped {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((bool*) state.End); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			internal DebugVoiceProps(Emulator emu, DLL.DspDebugVoiceState state) {
+				this.emu   = emu;
+				this.state = state;
+			}
+		}
+		
 		Emulator emu;
 		DLL.DspGlobalState state;
 			
@@ -399,21 +549,24 @@ public class DSP {
 			}
 		}
 		
-		public EchoProps    Echo  { get; }
-		public VoiceProps[] Voice { get; }
+		public EchoProps         Echo       { get; }
+		public VoiceProps[]      Voice      { get; }
+		public DebugVoiceProps[] VoiceDebug { get; }
 				
-		internal Properties(Emulator emu, DLL.DspGlobalState state, DLL.DspVoiceState[] voiceStates) {
+		internal Properties(Emulator emu, DLL.DspGlobalState state, DLL.DspVoiceState[] voiceStates, DLL.DspDebugVoiceState[] debugVoiceStates) {
 			this.emu   = emu;
 			this.state = state;
 			
-			Echo  = new(emu, state);
-			Voice = new VoiceProps[8];
+			Echo       = new(emu, state);
+			Voice      = new VoiceProps[8];
+			VoiceDebug = new DebugVoiceProps[8];
 			
 			for (var i = 0; i < 8; i++) {
 				if (i >= voiceStates.Length) {
 					break;
 				}
-				Voice[i] = new(emu, voiceStates[i]);
+				Voice[i]      = new(emu,      voiceStates[i]);
+				VoiceDebug[i] = new(emu, debugVoiceStates[i]);
 			}
 		}
 	}
@@ -480,7 +633,18 @@ public class DSP {
 				voiceStates.Add(v);
 			}
 			
-			State = new(emulator, globalState, voiceStates.ToArray());
+			List<DLL.DspDebugVoiceState> debugVoiceStates = new();
+			
+			for (var i = 0; i < 8; i++) {
+				var v = DLL.DspGetVoiceDebugState((byte) i, Emulator.handle);
+				if (v.Buffer == IntPtr.Zero) {
+					var errorCode = DLL.EmuGetLastError(Emulator.handle);
+					Error.Throw(errorCode);
+				}
+				debugVoiceStates.Add(v);
+			}
+			
+			State = new(emulator, globalState, voiceStates.ToArray(), debugVoiceStates.ToArray());
 		}
 	}
 }

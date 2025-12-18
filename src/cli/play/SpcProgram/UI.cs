@@ -41,7 +41,7 @@ public static partial class CliMain {
 	static int channelToToggle = 0;
 	
 	static int viewIndex = 0;
-	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.MemoryViewer];
+	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer];
 	
 	static bool heatMapEnabled    = false;
 	static bool cyclesInSpcClocks = false;
@@ -84,6 +84,11 @@ public static partial class CliMain {
 			
 			case View.DSPViewer2: {
 				showDSPViewer2(buffer!);
+				break;
+			}
+			
+			case View.DSPViewer3: {
+				showDSPViewer3(buffer!);
 				break;
 			}
 			
@@ -359,7 +364,7 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.ToggleHeatMap: {
-				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2) {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3) {
 					heatMapEnabled = !heatMapEnabled;
 					Display.Clear();
 					
@@ -562,7 +567,7 @@ public static partial class CliMain {
 		if (heatMapEnabled) {
 			var i = 0;
 			
-			var legX = Display.Width  - 20;
+			var legX = Display.Width  - 19;
 			var legY = Display.Height - 10;
 			
 			Display.Write("00 ..Unsigned..  FF", legX, legY + 1);

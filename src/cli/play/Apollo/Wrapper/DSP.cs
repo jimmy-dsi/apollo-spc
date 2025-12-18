@@ -18,6 +18,9 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "dsp_get_voice_state")]
 	public static partial DspVoiceState DspGetVoiceState(Byte voiceIdx, Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "dsp_get_voice_debug_state")]
+	public static partial DspDebugVoiceState DspGetVoiceDebugState(Byte voiceIdx, Emulator.Handle? emuPtr);
+	
 	[StructLayout(LayoutKind.Sequential)]
 	internal struct DspGlobalState {
 		public IntPtr EchoFeedback;
@@ -61,5 +64,27 @@ internal partial class DLL {
 		public IntPtr NoiseOn;
 		public IntPtr EchoOn;
 		public IntPtr End;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct DspDebugVoiceState {
+		public IntPtr Buffer;
+		public IntPtr BufferOffset;
+		public IntPtr GaussianOffset;
+		public IntPtr BrrAddress;
+		public IntPtr BrrOffset;
+		public IntPtr KeyOnDelay;
+		public IntPtr EnvMode;
+		public IntPtr EnvLevel;
+		
+		public IntPtr GainEnvLevel;
+		public IntPtr KeyLatch;
+		public IntPtr KeyOn;
+		public IntPtr KeyOff;
+		public IntPtr PitchModOn;
+		public IntPtr NoiseOn;
+		public IntPtr EchoOn;
+		public IntPtr End;
+		public IntPtr Looped;
 	}
 }

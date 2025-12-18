@@ -46,6 +46,24 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
+	public class DSP3State: ICloneable {
+		public DSPVoice3[] Voice { get; internal set; } = new DSPVoice3[8];
+		
+		public DSP3State Clone() {
+			var clone = (DSP3State) MemberwiseClone();
+			
+			clone.Voice = new DSPVoice3[8];
+			
+			for (var v = 0; v < 8; v++) {
+				clone.Voice[v] = Voice[v].Clone();
+			}
+			
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
 	public class DSPVoice1: ICloneable {
 		public sbyte  VolumeLeft  { get; internal set; }
 		public sbyte  VolumeRight { get; internal set; }
@@ -78,6 +96,35 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
+	public class DSPVoice3: ICloneable {
+		public Int16[]          Buffer         { get; internal set; } = new Int16[8];
+		public byte             BufferOffset   { get; internal set; }
+		public UInt16           GaussianOffset { get; internal set; }
+		public UInt16           BRRAddress     { get; internal set; }
+		public byte             BRROffset      { get; internal set; }
+		public byte             KeyOnDelay     { get; internal set; }
+		public DSP.EnvelopeMode EnvMode        { get; internal set; }
+		public UInt16           EnvLevel       { get; internal set; }
+		
+		public Int16            GAINEnvLevel   { get; internal set; }
+		public bool             KeyLatch       { get; internal set; }
+		public bool             KeyOn          { get; internal set; }
+		public bool             KeyOff         { get; internal set; }
+		public bool             PitchModOn     { get; internal set; }
+		public bool             NoiseOn        { get; internal set; }
+		public bool             EchoOn         { get; internal set; }
+		public bool             End            { get; internal set; }
+		public bool             Looped         { get; internal set; }
+		
+		public DSPVoice3 Clone() {
+			var clone = (DSPVoice3) MemberwiseClone();
+			clone.Buffer = Buffer.ToArray();
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
 	public long DSPCycle { get; private set; }
 	
 	public byte[]?      ARAM_Data       { get; private set; }
@@ -85,6 +132,7 @@ public class EmuDataBuffer: ICloneable {
 	public byte[]?      DSP_RegisterMem { get; private set; }
 	public DSPVoice1[]? DSP_Voice       { get; private set; }
 	public DSP2State?   DSP_State       { get; private set; }
+	public DSP3State?   DSP_DebugState  { get; private set; }
 	
 	public EmuDataBuffer(long dspCycle) {
 		DSPCycle = dspCycle;
@@ -181,6 +229,33 @@ public class EmuDataBuffer: ICloneable {
 				};
 			}
 		}
+		
+		if ((requests & Transfer.Requests.DSP_3) != 0) {
+			DSP_DebugState = new();
+			
+			for (var v = 0; v < 8; v++) {
+				DSP_DebugState.Voice[v] = new() {
+					Buffer         = emu.DSP.State.VoiceDebug[v].Buffer,
+					BufferOffset   = emu.DSP.State.VoiceDebug[v].BufferOffset,
+					GaussianOffset = emu.DSP.State.VoiceDebug[v].GaussianOffset,
+					BRRAddress     = emu.DSP.State.VoiceDebug[v].BRRAddress,
+					BRROffset      = emu.DSP.State.VoiceDebug[v].BRROffset,
+					KeyOnDelay     = emu.DSP.State.VoiceDebug[v].KeyOnDelay,
+					EnvMode        = emu.DSP.State.VoiceDebug[v].EnvMode,
+					EnvLevel       = emu.DSP.State.VoiceDebug[v].EnvLevel,
+					
+					GAINEnvLevel   = emu.DSP.State.VoiceDebug[v].GAINEnvLevel,
+					KeyLatch       = emu.DSP.State.VoiceDebug[v].KeyLatch,
+					KeyOn          = emu.DSP.State.VoiceDebug[v].KeyOn,
+					KeyOff         = emu.DSP.State.VoiceDebug[v].KeyOff,
+					PitchModOn     = emu.DSP.State.VoiceDebug[v].PitchModOn,
+					NoiseOn        = emu.DSP.State.VoiceDebug[v].NoiseOn,
+					EchoOn         = emu.DSP.State.VoiceDebug[v].EchoOn,
+					End            = emu.DSP.State.VoiceDebug[v].End,
+					Looped         = emu.DSP.State.VoiceDebug[v].Looped,
+				};
+			}
+		}
 	}
 	
 	public bool ExpectData(Transfer.Requests requests) {
@@ -191,6 +266,7 @@ public class EmuDataBuffer: ICloneable {
 		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) result = result && DSP_RegisterMem is not null;
 		if ((requests & Transfer.Requests.DSP_1)           != 0) result = result && DSP_Voice       is not null;
 		if ((requests & Transfer.Requests.DSP_2)           != 0) result = result && DSP_State       is not null;
+		if ((requests & Transfer.Requests.DSP_3)           != 0) result = result && DSP_DebugState  is not null;
 		
 		return result;
 	}
@@ -221,6 +297,10 @@ public class EmuDataBuffer: ICloneable {
 			clone.DSP_State = DSP_State.Clone();
 		}
 		
+		if (DSP_DebugState is not null) {
+			clone.DSP_DebugState = DSP_DebugState.Clone();
+		}
+		
 		return clone;
 	}
 	
@@ -232,5 +312,6 @@ public class EmuDataBuffer: ICloneable {
 		DSP_RegisterMem = null;
 		DSP_Voice       = null;
 		DSP_State       = null;
+		DSP_DebugState  = null;
 	}
 }

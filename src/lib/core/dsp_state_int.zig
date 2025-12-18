@@ -5,8 +5,8 @@ const brr      = @import("brr.zig");
 const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
 
 pub const DSPStateInternal = struct {
-    pub const EnvMode = enum {
-        key_off, attack, decay, release
+    pub const EnvMode = enum(u8) {
+        key_off = 0, attack = 1, decay = 2, release = 3
     };
 
     pub const BRR = struct {

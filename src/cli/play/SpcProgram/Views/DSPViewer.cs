@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace SpcProgram;
 
 using Apollo;
@@ -226,6 +228,67 @@ public static partial class CliMain {
 		showColorCoding();
 	}
 	
+	static void showDSPViewer3(EmuDataBuffer buffer) {
+		var yBase = 0;
+		
+		var x = 0;
+		var y = yBase;
+		
+		var voiceOnStates = PrimaryEmu.MainVoiceOnStates;
+		
+		for (var v = 0; v < 8; v++) {
+			x = 28 * (v % 4);
+			y = yBase + 15 * (v / 4);
+			
+			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			
+			Display.WriteBox([
+				"buff. offset:",
+				"gauss offset:",
+				"brr address:",
+				"brr offset:",
+				"key on delay:",
+				"noise on:",
+				"pitch mod on:",
+				"env. mode:",
+				"env. level:",
+				"buffer:",
+			], x + 4, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			
+			var envName = buffer.DSP_DebugState!.Voice[v].EnvMode switch {
+				DSP.EnvelopeMode.Attack  => "att.",
+				DSP.EnvelopeMode.Decay   => "dec.",
+				DSP.EnvelopeMode.Release => "rel.",
+				DSP.EnvelopeMode.KeyOff  => "off",
+				_ => throw new UnreachableException()
+			};
+		
+			Display.WriteBox([
+				$"{ buffer.DSP_DebugState!.Voice[v]  .BufferOffset:X1}",
+				$"{ buffer.DSP_DebugState!.Voice[v].GaussianOffset:X4}",
+				$"{ buffer.DSP_DebugState!.Voice[v]    .BRRAddress:X4}",
+				$"{ buffer.DSP_DebugState!.Voice[v]     .BRROffset:X1}",
+				$"{ buffer.DSP_DebugState!.Voice[v]    .KeyOnDelay:X1}",
+				$"{ buffer.DSP_DebugState!.Voice[v]       .NoiseOn   }",
+				$"{ buffer.DSP_DebugState!.Voice[v]    .PitchModOn   }",
+				$"{ envName } ",
+				$"{(buffer.DSP_DebugState!.Voice[v].EnvLevel >> 4):X2}.{((buffer.DSP_DebugState!.Voice[v].EnvLevel & 7) << 1):X1}",
+			], x + 21, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			
+			Display.Y++;
+			
+			for (var by = 0; by < 3; by++) {
+				for (var bx = 0; bx < 4; bx++) {
+					var val = (UInt16) buffer.DSP_DebugState!.Voice[v].Buffer[4 * by + bx];
+					Display.Write($"{val:X4}", x + 6 + 5 * bx);
+				}
+				Display.Y++;
+			}
+		}
+		
+		showColorCoding();
+	}
+		
 	static void showDSPMem(EmuDataBuffer buffer) {
 		if (progressiveBuffer is null) {
 			progressiveBuffer = buffer.DSP_RegisterMem!.ToArray();
