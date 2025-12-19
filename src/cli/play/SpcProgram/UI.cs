@@ -48,13 +48,23 @@ public static partial class CliMain {
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
 	
+	static long frame     = 0;
+	static long prevFrame = 0;
+	
 	static void handleUI(EmuDataBuffer? buffer) {
 		var action = KeyBindings.GetAction();
 		
-		PrevStartAddr4 = PrevStartAddr3;
-		PrevStartAddr3 = PrevStartAddr2;
-		PrevStartAddr2 = PrevStartAddr1;
-		PrevStartAddr1 = StartAddr;
+		prevFrame = frame;
+		frame     = AudioOutput.Frame;
+		
+		var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
+		
+		for (var _ = 0; _ < framesSinceLastDisplay; _++) {
+			PrevStartAddr4 = PrevStartAddr3;
+			PrevStartAddr3 = PrevStartAddr2;
+			PrevStartAddr2 = PrevStartAddr1;
+			PrevStartAddr1 = StartAddr;
+		}
 		
 		if (action is not null) {
 			doAction(action!.Value);

@@ -20,6 +20,9 @@ public static class Display {
 	static int y = 0;
 	static Color? color = null;
 	
+	static long frame     = 0;
+	static long prevFrame = 0;
+	
 	public static int Width  { get; private set; }
 	public static int Height { get; private set; }
 	
@@ -182,6 +185,11 @@ public static class Display {
 	}
 	
 	public static string Flush() {
+		prevFrame = frame;
+		frame = AudioOutput.Frame;
+		
+		var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
+		
 		StringBuilder sb = new("\x1B[H");
 		
 		sb.Append("\x1B[0m");
@@ -198,15 +206,17 @@ public static class Display {
 		var offset3 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr4 / 0x10;
 		
 		// Update color grids
-		for (var y = 0; y < Height; y++) {
-			for (var x = 0; x < Width; x++) {
-				var cl = colorGrid[y][x];
+		for (var i = 0; i < framesSinceLastDisplay; i++) {
+			for (var y = 0; y < Height; y++) {
+				for (var x = 0; x < Width; x++) {
+					var cl = colorGrid[y][x];
 				
-				// Update color grids
-				prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
-				prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
-				prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
-				prevColorGrids[0][y][x] = cl;
+					// Update color grids
+					prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
+					prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
+					prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
+					prevColorGrids[0][y][x] = cl;
+				}
 			}
 		}
 		

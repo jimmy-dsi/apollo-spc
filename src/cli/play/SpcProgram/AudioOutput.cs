@@ -8,6 +8,28 @@ using SDL2;
 public static class AudioOutput {
 	static Emulator emu => CliMain.PrimaryEmu;
 	
+	static long   frame = 0;
+	static object frameLock = new();
+	
+	public static long Frame {
+		get {
+			lock (frameLock) {
+				return frame;
+			}
+		}
+		private set {
+			lock (frameLock) {
+				frame = value;
+			}
+		}
+	}
+	
+	static void advanceFrame() {
+		lock (frameLock) {
+			frame++;
+		}
+	}
+	
 	public static void Setup(Action<EmuDataBuffer?> uiCallback) {
 		if (SDL.SDL_Init(SDL.SDL_INIT_AUDIO) < 0) {
 			Console.WriteLine("Failed to init SDL: " + SDL.SDL_GetError());
@@ -70,5 +92,6 @@ public static class AudioOutput {
 		Marshal.Copy(buffer, 0, stream, samples * 2);
 		
 		Transfer.SendEmuData();
+		advanceFrame();
 	}
 }
