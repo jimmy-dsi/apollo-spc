@@ -190,23 +190,56 @@ public static class Display {
 		}
 		
 		Color? prevColor = null;
+				
+		// Update positions
+		var offset0 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr1 / 0x10;
+		var offset1 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr2 / 0x10;
+		var offset2 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr3 / 0x10;
+		var offset3 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr4 / 0x10;
+		
+		// Update color grids
+		for (var y = 0; y < Height; y++) {
+			for (var x = 0; x < Width; x++) {
+				var cl = colorGrid[y][x];
+				
+				// Update color grids
+				prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
+				prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
+				prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
+				prevColorGrids[0][y][x] = cl;
+			}
+		}
 		
 		for (var y = 0; y < Height; y++) {
 			for (var x = 0; x < Width; x++) {
 				var ch =  charGrid[y][x];
 				var cl = colorGrid[y][x];
 				
-				prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
-				prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
-				prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
-				prevColorGrids[0][y][x] = cl;
-				
 				if (cl is not null) {
-					cl = blendColors(cl, prevColorGrids[0][y][x], prevColorGrids[1][y][x], prevColorGrids[2][y][x], prevColorGrids[3][y][x]);
+					var (y0, y1, y2, y3) = (y + offset0, y + offset1, y + offset2, y + offset3);
+					
+					if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
+						cl = blendColors(
+							cl,
+							prevColorGrids[0][y0][x],
+							prevColorGrids[1][y1][x],
+							prevColorGrids[2][y2][x],
+							prevColorGrids[3][y3][x]
+						);
+					}
+					else {
+						cl = blendColors(
+							cl,
+							prevColorGrids[0][y][x],
+							prevColorGrids[1][y][x],
+							prevColorGrids[2][y][x],
+							prevColorGrids[3][y][x]
+						);
+					}
 				}
 				
 				if (cl != prevColor) {
-					if (prevColor != null) {
+					if (prevColor is not null) {
 						sb.Append("\x1B[0m");
 					}
 					if (cl is not null) {
@@ -379,11 +412,11 @@ public static class Display {
 	}
 	
 	static double[] blendFilter = [
-		-0.075,
-		 0.250,
-		 0.650,
-		 0.250,
-		-0.075,
+		0.10,
+		0.25,
+		0.30,
+		0.25,
+		0.10,
 	];
 	
 	const double Gamma = 2.2;
@@ -393,43 +426,45 @@ public static class Display {
 			return c1;
 		}
 		
+		Color lastColor = c1;
+		
 		var (red, green, blue) = (0.0, 0.0, 0.0);
 		
 		red   += Math.Pow(c1.Red   / 255.0, 1 / Gamma) * blendFilter[0];
 		green += Math.Pow(c1.Green / 255.0, 1 / Gamma) * blendFilter[0];
 		blue  += Math.Pow(c1.Blue  / 255.0, 1 / Gamma) * blendFilter[0];
 		
-		if (c2 is null || !c2.IsRGB || !c2.IsBG) {
-			return new(Math.Pow(red, 2.2), Math.Pow(green, 2.2), Math.Pow(blue, 2.2), bg: true);
+		if (c2 is not null && c2.IsRGB && c2.IsBG) {
+			lastColor = c2;
 		}
 		
-		red   += Math.Pow(c2.Red   / 255.0, 1 / Gamma) * blendFilter[1];
-		green += Math.Pow(c2.Green / 255.0, 1 / Gamma) * blendFilter[1];
-		blue  += Math.Pow(c2.Blue  / 255.0, 1 / Gamma) * blendFilter[1];
+		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[1];
+		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[1];
+		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[1];
 		
-		if (c3 is null || !c3.IsRGB || !c3.IsBG) {
-			return new(Math.Pow(red, 2.2), Math.Pow(green, 2.2), Math.Pow(blue, 2.2), bg: true);
+		if (c3 is not null && c3.IsRGB && c3.IsBG) {
+			lastColor = c3;
 		}
 		
-		red   += Math.Pow(c3.Red   / 255.0, 1 / Gamma) * blendFilter[2];
-		green += Math.Pow(c3.Green / 255.0, 1 / Gamma) * blendFilter[2];
-		blue  += Math.Pow(c3.Blue  / 255.0, 1 / Gamma) * blendFilter[2];
+		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[2];
+		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[2];
+		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[2];
 		
-		if (c4 is null || !c4.IsRGB || !c4.IsBG) {
-			return new(Math.Pow(red, 2.2), Math.Pow(green, 2.2), Math.Pow(blue, 2.2), bg: true);
+		if (c4 is not null && c4.IsRGB && c4.IsBG) {
+			lastColor = c4;
 		}
 		
-		red   += Math.Pow(c4.Red   / 255.0, 1 / Gamma) * blendFilter[3];
-		green += Math.Pow(c4.Green / 255.0, 1 / Gamma) * blendFilter[3];
-		blue  += Math.Pow(c4.Blue  / 255.0, 1 / Gamma) * blendFilter[3];
+		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[3];
+		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[3];
+		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[3];
 		
-		if (c5 is null || !c5.IsRGB || !c5.IsBG) {
-			return new(Math.Pow(red, 2.2), Math.Pow(green, 2.2), Math.Pow(blue, 2.2), bg: true);
+		if (c5 is not null && c5.IsRGB && c5.IsBG) {
+			lastColor = c5;
 		}
 		
-		red   += Math.Pow(c5.Red   / 255.0, 1 / Gamma) * blendFilter[4];
-		green += Math.Pow(c5.Green / 255.0, 1 / Gamma) * blendFilter[4];
-		blue  += Math.Pow(c5.Blue  / 255.0, 1 / Gamma) * blendFilter[4];
+		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[4];
+		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[4];
+		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[4];
 		
 		return new(Math.Pow(red, 2.2), Math.Pow(green, 2.2), Math.Pow(blue, 2.2), bg: true);
 	}

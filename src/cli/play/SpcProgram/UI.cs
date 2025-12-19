@@ -51,6 +51,11 @@ public static partial class CliMain {
 	static void handleUI(EmuDataBuffer? buffer) {
 		var action = KeyBindings.GetAction();
 		
+		PrevStartAddr4 = PrevStartAddr3;
+		PrevStartAddr3 = PrevStartAddr2;
+		PrevStartAddr2 = PrevStartAddr1;
+		PrevStartAddr1 = StartAddr;
+		
 		if (action is not null) {
 			doAction(action!.Value);
 		}
@@ -298,8 +303,8 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ScrollRowUp: {
 				if (currentView == View.MemoryViewer) {
-					if (startAddr >= 0x10) {
-						startAddr -= 0x10;
+					if (StartAddr >= 0x10) {
+						StartAddr -= 0x10;
 						requestEmuData(requests);
 					}
 				}
@@ -308,8 +313,8 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ScrollRowDown: {
 				if (currentView == View.MemoryViewer) {
-					if (startAddr <= 0x1_0000 - ScrollAreaRows * 0x10 - 0x10) {
-						startAddr += 0x10;
+					if (StartAddr <= 0x1_0000 - ScrollAreaRows * 0x10 - 0x10) {
+						StartAddr += 0x10;
 						requestEmuData(requests);
 					}
 				}
@@ -318,12 +323,12 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ScrollPageUp: {
 				if (currentView == View.MemoryViewer) {
-					if (startAddr >= 0x100) {
-						startAddr -= 0x100;
+					if (StartAddr >= 0x100) {
+						StartAddr -= 0x100;
 						requestEmuData(requests);
 					}
-					else if (startAddr > 0) {
-						startAddr = 0;
+					else if (StartAddr > 0) {
+						StartAddr = 0;
 						requestEmuData(requests);
 					}
 				}
@@ -332,11 +337,11 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ScrollPageDown: {
 				if (currentView == View.MemoryViewer) {
-					if (startAddr <= 0xFF00 - ScrollAreaRows * 0x10) {
-						startAddr += 0x100;
+					if (StartAddr <= 0xFF00 - ScrollAreaRows * 0x10) {
+						StartAddr += 0x100;
 					}
-					else if (startAddr < 0x1_0000 - ScrollAreaRows * 0x10) {
-						startAddr = 0x1_0000 - ScrollAreaRows * 0x10;
+					else if (StartAddr < 0x1_0000 - ScrollAreaRows * 0x10) {
+						StartAddr = 0x1_0000 - ScrollAreaRows * 0x10;
 					}
 					requestEmuData(requests);
 				}
@@ -345,8 +350,8 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ScrollStart: {
 				if (currentView == View.MemoryViewer) {
-					if (startAddr > 0) {
-						startAddr = 0;
+					if (StartAddr > 0) {
+						StartAddr = 0;
 						requestEmuData(requests);
 					}
 				}
@@ -355,8 +360,8 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ScrollEnd: {
 				if (currentView == View.MemoryViewer) {
-					if (startAddr < 0x1_0000 - ScrollAreaRows * 0x10) {
-						startAddr = 0x1_0000 - ScrollAreaRows * 0x10;
+					if (StartAddr < 0x1_0000 - ScrollAreaRows * 0x10) {
+						StartAddr = 0x1_0000 - ScrollAreaRows * 0x10;
 						requestEmuData(requests);
 					}
 				}
@@ -762,6 +767,6 @@ public static partial class CliMain {
 	
 	static void requestEmuData(Transfer.Requests reqs) {
 		requests = reqs;
-		Transfer.RequestEmuData(reqs, startAddr, ScrollAreaRows * 0x10);
+		Transfer.RequestEmuData(reqs, StartAddr, ScrollAreaRows * 0x10);
 	}
 }
