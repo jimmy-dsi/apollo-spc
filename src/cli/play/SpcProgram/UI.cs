@@ -508,7 +508,6 @@ public static partial class CliMain {
 	                           int startRow,
 	                           int endRow,
 	                           byte[] data,
-	                           byte[]? dataForHeatmap = null,
 	                           Color?[]? colorData = null,
 	                           bool useHeatMap = false)
 	{
@@ -545,7 +544,7 @@ public static partial class CliMain {
 			if (useHeatMap) {
 				for (var c = 0; c < 16; c++) {
 					var idx = (i - startRow) * 16 + c;
-					var val = (dataForHeatmap ?? data)[idx];
+					var val = data[idx];
 					var col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
 					Display.Write("  ", col: col);
 				}

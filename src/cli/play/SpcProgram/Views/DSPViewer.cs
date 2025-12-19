@@ -6,8 +6,6 @@ using Apollo;
 using Jimbl;
 
 public static partial class CliMain {
-	static byte[]? progressiveBuffer = null;
-	
 	static void showDSPViewer1(EmuDataBuffer buffer) {
 		showDSPMem(buffer);
 		var yBase = Display.Y + 1;
@@ -252,7 +250,7 @@ public static partial class CliMain {
 				"pitch mod on:",
 				"env. mode:",
 				"env. level:",
-				"buffer:",
+				"decode buffer:",
 			], x + 4, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
 			
 			var envName = buffer.DSP_DebugState!.Voice[v].EnvMode switch {
@@ -269,18 +267,44 @@ public static partial class CliMain {
 				$"{ buffer.DSP_DebugState!.Voice[v]    .BRRAddress:X4}",
 				$"{ buffer.DSP_DebugState!.Voice[v]     .BRROffset:X1}",
 				$"{ buffer.DSP_DebugState!.Voice[v]    .KeyOnDelay:X1}",
-				$"{ buffer.DSP_DebugState!.Voice[v]       .NoiseOn   }",
-				$"{ buffer.DSP_DebugState!.Voice[v]    .PitchModOn   }",
+				$"{ buffer.DSP_DebugState!.Voice[v]       .NoiseOn   } ",
+				$"{ buffer.DSP_DebugState!.Voice[v]    .PitchModOn   } ",
 				$"{ envName } ",
-				$"{(buffer.DSP_DebugState!.Voice[v].EnvLevel >> 4):X2}.{((buffer.DSP_DebugState!.Voice[v].EnvLevel & 7) << 1):X1}",
+				$"{(buffer.DSP_DebugState!.Voice[v].EnvLevel >> 4):X2}.{(buffer.DSP_DebugState!.Voice[v].EnvLevel & 0xF):X1}",
 			], x + 21, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
 			
-			Display.Y++;
+			var nextY   = Display.Y;
+			var colMult = voiceOnStates[v] ? 1.0 : 0.125;
+		
+			if (heatMapEnabled) {
+				var xx = x + 18;
+				
+				var envModeU = (byte) buffer.DSP_DebugState!.Voice[v].EnvMode;
+				var envModeS = envModeU switch {
+					0 => 0,
+					1 => 0x40,
+					2 => 0x80,
+					3 => 0xC0,
+					_ => throw new UnreachableException()
+				};
+				
+				Display.Write("  ", xx, y    , col: heatMapColor(BusSize.Bit8,  signed: false, scale: 256.0 / 12 * colMult, buffer.DSP_DebugState!.Voice[v].BufferOffset));
+				Display.Write("  ", xx, y + 1, col: heatMapColor(BusSize.Bit16, signed: false, scale:          2 * colMult, buffer.DSP_DebugState!.Voice[v].GaussianOffset));
+				Display.Write("  ", xx, y + 2, col: heatMapColor(BusSize.Bit16, signed: false, scale:          1 * colMult, buffer.DSP_DebugState!.Voice[v].BRRAddress));
+				Display.Write("  ", xx, y + 3, col: heatMapColor(BusSize.Bit8,  signed: false, scale:         32 * colMult, buffer.DSP_DebugState!.Voice[v].BRROffset));
+				Display.Write("  ", xx, y + 4, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 256.0 /  5 * colMult, buffer.DSP_DebugState!.Voice[v].KeyOnDelay));
+				Display.Write("  ", xx, y + 5, col: heatMapColor(BusSize.Bit8,  signed: false, scale:        255 * colMult, buffer.DSP_DebugState!.Voice[v].NoiseOn ? 1 : 0));
+				Display.Write("  ", xx, y + 6, col: heatMapColor(BusSize.Bit8,  signed: false, scale:        255 * colMult, buffer.DSP_DebugState!.Voice[v].PitchModOn ? 1 : 0));
+				Display.Write("  ", xx, y + 7, col: heatMapColor(BusSize.Bit8,  signed:  true, scale:          1 * colMult, envModeS));
+				Display.Write("  ", xx, y + 8, col: heatMapColor(BusSize.Bit16, signed: false, scale:         32 * colMult, buffer.DSP_DebugState!.Voice[v].EnvLevel));
+			}
+			
+			Display.Y = nextY + 1;
 			
 			for (var by = 0; by < 3; by++) {
 				for (var bx = 0; bx < 4; bx++) {
 					var val = (UInt16) buffer.DSP_DebugState!.Voice[v].Buffer[4 * by + bx];
-					Display.Write($"{val:X4}", x + 6 + 5 * bx);
+					Display.Write($"{val:X4} ", x + 6 + 5 * bx, col: heatMapEnabled ? heatMapColor(BusSize.Bit16, signed: true, scale: colMult, val) : voiceOnStates[v] ? null : Color.DarkGrey);
 				}
 				Display.Y++;
 			}
@@ -290,13 +314,6 @@ public static partial class CliMain {
 	}
 		
 	static void showDSPMem(EmuDataBuffer buffer) {
-		if (progressiveBuffer is null) {
-			progressiveBuffer = buffer.DSP_RegisterMem!.ToArray();
-		}
-		else {
-			softFadeHeatmap(buffer.DSP_RegisterMem!, progressiveBuffer);
-		}
-		
 		var coloring = new Color?[0x80];
 		var color    = Color.DarkGrey;
 		
@@ -316,7 +333,7 @@ public static partial class CliMain {
 			}
 		}
 		
-		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, progressiveBuffer, coloring, useHeatMap: heatMapEnabled);
+		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, coloring, useHeatMap: heatMapEnabled);
 	}
 	
 	static byte vFlagsToByte(bool[] flags) {

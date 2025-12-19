@@ -114,6 +114,10 @@ public class Color {
 		}
 	}
 	
+	public bool IsRGB => value >> 24 <= 1;
+	
+	public bool IsBG => value >> 24 == 1;
+	
 	public static Color Black      = new(ansiCode: 30);
 	public static Color CRed       = new(ansiCode: 31);
 	public static Color CGreen     = new(ansiCode: 32);
@@ -137,6 +141,14 @@ public class Color {
 	public Color(byte ansiCode) {
 		value = (uint) ansiCode << 24;
 	}
+	
+	public Color(double red, double green, double blue, bool bg = false):
+		this(
+			(byte) Math.Clamp(red   * 255, 0, 255),
+			(byte) Math.Clamp(green * 255, 0, 255),
+			(byte) Math.Clamp(blue  * 255, 0, 255),
+			bg: bg
+		) { }
 	
 	public Color(byte red, byte green, byte blue): this(red, green, blue, bg: false) { }
 	
