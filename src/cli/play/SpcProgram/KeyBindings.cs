@@ -156,19 +156,28 @@ public static class KeyBindings {
 		ScrollEnd,
 		ToggleHeatMap,
 		ToggleCycleUnit,
+		SeekFwd,
+		SeekBack
 	}
 		
-	static Key?      lastCtrlKey  = null;
-	static Stopwatch lastCtrlTime = new();
+	static Key?      lastCtrlKey    = null;
+	static Key?      lastSingleKey  = null;
+	
+	static Stopwatch lastCtrlTime   = new();
+	static Stopwatch lastSingleTime = new();
 	
 	// Key bindings must be checked in the order they are listed here:
-	public static Dictionary<Key,        Action> CtrlBindings      = new();
-	public static Dictionary<(Key, Key), Action> Ctrl2KeyBindings  = new();
-	public static Dictionary<Key,        Action> SingleKeyBindings = new();
+	public static Dictionary<Key,        Action> CtrlBindings      = new(); // CTRL+<key>
+	public static Dictionary<(Key, Key), Action> Ctrl2KeyBindings  = new(); // CTRL+<key>+<key>
+	public static Dictionary<Key,        Action> SingleKeyBindings = new(); // <key>
+	public static Dictionary<(Key, Key), Action> DoubleKeyBindings = new(); // <key>+<key>
 	
 	public static void ResetKeyBindingState() {
-		lastCtrlKey = null;
-		lastCtrlTime.Reset();
+		lastCtrlKey   = null;
+		lastSingleKey = null;
+		
+		lastCtrlTime  .Reset();
+		lastSingleTime.Reset();
 	}
 	
 	public static void Register(Key key, Action action, bool ctrl = false) {
@@ -180,8 +189,13 @@ public static class KeyBindings {
 		}
 	}
 	
-	public static void Register(Key firstKey, Key secondKey, Action action) {
-		Ctrl2KeyBindings.Add((firstKey, secondKey), action);
+	public static void Register(Key firstKey, Key secondKey, Action action, bool ctrl = true) {
+		if (ctrl) {
+			Ctrl2KeyBindings.Add((firstKey, secondKey), action);
+		}
+		else {
+			DoubleKeyBindings.Add((firstKey, secondKey), action);
+		}
 	}
 	
 	public static Action? GetAction() {
@@ -216,6 +230,21 @@ public static class KeyBindings {
 			foreach (var (k, v) in SingleKeyBindings) {
 				if (k.IsPressed(ki)) {
 					return v;
+				}
+			}
+			
+			// TODO: Figure out why this doesn't work
+			foreach (var ((k1, k2), v) in DoubleKeyBindings) {
+				if (lastSingleTime.ElapsedMilliseconds > 1000) {
+					lastSingleTime.Reset();
+				}
+				else if (lastSingleKey == k1 && k2.IsPressed(ki)) {
+					ResetKeyBindingState();
+					return v;
+				}
+				else if (k1.IsPressed(ki)) {
+					lastSingleKey = k1;
+					lastSingleTime.Restart();
 				}
 			}
 		}

@@ -4,10 +4,16 @@ using Apollo;
 using Jimbl;
 
 public static partial class CliMain {
-	public static Emulator PrimaryEmu { get; private set; }
+	public static Emulator PrimaryEmu  { get; private set; }
+	public static Emulator RunAheadEmu { get; private set; }
 	public static bool     TerminateRequest { get; set; } = false;
 	
+	public static object EmuRestoreLock = new();
+	
 	static string spcFilePath;
+	
+	static Dictionary<int, Emulator> seekBarSnapshots = new();
+	static object seekBarLock = new();
 	
 	public static int Start(string[] args) {
 		try {
@@ -31,6 +37,9 @@ public static partial class CliMain {
 			PrimaryEmu.LoadSpcFile(spcFilePath);
 			PrimaryEmu.SMP.LoggingEnabled = true;
 			
+			RunAheadEmu = PrimaryEmu.SaveState();
+			seekBarSnapshot(0);
+			
 			// Register Key Bindings
 			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
 			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
@@ -53,14 +62,18 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('^'),  KeyBindings.Action.ToggleMainChannel_6);
 			KeyBindings.Register(KeyBindings.Key.Char('&'),  KeyBindings.Action.ToggleMainChannel_7);
 			KeyBindings.Register(KeyBindings.Key.Char('*'),  KeyBindings.Action.ToggleMainChannel_8);
+			KeyBindings.Register(KeyBindings.Key.F1,         KeyBindings.Action.ToggleEchoChannel_1, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F2,         KeyBindings.Action.ToggleEchoChannel_2, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F3,         KeyBindings.Action.ToggleEchoChannel_3, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F4,         KeyBindings.Action.ToggleEchoChannel_4, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F5,         KeyBindings.Action.ToggleEchoChannel_5, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F6,         KeyBindings.Action.ToggleEchoChannel_6, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F7,         KeyBindings.Action.ToggleEchoChannel_7, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F8,         KeyBindings.Action.ToggleEchoChannel_8, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.F1,         KeyBindings.Action.ToggleEchoChannel_1);
 			KeyBindings.Register(KeyBindings.Key.F2,         KeyBindings.Action.ToggleEchoChannel_2);
 			KeyBindings.Register(KeyBindings.Key.F3,         KeyBindings.Action.ToggleEchoChannel_3);
 			KeyBindings.Register(KeyBindings.Key.F4,         KeyBindings.Action.ToggleEchoChannel_4);
-			KeyBindings.Register(KeyBindings.Key.F5,         KeyBindings.Action.ToggleEchoChannel_5);
-			KeyBindings.Register(KeyBindings.Key.F6,         KeyBindings.Action.ToggleEchoChannel_6);
-			KeyBindings.Register(KeyBindings.Key.F7,         KeyBindings.Action.ToggleEchoChannel_7);
-			KeyBindings.Register(KeyBindings.Key.F8,         KeyBindings.Action.ToggleEchoChannel_8);
 			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.ScrollRowUp);
 			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.ScrollRowDown);
 			KeyBindings.Register(KeyBindings.Key.PageUp,     KeyBindings.Action.ScrollPageUp);
@@ -69,9 +82,14 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.End,        KeyBindings.Action.ScrollEnd);
 			KeyBindings.Register(KeyBindings.Key.Char('E'),  KeyBindings.Key.Char('T'),          KeyBindings.Action.ToggleHeatMap);
 			KeyBindings.Register(KeyBindings.Key.Char('D'),  KeyBindings.Action.ToggleCycleUnit, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.ArrowRight, KeyBindings.Action.SeekFwd,  ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.SeekBack, ctrl: true);
 			
 			Console.Clear();
 			Console.CursorVisible = false;
+			
+			Thread runAhead = new(RunAheadLoop);
+			runAhead.Start();
 			
 			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
@@ -87,6 +105,7 @@ public static partial class CliMain {
 			return 1;
 		}
 		finally {
+			// TODO: Thread join with run ahead thread if active
 			Lib.Deinit();
 			Console.CursorVisible = true;
 		}
@@ -119,7 +138,7 @@ public static partial class CliMain {
 				
 			Transfer.Signal = false;
 			
-			if (buffer is null || buffer.DSPCycle < lastCycle) {
+			if (buffer is null /*|| buffer.DSPCycle < lastCycle*/) {
 				continue;
 			}
 			
@@ -127,6 +146,52 @@ public static partial class CliMain {
 			
 			// Do UI display
 			uiCallback(buffer);
+		}
+	}
+
+	public static long RunAheadCycle {
+		get {
+			lock (runAheadLock) {
+				return runAheadCycle;
+			}
+		}
+		private set {
+			lock (runAheadLock) {
+				runAheadCycle = value;
+			}
+		}
+	}
+
+	static long   runAheadCycle = 0;
+	static object runAheadLock = new();
+	
+	const int SnapsPerSecond = 1;
+	
+	public static void RunAheadLoop() {
+		while (true) {
+			RunAheadEmu.StepNCyclesFast(2048000 / 60);
+			
+			var cycle = RunAheadEmu.DSP.CurrentCycle;
+			RunAheadCycle = cycle;
+			
+			// TODO: Check if main thread has terminated
+			if (RunAheadEmu.DSP.CurrentCycle <= (long) 2048000 * 60 * 12) { // Hard cutoff of run-ahead snapshots after 12 minutes
+				seekBarSnapshot(cycle);
+			}
+		}
+	}
+	
+	static int getSnapshotIndex(long cycle) {
+		return (int) (cycle / (2048000 / SnapsPerSecond));
+	}
+	
+	static void seekBarSnapshot(long cycle) {
+		var snapshotIndex = getSnapshotIndex(cycle);
+		
+		lock (seekBarLock) {
+			if (!seekBarSnapshots.ContainsKey(snapshotIndex)) {
+				seekBarSnapshots[snapshotIndex] = RunAheadEmu.SaveState();
+			}
 		}
 	}
 	

@@ -69,7 +69,7 @@ public static class Transfer {
 					}
 					else {
 						// Select the most recently computed buffer
-						if (buffers[0].Buffer!.DSPCycle >= buffers[1].Buffer!.DSPCycle) {
+						if (buffers[0].Buffer!.Step >= buffers[1].Buffer!.Step) {
 							uiUsingBufferA = true;
 							return buffers[0];
 						}
@@ -110,7 +110,7 @@ public static class Transfer {
 					}
 					else {
 						// Select the least recently computed buffer for overwriting
-						if (buffers[0].Buffer!.DSPCycle <= buffers[1].Buffer!.DSPCycle) {
+						if (buffers[0].Buffer!.Step <= buffers[1].Buffer!.Step) {
 							emuUsingBufferA = true;
 							return buffers[0];
 						}

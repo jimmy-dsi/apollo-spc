@@ -134,6 +134,11 @@ pub export fn emu_disable_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
     return true;
 }
 
+pub export fn emu_copy(dest_emu_ptr: ?[*]Emu, src_emu_ptr: ?[*]Emu) bool {
+    emu.copy(@ptrCast(dest_emu_ptr), @ptrCast(src_emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(dest_emu_ptr)); };
+    return true;
+}
+
 pub export fn emu_acquire_lock(emu_ptr: ?[*]Emu) bool {
     emu.acquire_lock(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
     return true;

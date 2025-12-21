@@ -67,31 +67,33 @@ public static class AudioOutput {
 	
 	// This will be called by SDL when it needs more audio data
 	static void Callback(IntPtr userdata, IntPtr stream, int len) {
-		var samples = len / sizeof(Int16) / 2;
-	
-		var approxCycles = (samples - 1) * 64 - cycleSpillOver;
-		var cycles       = emu.StepNCyclesFast(approxCycles);
-	
-		if (cycles < approxCycles) {
-			//Console.WriteLine($"{cycles} cycles ran out of {approxCycles}");
-			throw new Exception();
-		}
-	
-		while (emu.SamplesQueued < samples) {
-			emu.StepCycleFast(); // TODO: Check for errors
-		}
+		lock (CliMain.EmuRestoreLock) {
+			var samples = len / sizeof(Int16) / 2;
 		
-		// Run a random extra number of cycles, between 0 and 63
-		// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
-		cycleSpillOver = rng.Next(0, 64);
-		emu.StepNCyclesFast(cycleSpillOver); // TODO: Check for errors
-	
-		var buffer = emu.GetBufferedSamples();
+			var approxCycles = (samples - 1) * 64 - cycleSpillOver;
+			var cycles       = emu.StepNCyclesFast(approxCycles);
+		
+			if (cycles < approxCycles) {
+				//Console.WriteLine($"{cycles} cycles ran out of {approxCycles}");
+				throw new Exception();
+			}
+		
+			while (emu.SamplesQueued < samples) {
+				emu.StepCycleFast(); // TODO: Check for errors
+			}
+			
+			// Run a random extra number of cycles, between 0 and 63
+			// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
+			cycleSpillOver = rng.Next(0, 64);
+			emu.StepNCyclesFast(cycleSpillOver); // TODO: Check for errors
+		
+			var buffer = emu.GetBufferedSamples();
 
-		// Copy managed array into unmanaged buffer
-		Marshal.Copy(buffer, 0, stream, samples * 2);
-		
-		Transfer.SendEmuData();
-		advanceFrame();
+			// Copy managed array into unmanaged buffer
+			Marshal.Copy(buffer, 0, stream, samples * 2);
+			
+			Transfer.SendEmuData();
+			advanceFrame();
+		}
 	}
 }

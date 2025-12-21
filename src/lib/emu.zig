@@ -212,6 +212,15 @@ pub inline fn disable_echo_voice(emu_ptr: ?*Emu, index: u3) !void {
     return ep.?.disable_echo_voice(index);
 }
 
+pub inline fn copy(dest_emu_ptr: ?*Emu, src_emu_ptr: ?*const Emu) !void {
+    var ep = get_ptr(dest_emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    try main.validate_ptr(Emu, src_emu_ptr);
+
+    try ep.?.load_from(src_emu_ptr.?, .{});
+}
+
 pub inline fn acquire_lock(emu_ptr: ?*Emu) !void {
     var ep = get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);

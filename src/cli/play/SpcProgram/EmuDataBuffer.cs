@@ -125,6 +125,7 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
+	public long Step     { get; private set; }
 	public long DSPCycle { get; private set; }
 	
 	public byte[]?      ARAM_Data       { get; private set; }
@@ -134,8 +135,12 @@ public class EmuDataBuffer: ICloneable {
 	public DSP2State?   DSP_State       { get; private set; }
 	public DSP3State?   DSP_DebugState  { get; private set; }
 	
+	static long nextStep = 0;
+	
 	public EmuDataBuffer(long dspCycle) {
 		DSPCycle = dspCycle;
+		Step = nextStep;
+		nextStep++;
 	}
 	
 	public void RequestPopulate(Emulator emu, Transfer.Requests requests, UInt16 startAddr = 0, UInt16 length = 0x100) {

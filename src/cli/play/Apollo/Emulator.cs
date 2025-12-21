@@ -576,6 +576,42 @@ public class Emulator {
 		}
 	}
 	
+	public Emulator SaveState(bool makeShared = false) {
+		MaybeAcquireLock();
+		
+		try {
+			Emulator emuCopy = new(makeShared: makeShared);
+			
+			var result = DLL.EmuCopy(emuCopy.handle, handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+			
+			return emuCopy;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public void LoadStateFrom(Emulator other) {
+		MaybeAcquireLock();
+		other.MaybeAcquireLock();
+		
+		try {
+			var result = DLL.EmuCopy(handle, other.handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(handle);
+				Error.Throw(errorCode);
+			}
+		}
+		finally {
+			other.MaybeReleaseLock();
+			MaybeReleaseLock();
+		}
+	}
+	
 	internal void AcquireLock() {
 		var result = DLL.EmuAcquireLock(handle);
 		if (!result) {

@@ -80,6 +80,10 @@ internal partial class DLL {
 	[return: MarshalAs(UnmanagedType.I1)]
 	public static partial bool EmuDisableEchoVoice(Emulator.Handle emuPtr, byte voiceIndex);
 	
+	[LibraryImport("apollo", EntryPoint = "emu_copy")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool EmuCopy(Emulator.Handle destEmuPtr, Emulator.Handle srcEmuPtr);
+	
 	[LibraryImport("apollo", EntryPoint = "emu_acquire_lock")]
 	[return: MarshalAs(UnmanagedType.I1)]
 	public static partial bool EmuAcquireLock(Emulator.Handle emuPtr);

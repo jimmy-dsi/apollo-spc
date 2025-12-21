@@ -29,6 +29,8 @@ public static partial class CliMain {
 		
 		AllChannelsEnabled,  AllMainChannelsEnabled,  AllEchoChannelsEnabled,
 		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
+		
+		SeekFwd, SeekBack,
 	}
 	
 	static View       realView       = View.Metadata;
@@ -47,6 +49,8 @@ public static partial class CliMain {
 	static bool cyclesInSpcClocks = false;
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
+	
+	static long curCycle = 0;
 	
 	static long frame     = 0;
 	static long prevFrame = 0;
@@ -114,14 +118,22 @@ public static partial class CliMain {
 		
 		// Display Seek Bar
 		if (buffer is not null) {
+			curCycle = buffer.DSPCycle;
+			
 			Display.ClearLine(Display.Height - 3);
 			Display.Write(formatTime((int) (buffer.DSPCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
 			
-			var fullTimeInCycles = (long) (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 600) * 2048000;
-			var barLength = Display.Width - 1 - 14;
+			var fullTimeInCycles = (long) (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12)  * 2048000;
+			var barLength        = Display.Width - 1 - 14;
 			
-			var cursorPos = (int) ((double) buffer.DSPCycle / fullTimeInCycles * barLength);
-			Display.Write(new string('=', cursorPos) + '|', 14, Display.Height - 3, Color.Cyan);
+			var cursorPos  = (int) ((double) buffer.DSPCycle / fullTimeInCycles * barLength);
+			var cursorPos2 = (int) ((double)   RunAheadCycle / fullTimeInCycles * barLength);
+			
+			cursorPos  = Math  .Min(cursorPos,                          Display.Width - 1);
+			cursorPos2 = Math.Clamp(cursorPos2, Math.Max(1, cursorPos), Display.Width);
+			
+			Display.Write(new string('=', cursorPos) + '|',                         14,                 Display.Height - 3, Color    .Cyan);
+			Display.Write(new string('=', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, Color.DarkGrey);
 		}
 		
 		Display.Write("[", 13,                Display.Height - 3, Color.Cyan);
@@ -397,6 +409,18 @@ public static partial class CliMain {
 				cyclesInSpcClocks = !cyclesInSpcClocks;
 				break;
 			}
+			
+			case KeyBindings.Action.SeekFwd: {
+				seek(+5);
+				setTempStatusMsg(StatusMSG.SeekFwd);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekBack: {
+				seek(-5);
+				setTempStatusMsg(StatusMSG.SeekBack);
+				break;
+			}
 		}
 	}
 	
@@ -419,6 +443,36 @@ public static partial class CliMain {
 		channelToToggle = channelIndex + 1;
 		
 		setTempStatusMsg(newOnState ? StatusMSG.EchoChannelX_Enabled : StatusMSG.EchoChannelX_Disabled);
+	}
+	
+	static void seek(int offsetInSeconds) {
+		var targetCycle = Math.Max(0, curCycle + offsetInSeconds * 2048000);
+		var targetSnapshotIndex = getSnapshotIndex(targetCycle);
+		
+		if (offsetInSeconds >= 0 && targetCycle > 2048000L * (60 * 12 + 4)) {
+			return;
+		}
+		
+		Emulator? snapshot = null;
+		
+		lock (seekBarLock) {
+			while (!seekBarSnapshots.ContainsKey(targetSnapshotIndex)) {
+				targetSnapshotIndex--;
+				if (targetSnapshotIndex == 0) {
+					break;
+				}
+			}
+			
+			seekBarSnapshots.TryGetValue(targetSnapshotIndex, out snapshot);
+		}
+		
+		if (snapshot is null) {
+			throw new UnreachableException($"No viable seekbar snapshot found (this should never happen)");
+		}
+		
+		lock (EmuRestoreLock) {
+			PrimaryEmu.LoadStateFrom(snapshot);
+		}
 	}
 	
 	static void changeCurrentView(View newView, bool setAsRealView = true) {
@@ -486,6 +540,8 @@ public static partial class CliMain {
 			StatusMSG.EchoChannelX_Disabled => $"Echo channel {channelToToggle} disabled {showActiveChannels()}",
 			StatusMSG.EchoChannelX_Enabled  => $"Echo channel {channelToToggle} enabled  {showActiveChannels()}",
 			StatusMSG.AllChannelsEnabled    => $"All channels enabled    {showActiveChannels()}",
+			StatusMSG.SeekFwd               => $"Seek +5 seconds",
+			StatusMSG.SeekBack              => $"Seek -5 seconds",
 			_ => throw new NotImplementedException()
 		};
 	}

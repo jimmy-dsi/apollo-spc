@@ -2,6 +2,7 @@ const std = @import("std");
 
 const Emu          = @import("core/emu.zig").Emu;
 const SPCLoadError = @import("core/spc_loader.zig").SPCLoadError;
+const Script700    = @import("core/script700.zig").Script700;
 
 const emu = @import("emu.zig");
 
@@ -112,7 +113,7 @@ pub inline fn validate() !void {
     }
 }
 
-pub inline fn validate_ptr(comptime T: type, ptr: ?*T) !void {
+pub inline fn validate_ptr(comptime T: type, ptr: ?*const T) !void {
     try validate();
 
     if (ptr == null) {
@@ -149,6 +150,9 @@ pub inline fn err(e: anyerror) anyerror {
             Emu.Error.Timeout => .script700_timeout,
 
             Emu.Error.NoSingletonAttached => .emu_is_not_main,
+
+            Script700.Runtime.fetch_range   => .script700_load_error,
+            Script700.Runtime.out_of_memory => .script700_load_error,
 
             else => .unknown_error
         };
