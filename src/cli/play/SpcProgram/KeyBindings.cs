@@ -100,7 +100,7 @@ public static class KeyBindings {
 		}
 		
 		public Key(char printable) {
-			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')') && !printable.IsAsciiLetterOrDigit()) {
+			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '<' or '>') && !printable.IsAsciiLetterOrDigit()) {
 				throw new ArgumentException();
 			}
 			
@@ -157,7 +157,19 @@ public static class KeyBindings {
 		ToggleHeatMap,
 		ToggleCycleUnit,
 		SeekFwd,
-		SeekBack
+		SeekBack,
+		SeekFwdFar,
+		SeekBackFar,
+		SeekPos_0,
+		SeekPos_1,
+		SeekPos_2,
+		SeekPos_3,
+		SeekPos_4,
+		SeekPos_5,
+		SeekPos_6,
+		SeekPos_7,
+		SeekPos_8,
+		SeekPos_9,
 	}
 		
 	static Key?      lastCtrlKey    = null;
@@ -205,13 +217,6 @@ public static class KeyBindings {
 		var ki = keyInfo.Value;
 		
 		if (ki.HasCtrl()) {
-			foreach (var (k, v) in CtrlBindings) {
-				if (k.IsPressed(ki)) {
-					ResetKeyBindingState();
-					return v;
-				}
-			}
-			
 			foreach (var ((k1, k2), v) in Ctrl2KeyBindings) {
 				if (lastCtrlTime.ElapsedMilliseconds > 1000) {
 					lastCtrlTime.Reset();
@@ -225,15 +230,15 @@ public static class KeyBindings {
 					lastCtrlTime.Restart();
 				}
 			}
-		}
-		else {
-			foreach (var (k, v) in SingleKeyBindings) {
+			
+			foreach (var (k, v) in CtrlBindings) {
 				if (k.IsPressed(ki)) {
+					ResetKeyBindingState();
 					return v;
 				}
 			}
-			
-			// TODO: Figure out why this doesn't work
+		}
+		else {
 			foreach (var ((k1, k2), v) in DoubleKeyBindings) {
 				if (lastSingleTime.ElapsedMilliseconds > 1000) {
 					lastSingleTime.Reset();
@@ -245,6 +250,12 @@ public static class KeyBindings {
 				else if (k1.IsPressed(ki)) {
 					lastSingleKey = k1;
 					lastSingleTime.Restart();
+				}
+			}
+			
+			foreach (var (k, v) in SingleKeyBindings) {
+				if (k.IsPressed(ki)) {
+					return v;
 				}
 			}
 		}

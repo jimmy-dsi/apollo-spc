@@ -30,7 +30,7 @@ public static partial class CliMain {
 		AllChannelsEnabled,  AllMainChannelsEnabled,  AllEchoChannelsEnabled,
 		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
 		
-		SeekFwd, SeekBack,
+		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos
 	}
 	
 	static View       realView       = View.Metadata;
@@ -41,6 +41,7 @@ public static partial class CliMain {
 	static Stopwatch? tempMsgTime    = null;
 	
 	static int channelToToggle = 0;
+	static int seekPosition    = 1;
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer];
@@ -421,6 +422,78 @@ public static partial class CliMain {
 				setTempStatusMsg(StatusMSG.SeekBack);
 				break;
 			}
+			
+			case KeyBindings.Action.SeekFwdFar: {
+				seek(+30);
+				setTempStatusMsg(StatusMSG.SeekFwdFar);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekBackFar: {
+				seek(-30);
+				setTempStatusMsg(StatusMSG.SeekBackFar);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_0: {
+				seekPos(0);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_1: {
+				seekPos(1);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_2: {
+				seekPos(2);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_3: {
+				seekPos(3);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_4: {
+				seekPos(4);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_5: {
+				seekPos(5);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_6: {
+				seekPos(6);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_7: {
+				seekPos(7);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_8: {
+				seekPos(8);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
+			
+			case KeyBindings.Action.SeekPos_9: {
+				seekPos(9);
+				setTempStatusMsg(StatusMSG.SeekPos);
+				break;
+			}
 		}
 	}
 	
@@ -449,10 +522,29 @@ public static partial class CliMain {
 		var targetCycle = Math.Max(0, curCycle + offsetInSeconds * 2048000);
 		var targetSnapshotIndex = getSnapshotIndex(targetCycle);
 		
-		if (offsetInSeconds >= 0 && targetCycle > 2048000L * (60 * 12 + 4)) {
+		if (offsetInSeconds >= 0 && targetCycle > 2048000L * (60 * 12 + offsetInSeconds - 1)) {
 			return;
 		}
 		
+		loadSnapshot(targetSnapshotIndex);
+	}
+	
+	static void seekPos(int position) {
+		position = Math.Clamp(position, 0, 9);
+		seekPosition = position;
+		seekAbsolute(position / 10.0);
+	}
+	
+	static void seekAbsolute(double songtimeRatio) {
+		songtimeRatio = Math.Clamp(songtimeRatio, 0, 1);
+		
+		var targetCycle         = Math.Max(0, (long) (songtimeRatio * 2048000 * (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12)));
+		var targetSnapshotIndex = getSnapshotIndex(targetCycle);
+		
+		loadSnapshot(targetSnapshotIndex);
+	}
+	
+	static void loadSnapshot(int targetSnapshotIndex) {
 		Emulator? snapshot = null;
 		
 		lock (seekBarLock) {
@@ -542,6 +634,9 @@ public static partial class CliMain {
 			StatusMSG.AllChannelsEnabled    => $"All channels enabled    {showActiveChannels()}",
 			StatusMSG.SeekFwd               => $"Seek +5 seconds",
 			StatusMSG.SeekBack              => $"Seek -5 seconds",
+			StatusMSG.SeekFwdFar            => $"Seek +30 seconds",
+			StatusMSG.SeekBackFar           => $"Seek -30 seconds",
+			StatusMSG.SeekPos               => $"Seek to position {seekPosition}",
 			_ => throw new NotImplementedException()
 		};
 	}
