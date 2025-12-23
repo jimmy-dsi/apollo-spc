@@ -1,12 +1,13 @@
 const Emu = @import("lib/core/emu.zig").Emu;
 
-const main   = @import("lib/main.zig");
-const emu    = @import("lib/emu.zig");
-const dsp    = @import("lib/dsp.zig");
-const smp    = @import("lib/smp.zig");
-const spc    = @import("lib/spc.zig");
-const buffer = @import("lib/buffer.zig");
-const spcl   = @import("lib/spc_loader.zig");
+const main      = @import("lib/main.zig");
+const emu       = @import("lib/emu.zig");
+const dsp       = @import("lib/dsp.zig");
+const smp       = @import("lib/smp.zig");
+const spc       = @import("lib/spc.zig");
+const spcl      = @import("lib/spc_loader.zig");
+const script700 = @import("lib/script700.zig");
+const buffer    = @import("lib/buffer.zig");
 
 // Main
 pub export fn init() bool {
@@ -261,6 +262,86 @@ pub export fn spc_get_cpu_state(emu_ptr: ?[*]Emu) spc.State {
     return spc.get_cpu_state(@ptrCast(emu_ptr)) catch |e| emu.derr(spc.State, e, @ptrCast(emu_ptr));
 }
 
+// SPC Loader
+pub export fn spc_load(file_data: ?[*]const u8, len: u64, emu_ptr: ?[*]Emu) bool {
+    // TODO: Null-check file_data
+    spcl.load_spc(file_data.?[0..len], @ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn spc_get_metadata(emu_ptr: ?[*]Emu) spcl.Metadata {
+    return spcl.get_metadata(@ptrCast(emu_ptr)) catch |e| emu.derr(spcl.Metadata, e, @ptrCast(emu_ptr));
+}
+
+// Script700
+pub export fn script700_get_state(emu_ptr: ?[*]Emu) script700.State {
+    return script700.get_state(@ptrCast(emu_ptr)) catch |e| emu.derr(script700.State, e, @ptrCast(emu_ptr));
+}
+
+pub export fn script700_load_bytecode(emu_ptr: ?[*]Emu, script_bytecode: ?[*]const u32, len: u64) bool {
+    // TODO: Null-check script_bytecode
+    script700.load_bytecode(@ptrCast(emu_ptr), script_bytecode.?[0..len]) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn script700_load_data(emu_ptr: ?[*]Emu, data: ?[*]u8, len: u64) bool {
+    // TODO: Null-check data
+    script700.load_data(@ptrCast(emu_ptr), data.?[0..len]) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn script700_load_label_addresses(emu_ptr: ?[*]Emu, label_addresses: ?[*]u32, len: u64) bool {
+    // TODO: Null-check label_addresses
+    script700.load_label_addresses(@ptrCast(emu_ptr), label_addresses.?[0..len]) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn script700_load_label_remappings(emu_ptr: ?[*]Emu, label_remappings: ?[*]u32, len: u64) bool {
+    // TODO: Null-check remappings
+    script700.load_label_remappings(@ptrCast(emu_ptr), label_remappings.?[0..len]) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn script700_is_running(emu_ptr: ?[*]Emu) bool {
+    return script700.is_running(@ptrCast(emu_ptr)) catch |e| emu.ferr(e, @ptrCast(emu_ptr));
+}
+
+pub export fn script700_get_wait_until_cycle(emu_ptr: ?[*]Emu) u64 {
+    return script700.get_wait_until_cycle(@ptrCast(emu_ptr)) catch |e| emu.zerr(?u64, e, @ptrCast(emu_ptr)) orelse 0;
+}
+
+pub export fn script700_get_script_bytecode_length(emu_ptr: ?[*]Emu) u32 {
+    const result = script700.get_script_bytecode(@ptrCast(emu_ptr)) catch |e| emu.nerr([]const u32, e, @ptrCast(emu_ptr));
+    if (result) |r| {
+        return @intCast(r.len);
+    }
+    else {
+        return 0;
+    }
+}
+
+pub export fn script700_get_script_bytecode(emu_ptr: ?[*]Emu) ?[*]const u32 {
+    return @ptrCast(script700.get_script_bytecode(@ptrCast(emu_ptr)) catch |e| emu.nerr([]const u32, e, @ptrCast(emu_ptr)));
+}
+
+pub export fn script700_get_data_length(emu_ptr: ?[*]Emu) u32 {
+    const result = script700.get_data(@ptrCast(emu_ptr)) catch |e| emu.nerr([]u8, e, @ptrCast(emu_ptr));
+    if (result) |r| {
+        return @intCast(r.len);
+    }
+    else {
+        return 0;
+    }
+}
+
+pub export fn script700_get_data(emu_ptr: ?[*]Emu) ?[*]u8 {
+    return @ptrCast(script700.get_data(@ptrCast(emu_ptr)) catch |e| emu.nerr([]u8, e, @ptrCast(emu_ptr)));
+}
+
+pub export fn script700_get_label_addresses(emu_ptr: ?[*]Emu) ?[*]u32 {
+    return @ptrCast(script700.get_label_addresses(@ptrCast(emu_ptr)) catch |e| emu.nerr([]u32, e, @ptrCast(emu_ptr)));
+}
+
 // Buffer
 pub export fn buffer_create(num_bytes: u32) ?[*]u8 {
     return @ptrCast(buffer.create(num_bytes) catch |e| main.nerr([]u8, e));
@@ -272,15 +353,4 @@ pub export fn buffer_destroy(buf_ptr: ?[*]u8, num_bytes: u32) bool {
     }
     buffer.destroy(buf_ptr.?[0..num_bytes]) catch |e| { return main.ferr(e); };
     return true;
-}
-
-// SPC Loader
-pub export fn spc_load(file_data: ?[*]const u8, len: u64, emu_ptr: ?[*]Emu) bool {
-    // TODO: Null-check file_data
-    spcl.load_spc(file_data.?[0..len], @ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
-    return true;
-}
-
-pub export fn spc_get_metadata(emu_ptr: ?[*]Emu) spcl.Metadata {
-    return spcl.get_metadata(@ptrCast(emu_ptr)) catch |e| emu.derr(spcl.Metadata, e, @ptrCast(emu_ptr));
 }

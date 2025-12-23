@@ -99,3 +99,60 @@ public unsafe class UInt8BufferShared: UInt8Buffer {
 		}
 	}
 }
+
+public unsafe class UInt32Buffer: IEnumerable<UInt32> {
+	protected UInt32* ptr;
+	protected uint    size;
+	protected bool    isReadonly;
+	
+	public int Length => (int) size;
+	
+	internal UInt32Buffer(UInt32* ptr, int size, bool isReadonly = false) {
+		this.ptr        = ptr;
+		this.size       = size.SafeUnsigned();
+		this.isReadonly = isReadonly;
+	}
+	
+	public virtual UInt32 this[int index] {
+		get => *(ptr + index % size);
+		set {
+			if (isReadonly) {
+				throw new InvalidOperationException("Cannot write to readonly buffer");
+			}
+			*(ptr + index % size) = value;
+		}
+	}
+
+	public IEnumerator<UInt32> GetEnumerator() {
+		for (var i = 0; i < size; i++) {
+			yield return this[i];
+		}
+	}
+	
+	IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+public unsafe class UInt32BufferShared: UInt32Buffer {
+	Emulator emu;
+	
+	internal UInt32BufferShared(Emulator emu, UInt32* ptr, int size, bool isReadonly = false): base(ptr, size, isReadonly) {
+		this.emu = emu;
+	}
+	
+	public override UInt32 this[int index] {
+		get {
+			emu.AcquireLock();
+			try     { return *(ptr + index % size); }
+			finally { emu.ReleaseLock(); }
+		}
+		set {
+			if (isReadonly) {
+				throw new InvalidOperationException("Cannot write to readonly buffer");
+			}
+			
+			emu.AcquireLock();
+			try     { *(ptr + index % size) = value; }
+			finally { emu.ReleaseLock(); }
+		}
+	}
+}

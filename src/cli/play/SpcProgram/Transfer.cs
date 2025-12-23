@@ -20,7 +20,9 @@ public static class Transfer {
 		DSP_2 = 1 << 7,
 		DSP_3 = 1 << 8,
 		
-		Script700 = 1 << 9
+		Script700       = 1 << 9,
+		Script700_Break = 1 << 10,
+		Script700_Data  = 1 << 11,
 	}
 	
 	public static volatile bool Signal = false;

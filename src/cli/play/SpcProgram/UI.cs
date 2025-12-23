@@ -44,7 +44,7 @@ public static partial class CliMain {
 	static int seekPosition    = 1;
 	
 	static int viewIndex = 0;
-	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer];
+	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer];
 	
 	static bool heatMapEnabled    = false;
 	static bool cyclesInSpcClocks = false;
@@ -109,6 +109,11 @@ public static partial class CliMain {
 			
 			case View.DSPViewer3: {
 				showDSPViewer3(buffer!);
+				break;
+			}
+			
+			case View.Script700Viewer: {
+				showScript700Viewer(buffer!);
 				break;
 			}
 			
@@ -392,7 +397,7 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.ToggleHeatMap: {
-				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3) {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.Script700Viewer) {
 					heatMapEnabled = !heatMapEnabled;
 					Display.Clear();
 					
@@ -593,6 +598,11 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case View.Script700Viewer: {
+				requestEmuData(Transfer.Requests.Script700 | Transfer.Requests.SMP_State);
+				break;
+			}
+			
 			default: {
 				requestEmuData(Transfer.Requests.CycleCountOnly);
 				break;
@@ -667,7 +677,7 @@ public static partial class CliMain {
 	}
 	
 	enum BusSize {
-		Bit8, Bit16, Bit24, Bit32
+		Bit8, Bit16, Bit24, Bit32, Bit64
 	}
 	
 	static void memDisplayRows(BusSize addrBusSize,
@@ -806,6 +816,17 @@ public static partial class CliMain {
 				}
 				else {
 					interp = (double) value / UInt32.MaxValue;
+				}
+				break;
+			}
+			
+			case BusSize.Bit64: {
+				value = signed ? value : (Int64) value.SafeUnsigned();
+				if (signed) {
+					interp = (double) value / Int64.MaxValue;
+				}
+				else {
+					interp = (double) value / UInt64.MaxValue;
 				}
 				break;
 			}

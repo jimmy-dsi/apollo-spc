@@ -552,7 +552,7 @@ public class DSP {
 		public EchoProps         Echo       { get; }
 		public VoiceProps[]      Voice      { get; }
 		public DebugVoiceProps[] VoiceDebug { get; }
-				
+		
 		internal Properties(Emulator emu, DLL.DspGlobalState state, DLL.DspVoiceState[] voiceStates, DLL.DspDebugVoiceState[] debugVoiceStates) {
 			this.emu   = emu;
 			this.state = state;

@@ -125,15 +125,116 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
+	public class SMPState: ICloneable {
+		public struct TimerState {
+			bool Enabled;
+			
+			byte Stage0;
+			byte Stage1;
+			byte Stage2;
+			
+			byte Divider;
+			byte Output;
+			
+			internal TimerState(SMP.Properties.TimerProps timerProps) {
+				Enabled = timerProps.Enabled;
+				
+				Stage0  = timerProps.Stage0;
+				Stage1  = timerProps.Stage1;
+				Stage2  = timerProps.Stage2;
+				
+				Divider = timerProps.Divider;
+				Output  = timerProps.Output;
+			}
+		}
+		
+		public TimerState[] Timer              { get; internal set; } = new TimerState[3];
+		
+		public bool         GlobalTimerDisable { get; internal set; }
+		public bool         RAMWriteEnable     { get; internal set; }
+		public bool         RAMDisable         { get; internal set; }
+		public bool         GlobalTimerEnable  { get; internal set; }
+		public byte         RAMWaitstates      { get; internal set; }
+		public byte         IOWaitstates       { get; internal set; }
+		
+		public bool         UseBootROM         { get; internal set; }
+		
+		public byte         DSPAddress         { get; internal set; }
+		public byte[]       InputPorts         { get; internal set; } = new byte[4];
+		public byte[]       OutputPorts        { get; internal set; } = new byte[4];
+		
+		public byte[]       Aux                { get; internal set; } = new byte[2];
+		
+		public SMPState Clone() {
+			var clone = (SMPState) MemberwiseClone();
+			
+			clone.Timer       = Timer.ToArray();
+			clone.InputPorts  = InputPorts.ToArray();
+			clone.OutputPorts = OutputPorts.ToArray();
+			clone.Aux         = Aux.ToArray();
+			
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
+	public class Script700State: ICloneable {
+		public bool                 IsRunning      { get; internal set; }
+		
+		public byte[]               InputPorts     { get; internal set; } = new byte[4];
+		
+		public UInt32[]             Work           { get; internal set; } = new UInt32[8];
+		public UInt32[]             Cmp            { get; internal set; } = new UInt32[2];
+		
+		public UInt32[]             Callstack      { get; internal set; } = new UInt32[64];
+		public byte                 SP             { get; internal set; }
+		public byte                 SPTop          { get; internal set; }
+		
+		public bool                 CallstackOn    { get; internal set; }
+		public bool                 PortQueueOn    { get; internal set; }
+		
+		public UInt32               PC             { get; internal set; }
+		public UInt32               Step           { get; internal set; }
+		
+		public UInt64               CurCycle       { get; internal set; }
+		public UInt64               BeginCycle     { get; internal set; }
+		public UInt64               SyncPoint      { get; internal set; }
+		public UInt64               LastCycle      { get; internal set; }
+		
+		public UInt64               WaitUntil      { get; internal set; }
+		public Script700.WaitDevice WaitDevice     { get; internal set; }
+		public byte                 WaitPort       { get; internal set; }
+		
+		public int                  BytecodeLength { get; internal set; }
+		public int                  DataLength     { get; internal set; }
+		
+		public Script700State Clone() {
+			var clone = (Script700State) MemberwiseClone();
+			
+			clone.InputPorts = InputPorts.ToArray();
+			clone.Work       = Work.ToArray();
+			clone.Cmp        = Cmp.ToArray();
+			clone.Callstack  = Callstack.ToArray();
+			
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
 	public long Step     { get; private set; }
 	public long DSPCycle { get; private set; }
 	
-	public byte[]?      ARAM_Data       { get; private set; }
-	public byte[]?      SMP_BusData     { get; private set; }
-	public byte[]?      DSP_RegisterMem { get; private set; }
-	public DSPVoice1[]? DSP_Voice       { get; private set; }
-	public DSP2State?   DSP_State       { get; private set; }
-	public DSP3State?   DSP_DebugState  { get; private set; }
+	public byte[]?         ARAM_Data             { get; private set; }
+	public byte[]?         SMP_BusData           { get; private set; }
+	public byte[]?         DSP_RegisterMem       { get; private set; }
+	public bool[]?         Script700_Breakpoints { get; private set; }
+	public DSPVoice1[]?    DSP_Voice             { get; private set; }
+	public DSP2State?      DSP_State             { get; private set; }
+	public DSP3State?      DSP_DebugState        { get; private set; }
+	public SMPState?       SMP_State             { get; private set; }
+	public Script700State? Script700_State       { get; private set; }
 	
 	static long nextStep = 0;
 	
@@ -261,17 +362,88 @@ public class EmuDataBuffer: ICloneable {
 				};
 			}
 		}
+		
+		if ((requests & Transfer.Requests.SMP_State) != 0) {
+			SMP_State = new() {
+				Timer = [
+					new(emu.SMP.State.Timer[0]),
+					new(emu.SMP.State.Timer[1]),
+					new(emu.SMP.State.Timer[2])
+				],
+				
+				GlobalTimerDisable = emu.SMP.State.GlobalTimerDisable,
+				RAMWriteEnable     = emu.SMP.State.RAMWriteEnable,
+				RAMDisable         = emu.SMP.State.RAMDisable,
+				GlobalTimerEnable  = emu.SMP.State.GlobalTimerEnable,
+				RAMWaitstates      = emu.SMP.State.RAMWaitstates,
+				IOWaitstates       = emu.SMP.State.IOWaitstates,
+				UseBootROM         = emu.SMP.State.UseBootROM,
+				DSPAddress         = emu.SMP.State.DSPAddress,
+				
+				InputPorts = [
+					emu.SMP.State.IO.Input[0],
+					emu.SMP.State.IO.Input[1],
+					emu.SMP.State.IO.Input[2],
+					emu.SMP.State.IO.Input[3],
+				],
+				
+				OutputPorts = [
+					emu.SMP.State.IO.Output[0],
+					emu.SMP.State.IO.Output[1],
+					emu.SMP.State.IO.Output[2],
+					emu.SMP.State.IO.Output[3],
+				],
+				
+				Aux = [emu.SMP.State.Aux[0], emu.SMP.State.Aux[1]]
+			};
+		}
+		
+		if ((requests & Transfer.Requests.Script700) != 0) {
+			Script700_State = new() {
+				IsRunning      = emu.Script700.IsRunning,
+				
+				InputPorts     = emu.Script700.State.PortIn.ToArray(),
+				
+				Work           = emu.Script700.State.Work.ToArray(),
+				Cmp            = emu.Script700.State.Cmp .ToArray(),
+				
+				Callstack      = emu.Script700.State.Callstack.ToArray(),
+				SP             = emu.Script700.State.SP,
+				SPTop          = emu.Script700.State.SPTop,
+				
+				CallstackOn    = emu.Script700.State.CallstackOn,
+				PortQueueOn    = emu.Script700.State.PortQueueOn,
+				
+				PC             = emu.Script700.State.PC,
+				Step           = emu.Script700.State.Step,
+				
+				CurCycle       = emu.Script700.State.CurCycle,
+				BeginCycle     = emu.Script700.State.BeginCycle,
+				SyncPoint      = emu.Script700.State.SyncPoint,
+				LastCycle      = emu.Script700.State.LastCycle,
+				
+				WaitUntil      = emu.Script700.State.WaitUntil,
+				WaitDevice     = emu.Script700.State.WaitDevice,
+				WaitPort       = emu.Script700.State.WaitPort,
+				
+				BytecodeLength = emu.Script700.ScriptLength,
+				DataLength     = emu.Script700.DataLength,
+			};
+		}
 	}
 	
 	public bool ExpectData(Transfer.Requests requests) {
 		var result = true;
 		
-		if ((requests & Transfer.Requests.ARAM)            != 0) result = result && ARAM_Data       is not null;
-		if ((requests & Transfer.Requests.SMP_Bus)         != 0) result = result && SMP_BusData     is not null;
-		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) result = result && DSP_RegisterMem is not null;
-		if ((requests & Transfer.Requests.DSP_1)           != 0) result = result && DSP_Voice       is not null;
-		if ((requests & Transfer.Requests.DSP_2)           != 0) result = result && DSP_State       is not null;
-		if ((requests & Transfer.Requests.DSP_3)           != 0) result = result && DSP_DebugState  is not null;
+		if ((requests & Transfer.Requests.ARAM)            != 0) result = result && ARAM_Data             is not null;
+		if ((requests & Transfer.Requests.SMP_Bus)         != 0) result = result && SMP_BusData           is not null;
+		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) result = result && DSP_RegisterMem       is not null;
+		if ((requests & Transfer.Requests.DSP_1)           != 0) result = result && DSP_Voice             is not null;
+		if ((requests & Transfer.Requests.DSP_2)           != 0) result = result && DSP_State             is not null;
+		if ((requests & Transfer.Requests.DSP_3)           != 0) result = result && DSP_DebugState        is not null;
+		if ((requests & Transfer.Requests.SMP_State)       != 0) result = result && SMP_State             is not null;
+		if ((requests & Transfer.Requests.Script700)       != 0) result = result && Script700_State       is not null;
+		if ((requests & Transfer.Requests.Script700_Break) != 0) result = result && Script700_Breakpoints is not null;
 		
 		return result;
 	}
@@ -291,6 +463,10 @@ public class EmuDataBuffer: ICloneable {
 			clone.DSP_RegisterMem = DSP_RegisterMem.ToArray();
 		}
 		
+		if (Script700_Breakpoints is not null) {
+			clone.Script700_Breakpoints = Script700_Breakpoints.ToArray();
+		}
+		
 		if (DSP_Voice is not null) {
 			clone.DSP_Voice = new DSPVoice1[8];
 			for (var v = 0; v < 8; v++) {
@@ -306,17 +482,28 @@ public class EmuDataBuffer: ICloneable {
 			clone.DSP_DebugState = DSP_DebugState.Clone();
 		}
 		
+		if (SMP_State is not null) {
+			clone.SMP_State = SMP_State.Clone();
+		}
+		
+		if (Script700_State is not null) {
+			clone.Script700_State = Script700_State.Clone();
+		}
+		
 		return clone;
 	}
 	
 	object ICloneable.Clone() => Clone();
 	
 	void resetToNull() {
-		ARAM_Data       = null;
-		SMP_BusData     = null;
-		DSP_RegisterMem = null;
-		DSP_Voice       = null;
-		DSP_State       = null;
-		DSP_DebugState  = null;
+		ARAM_Data             = null;
+		SMP_BusData           = null;
+		DSP_RegisterMem       = null;
+		Script700_Breakpoints = null;
+		DSP_Voice             = null;
+		DSP_State             = null;
+		DSP_DebugState        = null;
+		SMP_State             = null;
+		Script700_State       = null;
 	}
 }

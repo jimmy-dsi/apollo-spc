@@ -1,6 +1,6 @@
 pub const Script700State = struct {
-    pub const WaitDevice = enum {
-        none, input, output
+    pub const WaitDevice = enum(u8) {
+        none = 0, input = 1, output = 2
     };
 
     port_in: [4]u8 = [_]u8 {0x00} ** 4,

@@ -75,10 +75,12 @@ public class Emulator {
 	
 	SPC.Metadata? metadata = null;
 	
-	public   DSP    DSP    { get; init; }
-	public   SMP    SMP    { get; init; }
-	public   SPC    SPC    { get; init; }
-	internal Handle handle { get;  set; }
+	public DSP       DSP       { get; init; }
+	public SMP       SMP       { get; init; }
+	public SPC       SPC       { get; init; }
+	public Script700 Script700 { get; init; }
+	
+	internal Handle handle { get; set; }
 
 	public bool MakeShared => makeShared;
 	
@@ -222,9 +224,11 @@ public class Emulator {
 		
 		handle.PostConstruct();
 		
-		DSP = new(this);
-		SMP = new(this);
-		SPC = new(this);
+		DSP       = new(this);
+		SMP       = new(this);
+		SPC       = new(this);
+		Script700 = new(this);
+		
 		handle.AddToCache(this);
 		
 		this.makeShared = makeShared;
