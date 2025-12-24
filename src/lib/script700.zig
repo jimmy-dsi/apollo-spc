@@ -64,6 +64,14 @@ pub inline fn get_state(emu_ptr: ?*Emu) !State {
     };
 }
 
+pub inline fn disable(emu_ptr: ?*Emu) !void {
+    const ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    var s700 = &ep.?.script700;
+    s700.enabled = false;
+}
+
 pub inline fn load_binary_file(emu_ptr: ?*Emu, bin_data: []const u8) !void {
     const ep = emu.get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);

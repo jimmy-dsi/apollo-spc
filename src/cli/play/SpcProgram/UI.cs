@@ -9,6 +9,8 @@ using Jimbl;
 public static partial class CliMain {
 	const int ScrollAreaRows = 0x1E;
 	
+	class EndAppException: Exception { }
+	
 	public enum State {
 		Normal, Paused, NonFatalError
 	}
@@ -34,17 +36,21 @@ public static partial class CliMain {
 		AllChannelsEnabled,  AllMainChannelsEnabled,  AllEchoChannelsEnabled,
 		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
 		
-		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos
+		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos,
+		
+		Script700_Error, Continue
 	}
 	
-	static State  uiState     = State.Normal;
-	static object uiStateLock = new();
+	static State  uiState          = State.Normal;
+	static bool   disableScript700 = false;
+	static object uiStateLock      = new();
 	
 	static View       realView       = View.Metadata;
 	static View       currentView    = View.Metadata;
 	static View       nextView       = View.Metadata;
 	static string     menuBarMsg     = "Press CTRL+L for help menu";
 	static string?    tempMenuBarMsg = null;
+	static bool       menuBarError   = false;
 	static Stopwatch? tempMsgTime    = null;
 	
 	static int channelToToggle = 0;
@@ -62,6 +68,20 @@ public static partial class CliMain {
 	
 	static long frame     = 0;
 	static long prevFrame = 0;
+			
+	static (int X, int Y, int W, int H)[] menuRegions = [
+		(22 + 2,                 0, 18, 2),
+		(Display.Width /  2 - 8, 0, 17, 2),
+		(Display.Width - 22 - 8, 1,  4, 1),
+	];
+			
+	static string[][] menuOptions = [
+		["Continue Script700",   "    execution"],
+		["Disable Script700",   "  and continue"],
+		["Quit"],
+	];
+	
+	static int selectedItem = 0;
 	
 	public static State UI_State {
 		get {
@@ -76,12 +96,120 @@ public static partial class CliMain {
 		}
 	}
 	
+	public static bool DisableScript700 {
+		get {
+			lock (uiStateLock) {
+				return disableScript700;
+			}
+		}
+		set {
+			lock (uiStateLock) {
+				disableScript700 = value;
+			}
+		}
+	}
+	
 	static void handleUI(EmuDataBuffer? buffer) {
 		KeyBindings.Action? action = null;
 		var state = UI_State;
 		
 		prevFrame = frame;
 		frame     = AudioOutput.Frame;
+		
+		if (state == State.NonFatalError) {
+			// Handle error menu controls
+			var keyInfo = KeyListener.GetKeyInfo();
+			if (keyInfo is not null) {
+				var ki = keyInfo.Value;
+				
+				if (ki.IsRightArrow()) {
+					selectedItem = Math.Clamp(selectedItem + 1, 0, 2);
+				}
+				else if (ki.IsLeftArrow()) {
+					selectedItem = Math.Clamp(selectedItem - 1, 0, 2);
+				}
+				else if (ki.IsTab()) {
+					selectedItem++;
+					selectedItem %= 3;
+				}
+				else if (ki.IsChar('C')) {
+					selectedItem = 0;
+				}
+				else if (ki.IsChar('D')) {
+					selectedItem = 1;
+				}
+				else if (ki.IsChar('Q')) {
+					selectedItem = 2;
+				}
+				else if (ki.IsEnter() || ki.IsChar(' ')) {
+					switch (selectedItem) {
+						case 0: {
+							// Remove all snapshots after current timestamp if Script700 is disabled->enabled
+							if (DisableScript700) {
+								lock (seekBarLock) {
+									runAheadThread!.Interrupt();
+								
+									var indexes  = seekBarSnapshots.Select(x => x.Key).ToArray();
+									var curIndex = getSnapshotIndex(curCycle);
+				
+									foreach (var idx in indexes) {
+										if (idx > 0 && idx >= curIndex) {
+											seekBarSnapshots.Remove(idx);
+										}
+									}
+								
+									RunAheadEmu = PrimaryEmu.SaveState();
+								}
+							}
+							
+							DisableScript700 = false;
+							UI_State         = State.Normal;
+							state            = State.Normal;
+							
+							setStatusMsg(StatusMSG.Default);
+							setTempStatusMsg(StatusMSG.Continue);
+							Display.Clear();
+							
+							break;
+						}
+						case 1: {
+							PrimaryEmu.Script700.Disable();
+							
+							// Remove all snapshots after current timestamp if Script700 is enabled->disabled
+							if (!DisableScript700) {
+								lock (seekBarLock) {
+									runAheadThread!.Interrupt();
+								
+									var indexes  = seekBarSnapshots.Select(x => x.Key).ToArray();
+									var curIndex = getSnapshotIndex(curCycle);
+				
+									foreach (var idx in indexes) {
+										if (idx > 0 && idx >= curIndex) {
+											seekBarSnapshots.Remove(idx);
+										}
+									}
+								
+									RunAheadEmu = PrimaryEmu.SaveState();
+								}
+							}
+							
+							DisableScript700 = true;
+							UI_State         = State.Normal;
+							state            = State.Normal;
+							
+							setStatusMsg(StatusMSG.Default);
+							setTempStatusMsg(StatusMSG.Continue);
+							Display.Clear();
+							
+							break;
+						}
+						case 2: {
+							throw new EndAppException();
+						}
+					}
+				}
+			}
+		}
 		
 		if (state != State.NonFatalError) {
 			action = KeyBindings.GetAction();
@@ -171,25 +299,28 @@ public static partial class CliMain {
 		Display.Write("]", Display.Width - 1, Display.Height - 3, Color.Cyan);
 		
 		// Display Menu Bar
-		Display.ClearLine(Display.Height - 1, Color.BGBlue);
+		var barColor = menuBarError ? Color.BGRed : Color.BGBlue;
+		Display.ClearLine(Display.Height - 1, barColor);
 		
 		if (tempMsgTime is not null && tempMsgTime.ElapsedMilliseconds >= 3000) {
 			resetMenuBar();
 		}
 		else if (tempMenuBarMsg is not null) {
-			Display.Write(tempMenuBarMsg, 0, Display.Height - 1, Color.BGBlue);
+			Display.Write(tempMenuBarMsg, 0, Display.Height - 1, barColor);
 		}
 		else {
-			Display.Write(menuBarMsg,     0, Display.Height - 1, Color.BGBlue);
+			Display.Write(menuBarMsg,     0, Display.Height - 1, barColor);
 		}
 		
 		if (buffer is not null) {
 			var cycleCounter = cyclesInSpcClocks ? $"SPC Cycle: {buffer.DSPCycle / 2}" : $"DSP Cycle: {buffer.DSPCycle}";
-			Display.Write(cycleCounter, Display.Width - 1 - cycleCounter.Length, Display.Height - 1, Color.BGBlue);
+			Display.Write(cycleCounter, Display.Width - 1 - cycleCounter.Length, Display.Height - 1, barColor);
 		}
 		
 		// Display error menu
 		if (state == State.NonFatalError) {
+			setStatusMsg(StatusMSG.Script700_Error, error: true);
+			
 			Display.DrawOutline(20, 8, Display.Width - 40, Display.Height - 18, Color.Yellow);
 			Display.ClearBox(Display.Width - 42, Display.Height - 20, 21, 9);
 			
@@ -214,23 +345,14 @@ public static partial class CliMain {
 			Display.WriteBox(explainText, x_: 22 + 4, col: Color.Yellow);
 			Display.Y += 2;
 			
-			(int X, int Y, int W, int H)[] menuRegions = [
-				(22 + 2,                 Display.Y,    18, 2),
-				(Display.Width /  2 - 8, Display.Y,    17, 2),
-				(Display.Width - 22 - 8, Display.Y + 1, 4, 1),
-			];
-			
-			string[][] menuOptions = [
-				["Continue Script700",   "    execution"],
-				["Disable Script700",   "  and continue"],
-				["Quit"],
-			];
+			var displayY = Display.Y;
 			
 			for (var i = 0; i < 3; i++) {
 				var region = menuRegions[i];
 				var option = menuOptions[i];
 				
-				Display.WriteBox(option, region.X, region.Y, col: Color.Cyan);
+				Display.ClearBox(region.W + 2, region.H, region.X - 1, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
+				Display.WriteBox(option, region.X, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
 			}
 		}
 		
@@ -690,13 +812,19 @@ public static partial class CliMain {
 		Display.Clear();
 	}
 	
-	static void setStatusMsg(StatusMSG msg) {
-		menuBarMsg = statusMsg(msg);
+	static void setStatusMsg(StatusMSG msg, bool error = false) {
+		tempMenuBarMsg = null;
+		menuBarError   = false;
+		tempMsgTime    = null;
+		
+		menuBarMsg   = statusMsg(msg);
+		menuBarError = error;
 	}
 	
-	static void setTempStatusMsg(StatusMSG msg) {
+	static void setTempStatusMsg(StatusMSG msg, bool error = false) {
 		tempMenuBarMsg = statusMsg(msg);
 		tempMsgTime    = new();
+		menuBarError   = error;
 		
 		tempMsgTime.Start();
 	}
@@ -718,6 +846,8 @@ public static partial class CliMain {
 			StatusMSG.SeekFwdFar            => $"Seek +30 seconds",
 			StatusMSG.SeekBackFar           => $"Seek -30 seconds",
 			StatusMSG.SeekPos               => $"Seek to position {seekPosition}",
+			StatusMSG.Script700_Error       => $"Script700 error occurred",
+			StatusMSG.Continue              => $"Resuming...",
 			_ => throw new NotImplementedException()
 		};
 	}

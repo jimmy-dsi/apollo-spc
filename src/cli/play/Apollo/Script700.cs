@@ -541,6 +541,17 @@ public class Script700 {
 		}
 	}
 	
+	public void Disable() {
+		Emulator.MaybeAcquireLock();
+		
+		try {
+			DLL.Script700Disable(Emulator.handle);
+		}
+		finally {
+			Emulator.MaybeReleaseLock();
+		}
+	}
+	
 	public void LoadBinaryFile(byte[] binaryData) {
 		Emulator.MaybeAcquireLock();
 		

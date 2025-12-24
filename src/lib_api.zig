@@ -278,6 +278,11 @@ pub export fn script700_get_state(emu_ptr: ?[*]Emu) script700.State {
     return script700.get_state(@ptrCast(emu_ptr)) catch |e| emu.derr(script700.State, e, @ptrCast(emu_ptr));
 }
 
+pub export fn script700_disable(emu_ptr: ?[*]Emu) bool {
+    script700.disable(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
 pub export fn script700_load_binary_file(emu_ptr: ?[*]Emu, bin_data: ?[*]const u8, len: u64) bool {
     // TODO: Null-check bin_data
     script700.load_binary_file(@ptrCast(emu_ptr), bin_data.?[0..len]) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };

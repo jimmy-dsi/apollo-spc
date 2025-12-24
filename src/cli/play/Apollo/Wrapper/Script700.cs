@@ -6,6 +6,10 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "script700_get_state")]
 	public static partial Script700State Script700GetState(Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "script700_disable")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool Script700Disable(Emulator.Handle? emuPtr);
+	
 	[LibraryImport("apollo", EntryPoint = "script700_load_binary_file")]
 	[return: MarshalAs(UnmanagedType.I1)]
 	public static partial bool Script700LoadBinaryFile(Emulator.Handle? emuPtr, IntPtr binData, UInt64 len);

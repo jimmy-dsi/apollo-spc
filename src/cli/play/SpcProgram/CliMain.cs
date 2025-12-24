@@ -15,6 +15,8 @@ public static partial class CliMain {
 	static Dictionary<int, Emulator> seekBarSnapshots = new();
 	static object seekBarLock = new();
 	
+	static Thread? runAheadThread = null;
+	
 	public static int Start(string[] args) {
 		try {
 			ConsoleWin32.EnableCmdAnsiCodes();
@@ -106,8 +108,8 @@ public static partial class CliMain {
 			Console.Clear();
 			Console.CursorVisible = false;
 			
-			Thread runAhead = new(RunAheadLoop);
-			runAhead.Start();
+			runAheadThread = new(RunAheadLoop);
+			runAheadThread.Start();
 			
 			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
@@ -121,6 +123,10 @@ public static partial class CliMain {
 		catch (IOException) {
 			Console.Error.WriteLine($"error: The SPC file '{spcFilePath}' was not found or could not be loaded");
 			return 1;
+		}
+		catch (EndAppException) {
+			// Catch and return 0
+			return 0;
 		}
 		finally {
 			// TODO: Thread join with run ahead thread if active
@@ -187,14 +193,22 @@ public static partial class CliMain {
 	
 	public static void RunAheadLoop() {
 		while (true) {
-			RunAheadEmu.StepNCyclesFast(2048000 / 60);
-			
-			var cycle = RunAheadEmu.DSP.CurrentCycle;
-			RunAheadCycle = cycle;
-			
-			// TODO: Check if main thread has terminated
-			if (RunAheadEmu.DSP.CurrentCycle <= (long) 2048000 * 60 * 12) { // Hard cutoff of run-ahead snapshots after 12 minutes
-				seekBarSnapshot(cycle);
+			try {
+				var runAheadEmu = RunAheadEmu;
+				runAheadEmu.StepNCyclesFast(2048000 / 60);
+				
+				var cycle = runAheadEmu.DSP.CurrentCycle;
+				RunAheadCycle = cycle;
+				
+				// TODO: Check if main thread has terminated
+				if (runAheadEmu.DSP.CurrentCycle <= (long) 2048000 * 60 * 12) { // Hard cutoff of run-ahead snapshots after 12 minutes
+					seekBarSnapshot(cycle);
+				}
+			}
+			catch (ThreadInterruptedException) {
+				lock (seekBarLock) {
+					continue;
+				}
 			}
 		}
 	}

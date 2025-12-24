@@ -137,6 +137,7 @@ public class Color {
 	public static Color BGCyan     = new(ansiCode: 46);
 	
 	public static Color BGDarkGrey = new(ansiCode: 100);
+	public static Color BGWhite    = new(ansiCode: 107);
 	
 	public Color(byte ansiCode) {
 		value = (uint) ansiCode << 24;
