@@ -65,35 +65,74 @@ public static class AudioOutput {
 	static Random rng = new();
 	static int cycleSpillOver = 0;
 	
+	const int MaxConsecutiveTimeouts = 90;
+	const int BusyloopReliefMS       = 20;
+	
 	// This will be called by SDL when it needs more audio data
 	static void Callback(IntPtr userdata, IntPtr stream, int len) {
+		var numShorts = len / sizeof(Int16);
+		Int16[] buffer = new Int16[numShorts];
+		
 		lock (CliMain.EmuRestoreLock) {
-			var samples = len / sizeof(Int16) / 2;
+			try {
+				if (CliMain.UI_State is not CliMain.State.Normal) {
+					return;
+				}
+				
+				var samples = numShorts / 2;
 		
-			var approxCycles = (samples - 1) * 64 - cycleSpillOver;
-			var cycles       = emu.StepNCyclesFast(approxCycles);
+				var approxCycles = (samples - 1) * 64 - cycleSpillOver;
+				var cycles       = emu.Script700.IsRunning ? emu.StepNCycles(approxCycles) : emu.StepNCyclesFast(approxCycles);
 		
-			if (cycles < approxCycles) {
-				//Console.WriteLine($"{cycles} cycles ran out of {approxCycles}");
-				throw new Exception();
-			}
-		
-			while (emu.SamplesQueued < samples) {
-				emu.StepCycleFast(); // TODO: Check for errors
-			}
+				var attempts = 1;
 			
-			// Run a random extra number of cycles, between 0 and 63
-			// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
-			cycleSpillOver = rng.Next(0, 64);
-			emu.StepNCyclesFast(cycleSpillOver); // TODO: Check for errors
+				while (cycles < approxCycles) {
+					Thread.Sleep(BusyloopReliefMS);
+				
+					if (attempts >= MaxConsecutiveTimeouts) {
+						CliMain.UI_State = CliMain.State.NonFatalError;
+						return;
+					}
+				
+					var remainingCycles = approxCycles - cycles;
+					cycles = emu.Script700.IsRunning ? emu.StepNCycles(remainingCycles) : emu.StepNCyclesFast(remainingCycles);
+				
+					attempts++;
+				}
 		
-			var buffer = emu.GetBufferedSamples();
-
-			// Copy managed array into unmanaged buffer
-			Marshal.Copy(buffer, 0, stream, samples * 2);
+				// TODO: Check for errors
+				if (emu.Script700.IsRunning) {
+					while (emu.SamplesQueued < samples) {
+						emu.StepCycle();
+					}
+				}
+				else {
+					while (emu.SamplesQueued < samples) {
+						emu.StepCycleFast();
+					}
+				}
 			
-			Transfer.SendEmuData();
-			advanceFrame();
+				// Run a random extra number of cycles, between 0 and 63
+				// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
+				cycleSpillOver = rng.Next(0, 64);
+			
+				// TODO: Check for errors
+				if (emu.Script700.IsRunning) {
+					emu.StepNCycles(cycleSpillOver);
+				}
+				else {
+					emu.StepNCyclesFast(cycleSpillOver);
+				}
+		
+				buffer = emu.GetBufferedSamples();
+			}
+			finally {
+				// Copy managed array into unmanaged buffer
+				Marshal.Copy(buffer, 0, stream, numShorts);
+				
+				Transfer.SendEmuData();
+				advanceFrame();
+			}
 		}
 	}
 }

@@ -92,16 +92,16 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.SeekBack,        ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.Char('>'),  KeyBindings.Action.SeekFwdFar);
 			KeyBindings.Register(KeyBindings.Key.Char('<'),  KeyBindings.Action.SeekBackFar);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char(')'),          KeyBindings.Action.SeekPos_0, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('!'),          KeyBindings.Action.SeekPos_1, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('@'),          KeyBindings.Action.SeekPos_2, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('#'),          KeyBindings.Action.SeekPos_3, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('$'),          KeyBindings.Action.SeekPos_4, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('%'),          KeyBindings.Action.SeekPos_5, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('^'),          KeyBindings.Action.SeekPos_6, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('&'),          KeyBindings.Action.SeekPos_7, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('*'),          KeyBindings.Action.SeekPos_8, ctrl: false);
-			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('('),          KeyBindings.Action.SeekPos_9, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char(')'), KeyBindings.Action.SeekPos_0, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('!'), KeyBindings.Action.SeekPos_1, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('@'), KeyBindings.Action.SeekPos_2, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('#'), KeyBindings.Action.SeekPos_3, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('$'), KeyBindings.Action.SeekPos_4, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('%'), KeyBindings.Action.SeekPos_5, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('^'), KeyBindings.Action.SeekPos_6, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('&'), KeyBindings.Action.SeekPos_7, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('*'), KeyBindings.Action.SeekPos_8, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('('), KeyBindings.Action.SeekPos_9, ctrl: false);
 			
 			Console.Clear();
 			Console.CursorVisible = false;

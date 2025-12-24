@@ -9,6 +9,10 @@ using Jimbl;
 public static partial class CliMain {
 	const int ScrollAreaRows = 0x1E;
 	
+	public enum State {
+		Normal, Paused, NonFatalError
+	}
+	
 	enum View {
 		Metadata,
 		Help,
@@ -33,6 +37,9 @@ public static partial class CliMain {
 		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos
 	}
 	
+	static State  uiState     = State.Normal;
+	static object uiStateLock = new();
+	
 	static View       realView       = View.Metadata;
 	static View       currentView    = View.Metadata;
 	static View       nextView       = View.Metadata;
@@ -56,28 +63,46 @@ public static partial class CliMain {
 	static long frame     = 0;
 	static long prevFrame = 0;
 	
+	public static State UI_State {
+		get {
+			lock (uiStateLock) {
+				return uiState;
+			}
+		}
+		set {
+			lock (uiStateLock) {
+				uiState = value;
+			}
+		}
+	}
+	
 	static void handleUI(EmuDataBuffer? buffer) {
-		var action = KeyBindings.GetAction();
+		KeyBindings.Action? action = null;
+		var state = UI_State;
 		
 		prevFrame = frame;
 		frame     = AudioOutput.Frame;
 		
-		var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
+		if (state != State.NonFatalError) {
+			action = KeyBindings.GetAction();
 		
-		for (var _ = 0; _ < framesSinceLastDisplay; _++) {
-			PrevStartAddr4 = PrevStartAddr3;
-			PrevStartAddr3 = PrevStartAddr2;
-			PrevStartAddr2 = PrevStartAddr1;
-			PrevStartAddr1 = StartAddr;
-		}
+			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
 		
-		if (action is not null) {
-			doAction(action!.Value);
-		}
+			for (var _ = 0; _ < framesSinceLastDisplay; _++) {
+				PrevStartAddr4 = PrevStartAddr3;
+				PrevStartAddr3 = PrevStartAddr2;
+				PrevStartAddr2 = PrevStartAddr1;
+				PrevStartAddr1 = StartAddr;
+			}
 		
-		if (nextView != currentView) {
-			if (buffer?.ExpectData(requests) ?? false) {
-				commitCurrentView();
+			if (action is not null) {
+				doAction(action!.Value);
+			}
+		
+			if (nextView != currentView) {
+				if (buffer?.ExpectData(requests) ?? false) {
+					commitCurrentView();
+				}
 			}
 		}
 		
@@ -161,6 +186,52 @@ public static partial class CliMain {
 		if (buffer is not null) {
 			var cycleCounter = cyclesInSpcClocks ? $"SPC Cycle: {buffer.DSPCycle / 2}" : $"DSP Cycle: {buffer.DSPCycle}";
 			Display.Write(cycleCounter, Display.Width - 1 - cycleCounter.Length, Display.Height - 1, Color.BGBlue);
+		}
+		
+		// Display error menu
+		if (state == State.NonFatalError) {
+			Display.DrawOutline(20, 8, Display.Width - 40, Display.Height - 18, Color.Yellow);
+			Display.ClearBox(Display.Width - 42, Display.Height - 20, 21, 9);
+			
+			Display.Write(" Error ", Display.Width / 2 - 3, 8, Color.Yellow);
+			
+			var errorText = Display.WordWrap("A non-fatal error has occurred during the processing of Script700 code.", Display.Width - 36, 3);
+			Display.WriteBox(errorText, 23, 10, Color.Yellow);
+			Display.Y++;
+			Display.WriteBox([
+				"Error reason: ",
+				"    Script700 execution timed out",
+				""
+			], col: Color.Yellow);
+			
+			var explainText = Display.WordWrap(
+				"This error can occur from either an infinite loop, or the execution of a long stretch of non-yielding Script700 code " +
+				"(i.e. no `w` command)",
+				Display.Width - 42 - 4, 3
+			);
+			Display.Write("Explanation: ", col: Color.Yellow);
+			Display.Y++;
+			Display.WriteBox(explainText, x_: 22 + 4, col: Color.Yellow);
+			Display.Y += 2;
+			
+			(int X, int Y, int W, int H)[] menuRegions = [
+				(22 + 2,                 Display.Y,    18, 2),
+				(Display.Width /  2 - 8, Display.Y,    17, 2),
+				(Display.Width - 22 - 8, Display.Y + 1, 4, 1),
+			];
+			
+			string[][] menuOptions = [
+				["Continue Script700",   "    execution"],
+				["Disable Script700",   "  and continue"],
+				["Quit"],
+			];
+			
+			for (var i = 0; i < 3; i++) {
+				var region = menuRegions[i];
+				var option = menuOptions[i];
+				
+				Display.WriteBox(option, region.X, region.Y, col: Color.Cyan);
+			}
 		}
 		
 		Console.Write(Display.Flush());

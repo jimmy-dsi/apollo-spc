@@ -124,19 +124,18 @@ public static class Display {
 	
 	public static void WriteBox(string[] lines, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
 		var initX = x_ ?? x;
-		var lastY = y_ ?? y;
+		var initY = y_ ?? y;
 		
 		var maxLength = lines.Max(line => line.Length);
-		ClearBox(maxLength, lines.Length, x, y, col, writeThruToScrollBuf);
+		ClearBox(maxLength, lines.Length, initX, initY, col, writeThruToScrollBuf);
 		
 		x = initX;
-		y = lastY;
+		y = initY;
 		
 		foreach (var line in lines) {
 			Write(line, x, y, col, writeThruToScrollBuf);
 			x = initX;
-			lastY++;
-			y = lastY;
+			y++;
 		}
 	}
 	
@@ -151,12 +150,11 @@ public static class Display {
 	
 	public static void ClearBox(int width, int height, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
 		var initX = x_ ?? x;
+		var initY = y_ ?? y;
 		
 		for (var yy = 0; yy < height; yy++) {
-			var lastY = x_ ?? y;
-			Write(new(' ', width), x_, y_, col ?? color, writeThruToScrollBuf);
+			Write(new(' ', width), x_, initY + yy, col ?? color, writeThruToScrollBuf);
 			x = initX;
-			y = lastY + 1;
 		}
 	}
 	
@@ -265,6 +263,10 @@ public static class Display {
 				sb.Append('\n');
 			}
 		}
+		
+		// Reset draw position
+		X = 0;
+		Y = 0;
 		
 		sb.Append("\x1B[0m");
 		return sb.ToString();

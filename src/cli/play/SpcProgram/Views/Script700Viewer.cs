@@ -36,19 +36,19 @@ public static partial class CliMain {
 		Display.Write($"{s700 .Cmp[0]:X8} {s700. Cmp[1]:X8}", x, y); y++;
 		
 		if (s700.WaitUntil > 0) {
-			Display.Write($"{s700.WaitUntil:X16} ({s700.WaitUntil})", x, y);
+			Display.Write($"{s700.WaitUntil:X16} ({s700.WaitUntil})".PadRight(x + 36), x, y);
 		}
 		else {
-			Display.Write($"---------------- (none)", x, y);
+			Display.Write($"---------------- (none)".PadRight(x + 36), x, y);
 		}
 		y++;
 		
 		Display.Write($"{s700.BytecodeLength:X6}", x, y); y++;
 		Display.Write($"{s700.DataLength:X6} (PC={s700.PC:X6} SP={s700.SP:X2} ST={s700.SPTop:X2})", x, y); y++;
 		
-		Display.Write($"{s700.CurCycle  :X16} ({s700  .CurCycle})", x, y); y++;
-		Display.Write($"{s700.BeginCycle:X16} ({s700.BeginCycle})", x, y); y++;
-		Display.Write($"{s700.SyncPoint :X16} ({s700 .SyncPoint})", x, y); y++;
+		Display.Write($"{s700.CurCycle  :X16} ({s700  .CurCycle})".PadRight(x + 36), x, y); y++;
+		Display.Write($"{s700.BeginCycle:X16} ({s700.BeginCycle})".PadRight(x + 36), x, y); y++;
+		Display.Write($"{s700.SyncPoint :X16} ({s700 .SyncPoint})".PadRight(x + 36), x, y); y++;
 		
 		if (heatMapEnabled) {
 			x += 36;
