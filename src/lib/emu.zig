@@ -218,7 +218,7 @@ pub inline fn copy(dest_emu_ptr: ?*Emu, src_emu_ptr: ?*const Emu) !void {
 
     try main.validate_ptr(Emu, src_emu_ptr);
 
-    try ep.?.load_from(src_emu_ptr.?, .{});
+    try ep.?.load_from(src_emu_ptr.?, .{ .copy_everything = true });
 }
 
 pub inline fn acquire_lock(emu_ptr: ?*Emu) !void {

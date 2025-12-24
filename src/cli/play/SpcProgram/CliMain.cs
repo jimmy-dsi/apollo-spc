@@ -37,6 +37,12 @@ public static partial class CliMain {
 			PrimaryEmu.LoadSpcFile(spcFilePath);
 			PrimaryEmu.SMP.LoggingEnabled = true;
 			
+			// Enable Script700 if binary file is present
+			var scriptBinary = Script700.BinaryFile(spcFilePath);
+			if (scriptBinary is not null) {
+				PrimaryEmu.Script700.LoadBinaryFile(File.ReadAllBytes(scriptBinary));
+			}
+			
 			RunAheadEmu = PrimaryEmu.SaveState();
 			seekBarSnapshot(0);
 			

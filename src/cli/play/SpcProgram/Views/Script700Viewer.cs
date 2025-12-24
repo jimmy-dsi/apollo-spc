@@ -69,7 +69,7 @@ public static partial class CliMain {
 			y++;
 			
 			for (var i = 0; i < 4; i++) {
-				Display.Write("  ", x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.Work[i]));
+				Display.Write("  ", x + 2 * i, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, s700.Work[i]));
 			}
 			y++;
 			
@@ -91,9 +91,9 @@ public static partial class CliMain {
 			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 256, s700.BytecodeLength)); y++;
 			
 			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 256, s700.DataLength));
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 256, s700.PC));
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit8,  signed: false, scale:   1, s700.SP));
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit8,  signed: false, scale:   1, s700.SPTop));
+			Display.Write("  ", col: heatMapColor(BusSize.Bit32, signed: false, scale: 256, s700.PC));
+			Display.Write("  ", col: heatMapColor(BusSize.Bit8,  signed: false, scale:   1, s700.SP));
+			Display.Write("  ", col: heatMapColor(BusSize.Bit8,  signed: false, scale:   1, s700.SPTop));
 			y++;
 			
 			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, s700.CurCycle  .SafeSigned())); y++;

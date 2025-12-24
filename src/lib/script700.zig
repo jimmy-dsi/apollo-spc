@@ -1,7 +1,8 @@
 const std = @import("std");
 
-const Emu       = @import("core/emu.zig").Emu;
-const Script700 = @import("core/script700.zig").Script700;
+const Emu             = @import("core/emu.zig").Emu;
+const Script700       = @import("core/script700.zig").Script700;
+const Script700Loader = @import("core/script700_loader.zig").Script700Loader;
 
 const main = @import("main.zig");
 const emu  = @import("emu.zig");
@@ -61,6 +62,15 @@ pub inline fn get_state(emu_ptr: ?*Emu) !State {
         .wait_device = @ptrCast(&state.wait_device),
         .wait_port   = @ptrCast(&state.wait_port),
     };
+}
+
+pub inline fn load_binary_file(emu_ptr: ?*Emu, bin_data: []const u8) !void {
+    const ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const s700 = &ep.?.script700;
+    try Script700Loader.load_script(s700, bin_data);
+    s700.enabled = true;
 }
 
 pub inline fn load_bytecode(emu_ptr: ?*Emu, script_bytecode: []const u32) !void {

@@ -541,6 +541,29 @@ public class Script700 {
 		}
 	}
 	
+	public void LoadBinaryFile(byte[] binaryData) {
+		Emulator.MaybeAcquireLock();
+		
+		try {
+			unsafe {
+				Buffer? dataBuffer = new(binaryData.Length);
+				// Copy buffer
+				for (var i = 0; i < binaryData.Length; i++) {
+					dataBuffer[i] = binaryData[i];
+				}
+				
+				var result = DLL.Script700LoadBinaryFile(Emulator.handle, dataBuffer.Ptr, binaryData.Length.SafeUnsigned());
+				if (!result) {
+					var errorCode = DLL.EmuGetLastError(Emulator.handle);
+					Error.Throw(errorCode);
+				}
+			}
+		}
+		finally {
+			Emulator.MaybeReleaseLock();
+		}
+	}
+	
 	public void LoadBytecode(UInt32[] scriptBytecode) {
 		Emulator.MaybeAcquireLock();
 		
@@ -676,6 +699,24 @@ public class Script700 {
 		}
 		
 		return sb + "\n" + nybbleStream.Compile();
+	}
+	
+	public static string? BinaryFile(string spcFilePath) {
+		string dir = Env.ContainingDirectory(spcFilePath)!;
+		
+		if (spcFilePath.ToLower().EndsWith(".spc")) {
+			var s7sb = spcFilePath[..^4] + ".7sb";
+			if (File.Exists(s7sb)) {
+				return s7sb;
+			}
+			
+			var s657sb = Path.Join(dir, "65816.7sb");
+			if (File.Exists(s657sb)) {
+				return s657sb;
+			}
+		}
+		
+		return null;
 	}
 	
 	public static string? ScriptFile(string spcFilePath) {
