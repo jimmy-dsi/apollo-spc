@@ -147,8 +147,6 @@ public static partial class CliMain {
 							// Remove all snapshots after current timestamp if Script700 is disabled->enabled
 							if (DisableScript700) {
 								lock (seekBarLock) {
-									runAheadThread!.Interrupt();
-								
 									var indexes  = seekBarSnapshots.Select(x => x.Key).ToArray();
 									var curIndex = getSnapshotIndex(curCycle);
 				
@@ -178,8 +176,6 @@ public static partial class CliMain {
 							// Remove all snapshots after current timestamp if Script700 is enabled->disabled
 							if (!DisableScript700) {
 								lock (seekBarLock) {
-									runAheadThread!.Interrupt();
-								
 									var indexes  = seekBarSnapshots.Select(x => x.Key).ToArray();
 									var curIndex = getSnapshotIndex(curCycle);
 				

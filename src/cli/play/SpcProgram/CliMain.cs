@@ -46,7 +46,7 @@ public static partial class CliMain {
 			}
 			
 			RunAheadEmu = PrimaryEmu.SaveState();
-			seekBarSnapshot(0);
+			seekBarSnapshot(0, RunAheadEmu);
 			
 			// Register Key Bindings
 			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
@@ -193,22 +193,25 @@ public static partial class CliMain {
 	
 	public static void RunAheadLoop() {
 		while (true) {
-			try {
-				var runAheadEmu = RunAheadEmu;
-				runAheadEmu.StepNCyclesFast(2048000 / 60);
-				
-				var cycle = runAheadEmu.DSP.CurrentCycle;
-				RunAheadCycle = cycle;
-				
-				// TODO: Check if main thread has terminated
-				if (runAheadEmu.DSP.CurrentCycle <= (long) 2048000 * 60 * 12) { // Hard cutoff of run-ahead snapshots after 12 minutes
-					seekBarSnapshot(cycle);
-				}
+			Emulator runAheadEmu;
+			lock (seekBarLock) {
+				runAheadEmu = RunAheadEmu;
 			}
-			catch (ThreadInterruptedException) {
-				lock (seekBarLock) {
-					continue;
-				}
+			var cycles = 2048000 / 60;
+			
+			if (runAheadEmu.Script700.IsRunning) {
+				runAheadEmu.StepNCycles(cycles);
+			}
+			else {
+				runAheadEmu.StepNCyclesFast(cycles);
+			}
+			
+			var cycle = runAheadEmu.DSP.CurrentCycle;
+			RunAheadCycle = cycle;
+			
+			// TODO: Check if main thread has terminated
+			if (runAheadEmu.DSP.CurrentCycle <= (long) 2048000 * 60 * 12) { // Hard cutoff of run-ahead snapshots after 12 minutes
+				seekBarSnapshot(cycle, runAheadEmu);
 			}
 		}
 	}
@@ -217,12 +220,12 @@ public static partial class CliMain {
 		return (int) (cycle / (2048000 / SnapsPerSecond));
 	}
 	
-	static void seekBarSnapshot(long cycle) {
+	static void seekBarSnapshot(long cycle, Emulator runAheadEmu) {
 		var snapshotIndex = getSnapshotIndex(cycle);
 		
 		lock (seekBarLock) {
-			if (!seekBarSnapshots.ContainsKey(snapshotIndex)) {
-				seekBarSnapshots[snapshotIndex] = RunAheadEmu.SaveState();
+			if (ReferenceEquals(runAheadEmu, RunAheadEmu) && !seekBarSnapshots.ContainsKey(snapshotIndex)) {
+				seekBarSnapshots[snapshotIndex] = runAheadEmu.SaveState();
 			}
 		}
 	}
