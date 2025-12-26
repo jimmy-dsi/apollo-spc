@@ -17,6 +17,22 @@ public static partial class CliMain {
 	
 	static Thread? runAheadThread = null;
 	
+	static bool   killAllThreads     = false;
+	static object killAllThreadsLock = new();
+
+	public static bool KillAllThreads {
+		get {
+			lock (killAllThreadsLock) {
+				return killAllThreads;
+			}
+		}
+		set {
+			lock (killAllThreadsLock) {
+				killAllThreads = value;
+			}
+		}
+	}
+
 	public static int Start(string[] args) {
 		try {
 			ConsoleWin32.EnableCmdAnsiCodes();
@@ -114,7 +130,7 @@ public static partial class CliMain {
 			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
 			
-			AudioOutput.Setup(handleUI);
+			Driver.Setup(handleUI);
 		}
 		catch (SpcMissingHeaderError) {
 			Console.Error.WriteLine($"error: An unknown error occurred while attempting to process SPC metadata");
@@ -129,7 +145,8 @@ public static partial class CliMain {
 			return 0;
 		}
 		finally {
-			// TODO: Thread join with run ahead thread if active
+			KillAllThreads = true; // Send signal to run-ahead thread to terminate
+			runAheadThread?.Join();
 			Lib.Deinit();
 			Console.CursorVisible = true;
 		}
@@ -193,6 +210,10 @@ public static partial class CliMain {
 	
 	public static void RunAheadLoop() {
 		while (true) {
+			if (KillAllThreads) {
+				return;
+			}
+			
 			Emulator runAheadEmu;
 			lock (seekBarLock) {
 				runAheadEmu = RunAheadEmu;
@@ -209,7 +230,6 @@ public static partial class CliMain {
 			var cycle = runAheadEmu.DSP.CurrentCycle;
 			RunAheadCycle = cycle;
 			
-			// TODO: Check if main thread has terminated
 			if (runAheadEmu.DSP.CurrentCycle <= (long) 2048000 * 60 * 12) { // Hard cutoff of run-ahead snapshots after 12 minutes
 				seekBarSnapshot(cycle, runAheadEmu);
 			}

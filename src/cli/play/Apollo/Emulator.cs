@@ -327,6 +327,44 @@ public class Emulator {
 		finally { MaybeReleaseLock(); }
 	}
 	
+	public bool StepCyclesUntil(Func<bool> condition, out int steps) {
+		MaybeAcquireLock();
+		try {
+			steps = 0;
+			while (condition()) {
+				var result = DLL.EmuStepCycle(handle);
+				if (!result) {
+					_ = DLL.EmuGetLastError(handle); // Swallow error code and discard (resets next last result to success)
+					return false;
+				}
+				steps++;
+			}
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
+	public bool StepCyclesUntilFast(Func<bool> condition, out int steps) {
+		MaybeAcquireLock();
+		try {
+			steps = 0;
+			while (condition()) {
+				var result = DLL.EmuStepCycleFast(handle);
+				if (!result) {
+					_ = DLL.EmuGetLastError(handle); // Swallow error code and discard (resets next last result to success)
+					return false;
+				}
+				steps++;
+			}
+			return true;
+		}
+		finally {
+			MaybeReleaseLock();
+		}
+	}
+	
 	internal void CheckForError() {
 		var resultCode = DLL.EmuGetLastResult(handle);
 		if (resultCode != 0) {

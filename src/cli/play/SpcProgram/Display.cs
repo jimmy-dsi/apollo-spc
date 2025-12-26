@@ -184,7 +184,7 @@ public static class Display {
 	
 	public static string Flush() {
 		prevFrame = frame;
-		frame = AudioOutput.Frame;
+		frame = Driver.Frame;
 		
 		var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
 		

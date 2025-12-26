@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace SpcProgram;
 
 using System.Runtime.InteropServices;
@@ -5,7 +7,7 @@ using System.Runtime.InteropServices;
 using Apollo;
 using SDL2;
 
-public static class AudioOutput {
+public static class Driver {
 	static Emulator emu => CliMain.PrimaryEmu;
 	
 	static long   frame = 0;
@@ -35,6 +37,9 @@ public static class AudioOutput {
 			Console.WriteLine("Failed to init SDL: " + SDL.SDL_GetError());
 			return;
 		}
+		
+		// Run display before first cycle runs, in case it gets stuck in a Script700 infinite loop (we want there to be display instead of black screen)
+		uiCallback(null);
 
 		SDL.SDL_AudioSpec want = new();
 		want.freq     = 32000;
@@ -43,7 +48,7 @@ public static class AudioOutput {
 		want.samples  = 512;           // Buffer size in samples
 		want.callback = Callback;
 
-		SDL.SDL_SetHint(SDL.SDL_HINT_AUDIO_RESAMPLING_MODE, "0"); // Trivial resampling
+		SDL.SDL_SetHint(SDL.SDL_HINT_AUDIO_RESAMPLING_MODE, "3"); // Use highest possible quality resampling if available
 
 		var device = SDL.SDL_OpenAudioDevice(null, 0, ref want, out SDL.SDL_AudioSpec have, 0);
 		if (device == IntPtr.Zero) {
@@ -82,46 +87,20 @@ public static class AudioOutput {
 				var samples = numShorts / 2;
 		
 				var approxCycles = (samples - 1) * 64 - cycleSpillOver;
-				var cycles       = emu.Script700.IsRunning ? emu.StepNCycles(approxCycles) : emu.StepNCyclesFast(approxCycles);
-		
-				var attempts = 1;
-			
-				while (cycles < approxCycles) {
-					Thread.Sleep(BusyloopReliefMS);
-				
-					if (attempts >= MaxConsecutiveTimeouts) {
-						CliMain.UI_State = CliMain.State.NonFatalError;
-						return;
-					}
-				
-					var remainingCycles = approxCycles - cycles;
-					cycles = emu.Script700.IsRunning ? emu.StepNCycles(remainingCycles) : emu.StepNCyclesFast(remainingCycles);
-				
-					attempts++;
+				if (!StepCycles(approxCycles)) {
+					return;
 				}
-		
-				// TODO: Check for errors
-				if (emu.Script700.IsRunning) {
-					while (emu.SamplesQueued < samples) {
-						emu.StepCycle();
-					}
-				}
-				else {
-					while (emu.SamplesQueued < samples) {
-						emu.StepCycleFast();
-					}
+				
+				if (!StepCycles(() => emu.SamplesQueued < samples)) {
+					return;
 				}
 			
 				// Run a random extra number of cycles, between 0 and 63
 				// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
 				cycleSpillOver = rng.Next(0, 64);
 			
-				// TODO: Check for errors
-				if (emu.Script700.IsRunning) {
-					emu.StepNCycles(cycleSpillOver);
-				}
-				else {
-					emu.StepNCyclesFast(cycleSpillOver);
+				if (!StepCycles(cycleSpillOver)) {
+					return;
 				}
 		
 				buffer = emu.GetBufferedSamples();
@@ -133,6 +112,72 @@ public static class AudioOutput {
 				Transfer.SendEmuData();
 				advanceFrame();
 			}
+		}
+	}
+	
+	static bool StepCycles(int cycles) {
+		if (emu.Script700.IsRunning) {
+			var completed = emu.StepNCycles(cycles);
+			
+			var attempts = 1;
+			
+			while (completed < cycles) {
+				Thread.Sleep(BusyloopReliefMS);
+				
+				if (attempts >= MaxConsecutiveTimeouts) {
+					CliMain.UI_State = CliMain.State.NonFatalError;
+					return false;
+				}
+				
+				var remainingCycles = cycles - completed;
+				cycles = emu.StepNCycles(remainingCycles);
+				
+				attempts++;
+			}
+			
+			return true;
+		}
+		else {
+			var completed = emu.StepNCyclesFast(cycles);
+			if (completed < cycles) {
+				throw new UnreachableException($"Attempted run of {cycles} fast cycles, only {completed} succeeded. This should never happen.");
+			}
+			return true;
+		}
+	}
+	
+	static bool StepCycles(Func<bool> condition) {
+		if (emu.Script700.IsRunning) {
+			var success = emu.StepCyclesUntil(condition, out var steps);
+			
+			var attempts = 1;
+			
+			while (!success) {
+				Thread.Sleep(BusyloopReliefMS);
+				
+				if (attempts >= MaxConsecutiveTimeouts) {
+					CliMain.UI_State = CliMain.State.NonFatalError;
+					return false;
+				}
+				
+				success = emu.StepCyclesUntil(condition, out steps);
+				
+				if (steps > 0 && !success) { // Reset attempt counter if there's movement, but it hits a different Script700 snag afterward
+					attempts = 1;
+				}
+				else {
+					attempts++;
+				}
+			}
+			
+			return true;
+		}
+		else {
+			var success = emu.StepCyclesUntilFast(condition, out _);
+			if (!success) {
+				throw new UnreachableException($"Attempted run of fast cycles until condition, ended prematurely. This should never happen.");
+			}
+			return true;
 		}
 	}
 }

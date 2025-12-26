@@ -153,13 +153,14 @@ pub const Script700 = struct {
 
     pub fn run(self: *Script700, options: RunOptions) !void {
         if (!self.initialized) {
+            self.initialized = true;
+
             if (self.compat_mode) {
                 // SPCPlay's Script700 engine does not start running until 32 DSP cycles have elapsed after SPC reset
                 self.state.wait_until = self.state.cur_cycle +| 32;
+                self._finished = true;
+                return;
             }
-            self.initialized = true;
-            self._finished = true;
-            return;
         }
 
         self.state.step = 0;

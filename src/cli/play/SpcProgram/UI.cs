@@ -12,7 +12,7 @@ public static partial class CliMain {
 	class EndAppException: Exception { }
 	
 	public enum State {
-		Normal, Paused, NonFatalError
+		Init, Normal, Paused, NonFatalError
 	}
 	
 	enum View {
@@ -41,7 +41,7 @@ public static partial class CliMain {
 		Script700_Error, Continue
 	}
 	
-	static State  uiState          = State.Normal;
+	static State  uiState          = State.Init;
 	static bool   disableScript700 = false;
 	static object uiStateLock      = new();
 	
@@ -114,7 +114,7 @@ public static partial class CliMain {
 		var state = UI_State;
 		
 		prevFrame = frame;
-		frame     = AudioOutput.Frame;
+		frame     = Driver.Frame;
 		
 		if (state == State.NonFatalError) {
 			// Handle error menu controls
@@ -207,7 +207,7 @@ public static partial class CliMain {
 			}
 		}
 		
-		if (state != State.NonFatalError) {
+		if (state is not State.NonFatalError and not State.Init) {
 			action = KeyBindings.GetAction();
 		
 			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
@@ -272,17 +272,17 @@ public static partial class CliMain {
 		}
 		
 		// Display Seek Bar
-		if (buffer is not null) {
-			curCycle = buffer.DSPCycle;
+		if (buffer is not null || state == State.Init) {
+			curCycle = buffer?.DSPCycle ?? 0;
 			
 			Display.ClearLine(Display.Height - 3);
-			Display.Write(formatTime((int) (buffer.DSPCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
+			Display.Write(formatTime((int) (curCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
 			
 			var fullTimeInCycles = (long) (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12)  * 2048000;
 			var barLength        = Display.Width - 1 - 14;
 			
-			var cursorPos  = (int) ((double) buffer.DSPCycle / fullTimeInCycles * barLength);
-			var cursorPos2 = (int) ((double)   RunAheadCycle / fullTimeInCycles * barLength);
+			var cursorPos  = (int) ((double)      curCycle / fullTimeInCycles * barLength);
+			var cursorPos2 = (int) ((double) RunAheadCycle / fullTimeInCycles * barLength);
 			
 			cursorPos  = Math  .Min(cursorPos,                          Display.Width - 1);
 			cursorPos2 = Math.Clamp(cursorPos2, Math.Max(1, cursorPos), Display.Width);
@@ -308,8 +308,9 @@ public static partial class CliMain {
 			Display.Write(menuBarMsg,     0, Display.Height - 1, barColor);
 		}
 		
-		if (buffer is not null) {
-			var cycleCounter = cyclesInSpcClocks ? $"SPC Cycle: {buffer.DSPCycle / 2}" : $"DSP Cycle: {buffer.DSPCycle}";
+		if (buffer is not null || state == State.Init) {
+			var cycle = buffer?.DSPCycle ?? 0;
+			var cycleCounter = cyclesInSpcClocks ? $"SPC Cycle: {cycle / 2}" : $"DSP Cycle: {cycle}";
 			Display.Write(cycleCounter, Display.Width - 1 - cycleCounter.Length, Display.Height - 1, barColor);
 		}
 		
@@ -350,6 +351,10 @@ public static partial class CliMain {
 				Display.ClearBox(region.W + 2, region.H, region.X - 1, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
 				Display.WriteBox(option, region.X, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
 			}
+		}
+		
+		if (state == State.Init) {
+			UI_State = State.Normal;
 		}
 		
 		Console.Write(Display.Flush());
