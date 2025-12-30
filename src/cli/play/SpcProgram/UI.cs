@@ -940,6 +940,42 @@ public static partial class CliMain {
 		}
 	}
 	
+	static sbyte[] heatValues = [0x7F, 0x60, 0x38, 0x10, -0x10, -0x58, -0x6D, -0x80];
+	
+	static void showBar(double value, int displayHeight, int x, int y) {
+		var color  = Color.CRed;
+		var height = (int) Math.Round(value * displayHeight * 2);
+		
+		var refColor_1 = heatMapColor(BusSize.Bit8, signed: true, scale: 1, heatValues[0]);
+		
+		x -= 1;
+		
+		if (height > 0) {
+			for (var i = 0; i < displayHeight; i++) {
+				Color bgcol = heatMapColor(BusSize.Bit8, signed: true, scale: 1, heatValues[i]);
+				Color fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
+				fgCol = Color.FromLCH((3 * refColor_1.L + 2 * fgCol.L) / 5, fgCol.C, fgCol.H);
+				
+				if (i < height / 2) {
+					Display.Write("███", x, y - i - 1, fgCol);
+				}
+				else if (i == height / 2 && height % 2 == 1) {
+					Display.Write("▄▄▄", x, y - i - 1, fgCol);
+				}
+			}
+		}
+		else if (height < 0) {
+			for (var i = 0; i < displayHeight; i++) {
+				if (i < -height / 2) {
+					Display.Write("███", x, y + i, col: color);
+				}
+				else if (i == -height / 2 && -height % 2 == 1) {
+					Display.Write("▀▀▀", x, y + i, col: color);
+				}
+			}
+		}
+	}
+	
 	static void showColorCoding() {
 		if (heatMapEnabled) {
 			var i = 0;

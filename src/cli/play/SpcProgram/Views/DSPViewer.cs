@@ -1,6 +1,6 @@
-using System.Diagnostics;
-
 namespace SpcProgram;
+
+using System.Diagnostics;
 
 using Apollo;
 using Jimbl;
@@ -172,6 +172,49 @@ public static partial class CliMain {
 		}
 		
 		// Section 5
+		var specX = firX + 37;
+		var specY = Display.Y - 5;
+		
+		var darkBlue = heatMapColor(BusSize.Bit8, false, 1, 12);
+		
+		Display.ClearBox(20, 8, specX + 1, specY + 1);
+		Display.Write(new('_', 20), specX + 1, specY + 2, col: Color.DarkGrey);
+		Display.Write(new('_', 20), specX + 1, specY + 4, col: Color.Grey);
+		Display.Write(new('_', 20), specX + 1, specY + 6, col: Color.DarkGrey);
+		
+		var firFFT = JMath.FFT_Gain(buffer.DSP_State!.FIR.Select(x => (int) x).ToArray(), 0x80);
+		const double MaxDB = 16;
+		
+		for (var i = 0; i < firFFT.Length; i++) {
+			var raw = JDSP.AmpToDB(firFFT[i]);
+			var val = Math.Clamp(raw + MaxDB, 0, MaxDB * 2);
+			
+			var bar = val / (MaxDB * 2);
+			
+			showBar(bar, 8, specX + 2 + 4 * i, specY + 9);
+		}
+		
+		Display.DrawOutline(specX, specY, 22, 10, col: Color.BGMagenta);
+		Display.Write(new(' ', 22), specX,      specY);
+		Display.Write(new(' ', 20), specX + 1,  specY,     col: darkBlue);
+		Display.Write(new(' ', 22), specX,      specY + 9);
+		Display.Write(" ",          specX,      specY, col: Color.BGMagenta);
+		Display.Write(" ",          specX + 21, specY, col: Color.BGMagenta);
+		
+		//Display.ClearBox(4, 9, specX - 4, specY + 1, col: Color.BGMagenta);
+		Display.Write("+16 _", specX - 5, specY,     col: Color.BGMagenta);
+		Display.Write("+12 _", specX - 5, specY + 1, col: Color.BGMagenta);
+		Display.Write("+8  _", specX - 5, specY + 2, col: Color.BGMagenta);
+		Display.Write("+4  _", specX - 5, specY + 3, col: Color.BGMagenta);
+		Display.Write(" 0  _", specX - 5, specY + 4, col: Color.BGMagenta);
+		Display.Write("-4  _", specX - 5, specY + 5, col: Color.BGMagenta);
+		Display.Write("-8  _", specX - 5, specY + 6, col: Color.BGMagenta);
+		Display.Write("-12 _", specX - 5, specY + 7, col: Color.BGMagenta);
+		Display.Write("-16 _", specX - 5, specY + 8, col: Color.BGMagenta);
+		Display.Write("     ", specX - 5, specY + 9, col: Color.BGMagenta);
+		Display.Write(" 0k  4k  8k  12k  16k ", specX, specY + 9, col: Color.BGMagenta);
+		
+		// Section 6
 		y = baseY;
 		x = xo1 + 11;
 		

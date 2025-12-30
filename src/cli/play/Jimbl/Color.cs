@@ -125,6 +125,7 @@ public class Color {
 	public static Color CBlue      = new(ansiCode: 34);
 	public static Color Magenta    = new(ansiCode: 35);
 	public static Color Cyan       = new(ansiCode: 36);
+	public static Color Grey       = new(ansiCode: 37);
 	
 	public static Color DarkGrey   = new(ansiCode: 90);
 	
@@ -135,6 +136,7 @@ public class Color {
 	public static Color BGBlue     = new(ansiCode: 44);
 	public static Color BGMagenta  = new(ansiCode: 45);
 	public static Color BGCyan     = new(ansiCode: 46);
+	public static Color BGGrey     = new(ansiCode: 47);
 	
 	public static Color BGDarkGrey = new(ansiCode: 100);
 	public static Color BGWhite    = new(ansiCode: 107);
