@@ -940,21 +940,38 @@ public static partial class CliMain {
 		}
 	}
 	
-	static sbyte[] heatValues = [0x7F, 0x60, 0x38, 0x10, -0x10, -0x58, -0x6D, -0x80];
+	static byte[] heatValues = [0x50, 0x68, 0xA0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0];
 	
 	static void showBar(double value, int displayHeight, int x, int y) {
 		var color  = Color.CRed;
 		var height = (int) Math.Round(value * displayHeight * 2);
 		
-		var refColor_1 = heatMapColor(BusSize.Bit8, signed: true, scale: 1, heatValues[0]);
+		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF);
 		
 		x -= 1;
 		
 		if (height > 0) {
 			for (var i = 0; i < displayHeight; i++) {
-				Color bgcol = heatMapColor(BusSize.Bit8, signed: true, scale: 1, heatValues[i]);
-				Color fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
-				fgCol = Color.FromLCH((3 * refColor_1.L + 2 * fgCol.L) / 5, fgCol.C, fgCol.H);
+				Color bgcol;
+				Color fgCol;
+				
+				if (i >= displayHeight / 2) {
+					var interp = (double) (displayHeight - i) / (displayHeight / 2 + 1);
+					interp = Math.Pow(interp, 2);
+					
+					bgcol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i]);
+					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
+					fgCol = Color.FromLCH(
+						refColor.L * interp + fgCol.L * (1 - interp),
+						refColor.C * interp + fgCol.C * (1 - interp),
+						refColor.H * interp + fgCol.H * (1 - interp)
+					);
+				}
+				else {
+					bgcol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i]);
+					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
+				}
+				
 				
 				if (i < height / 2) {
 					Display.Write("███", x, y - i - 1, fgCol);

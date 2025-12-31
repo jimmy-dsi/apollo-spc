@@ -173,14 +173,15 @@ public static partial class CliMain {
 		
 		// Section 5
 		var specX = firX + 37;
-		var specY = Display.Y - 5;
+		var specY = Display.Y - 6;
 		
-		var darkBlue = heatMapColor(BusSize.Bit8, false, 1, 12);
+		Color? darkBlue = null; //heatMapColor(BusSize.Bit8, false, 1, 12);
+		Color? boxColor = null;
 		
 		Display.ClearBox(20, 8, specX + 1, specY + 1);
-		Display.Write(new('_', 20), specX + 1, specY + 2, col: Color.DarkGrey);
-		Display.Write(new('_', 20), specX + 1, specY + 4, col: Color.Grey);
-		Display.Write(new('_', 20), specX + 1, specY + 6, col: Color.DarkGrey);
+		Display.Write(new('_', 21), specX, specY + 2, col: Color.DarkGrey);
+		Display.Write(new('_', 21), specX, specY + 4, col: Color.Grey);
+		Display.Write(new('_', 21), specX, specY + 6, col: Color.DarkGrey);
 		
 		var firFFT = JMath.FFT_Gain(buffer.DSP_State!.FIR.Select(x => (int) x).ToArray(), 0x80);
 		const double MaxDB = 16;
@@ -194,25 +195,25 @@ public static partial class CliMain {
 			showBar(bar, 8, specX + 2 + 4 * i, specY + 9);
 		}
 		
-		Display.DrawOutline(specX, specY, 22, 10, col: Color.BGMagenta);
-		Display.Write(new(' ', 22), specX,      specY);
-		Display.Write(new(' ', 20), specX + 1,  specY,     col: darkBlue);
-		Display.Write(new(' ', 22), specX,      specY + 9);
-		Display.Write(" ",          specX,      specY, col: Color.BGMagenta);
-		Display.Write(" ",          specX + 21, specY, col: Color.BGMagenta);
+		Display.DrawOutline(specX - 1, specY, 23, 10, col: boxColor);
+		Display.Write(new(' ', 23), specX -  1, specY);
+		Display.Write(new(' ', 21), specX,      specY,     col: darkBlue);
+		Display.Write(new(' ', 23), specX -  1, specY + 9);
+		Display.Write(" ",          specX -  1, specY, col: boxColor);
+		Display.Write(" ",          specX + 21, specY, col: boxColor);
 		
 		//Display.ClearBox(4, 9, specX - 4, specY + 1, col: Color.BGMagenta);
-		Display.Write("+16 _", specX - 5, specY,     col: Color.BGMagenta);
-		Display.Write("+12 _", specX - 5, specY + 1, col: Color.BGMagenta);
-		Display.Write("+8  _", specX - 5, specY + 2, col: Color.BGMagenta);
-		Display.Write("+4  _", specX - 5, specY + 3, col: Color.BGMagenta);
-		Display.Write(" 0  _", specX - 5, specY + 4, col: Color.BGMagenta);
-		Display.Write("-4  _", specX - 5, specY + 5, col: Color.BGMagenta);
-		Display.Write("-8  _", specX - 5, specY + 6, col: Color.BGMagenta);
-		Display.Write("-12 _", specX - 5, specY + 7, col: Color.BGMagenta);
-		Display.Write("-16 _", specX - 5, specY + 8, col: Color.BGMagenta);
-		Display.Write("     ", specX - 5, specY + 9, col: Color.BGMagenta);
-		Display.Write(" 0k  4k  8k  12k  16k ", specX, specY + 9, col: Color.BGMagenta);
+		Display.Write("+16 _", specX - 6, specY,     col: boxColor);
+		Display.Write("+12 _", specX - 6, specY + 1, col: boxColor);
+		Display.Write("+8  _", specX - 6, specY + 2, col: boxColor);
+		Display.Write("+4  _", specX - 6, specY + 3, col: boxColor);
+		Display.Write(" 0  _", specX - 6, specY + 4, col: boxColor);
+		Display.Write("-4  _", specX - 6, specY + 5, col: boxColor);
+		Display.Write("-8  _", specX - 6, specY + 6, col: boxColor);
+		Display.Write("-12 _", specX - 6, specY + 7, col: boxColor);
+		Display.Write("-16 _", specX - 6, specY + 8, col: boxColor);
+		Display.Write("     ", specX - 6, specY + 9, col: boxColor);
+		Display.Write("  0k  4k  8k  12k  16k ", specX - 1, specY + 9, col: boxColor);
 		
 		// Section 6
 		y = baseY;
@@ -234,7 +235,7 @@ public static partial class CliMain {
 			Display.Write("  ", x + xo2, y + 6, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1,  buffer.DSP_State!.SourceStartPage));
 			Display.Write("  ", x + xo2, y + 7, col: heatMapColor(BusSize.Bit8, signed: false, scale: 16, buffer.DSP_State!.EchoDelay));
 		}
-			
+		
 		xhm += 3;
 		
 		Display.WriteBox([
