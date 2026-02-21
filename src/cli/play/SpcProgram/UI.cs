@@ -109,6 +109,17 @@ public static partial class CliMain {
 		}
 	}
 	
+	public static void TogglePause() {
+		lock (uiStateLock) {
+			if (uiState == State.Normal) {
+				uiState = State.Paused;
+			}
+			else if (uiState == State.Paused) {
+				uiState = State.Normal;
+			}
+		}
+	}
+	
 	static void handleUI(EmuDataBuffer? buffer) {
 		KeyBindings.Action? action = null;
 		var state = UI_State;
@@ -693,6 +704,11 @@ public static partial class CliMain {
 				setTempStatusMsg(StatusMSG.SeekPos);
 				break;
 			}
+			
+			case KeyBindings.Action.TogglePause: {
+				TogglePause();
+				break;
+			}
 		}
 	}
 	
@@ -944,7 +960,7 @@ public static partial class CliMain {
 	
 	static void showBar(double value, int displayHeight, int x, int y) {
 		var color  = Color.CRed;
-		var height = (int) Math.Round(value * displayHeight * 2);
+		var height = (int) Math.Round(value * displayHeight * 8);
 		
 		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF);
 		
@@ -972,13 +988,38 @@ public static partial class CliMain {
 					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
 				}
 				
-				
-				if (i < height / 2) {
-					Display.Write("███", x, y - i - 1, fgCol);
-				}
-				else if (i == height / 2 && height % 2 == 1) {
-					Display.Write("▄▄▄", x, y - i - 1, fgCol);
-				}
+				#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
+					if (i < height / 8) {
+						Display.Write("███", x, y - i - 1, fgCol);
+					}
+					else if (i == height / 8 && height % 8 > 0) {
+						var barString = (height % 8) switch {
+							1 => "▁▁▁",
+							2 => "▂▂▂",
+							3 => "▃▃▃",
+							4 => "▄▄▄",
+							5 => "▅▅▅",
+							6 => "▆▆▆",
+							7 => "▇▇▇",
+							_ => throw new UnreachableException()
+						};
+						Display.Write(barString, x, y - i - 1, fgCol);
+					}
+				#else
+					if (i < height / 8) {
+						Display.Write("███", x, y - i - 1, fgCol);
+					}
+					else if (i == height / 8 && height % 8 >= 4) {
+						var barString = (height % 8) switch {
+							4 => "▄▄▄",
+							5 => "▄▄▄",
+							6 => "▄▄▄",
+							7 => "▄▄▄",
+							_ => throw new UnreachableException()
+						};
+						Display.Write(barString, x, y - i - 1, fgCol);
+					}
+				#endif
 			}
 		}
 		else if (height < 0) {

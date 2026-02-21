@@ -100,7 +100,7 @@ public static class KeyBindings {
 		}
 		
 		public Key(char printable) {
-			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '<' or '>') && !printable.IsAsciiLetterOrDigit()) {
+			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '<' or '>' or ' ') && !printable.IsAsciiLetterOrDigit()) {
 				throw new ArgumentException();
 			}
 			
@@ -170,6 +170,7 @@ public static class KeyBindings {
 		SeekPos_7,
 		SeekPos_8,
 		SeekPos_9,
+		TogglePause,
 	}
 		
 	static Key?      lastCtrlKey    = null;

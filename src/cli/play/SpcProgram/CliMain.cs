@@ -120,6 +120,7 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('&'), KeyBindings.Action.SeekPos_7, ctrl: false);
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('*'), KeyBindings.Action.SeekPos_8, ctrl: false);
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('('), KeyBindings.Action.SeekPos_9, ctrl: false);
+			KeyBindings.Register(KeyBindings.Key.Char(' '),  KeyBindings.Action.TogglePause);
 			
 			Console.Clear();
 			Console.CursorVisible = false;

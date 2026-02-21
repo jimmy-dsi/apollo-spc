@@ -42,6 +42,9 @@ public static partial class CliMain {
 		Display.Write("[Warning: may produce rapid flashing]", x * 2, y, Color.Yellow);
 		y++;
 		Display.Write($"Display cycle count in {(cyclesInSpcClocks ? "DSP" : "SPC")} clocks", 1, y); Display.Write("Ctrl+D", x, y); y++;
+		y++;
+		
+		Display.Write("Pause/Resume",                   1, y); Display.Write("Space",               x, y); y++;
 		
 		Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
 	}
