@@ -1,0 +1,82 @@
+# Compiling
+This section details the build process on Windows 10/11 for both the full **apollo-spc-program** app as well as the **apollo.dll** library.
+
+## Required
+- Zig 0.14.1 — **Later versions will not work!**
+- Dotnet SDK 8.0+
+- Visual Studio 2022 "Desktop development with C++" workload
+
+## Zig Installation
+Download Zig 0.14.1 (Windows x86_64) from https://ziglang.org/download/0.14.1/zig-x86_64-windows-0.14.1.zip
+
+Extract the archive to your desired location, then open up a new Powershell window (or Windows Terminal with a Powershell profile). Add the directory path containing the `zig` executable to your `PATH` environment variable with the following command (Replace `C:\path\to\folder\with\zig\binary`) below:
+
+```powershell
+$zigPath = "C:\path\to\folder\with\zig\binary"
+$env:Path = $zigPath + ";" + $env:Path
+$newPath = $zigPath + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+[System.Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+```
+
+Check to make sure Zig is installed correctly:
+
+```powershell
+zig version
+```
+
+If you see `0.14.1` as your output, you are good to continue on to the next steps. If you see any other version number, or "command not found", then something went wrong during download or path setup.
+
+## Dotnet Installation
+Firstly, before doing anything, you'll want to create a new persistent environment variable called `DOTNET_CLI_TELEMETRY_OPTOUT` with a value of `1`. This will prevent further data collection by Microsoft while using the dotnet toolchain (https://learn.microsoft.com/en-us/dotnet/core/tools/telemetry#how-to-opt-out).
+
+```powershell
+[Environment]::SetEnvironmentVariable('DOTNET_CLI_TELEMETRY_OPTOUT', 1, 'User')
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = 1
+```
+
+Now you're ready to install the dotnet SDK for Windows. Download from the official dotnet SDK link:
+https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.305/dotnet-sdk-9.0.305-win-x64.exe
+
+Open the setup exe and follow the prompts until the installation is complete.
+
+## Installing the Visual Studio C++ Workload
+
+The CLI app utilizes dotnet's Ahead-Of-Time (AOT) compilation features. In order to build projects using these features, you will first need to download and install Visual Studio 2022 if you haven't already.
+
+If you already have Visual Studio 2022, create or open up any project, go to the "Tools" menu in the top menu bar and click on "Get Tools and Features..." (This should be the very first item in the drop-down menu).
+
+You should see a menu like the one below. Enable the checkbox in the highlighted area:
+![Visual Studio Menu](doc/visual-studio-menu.png)
+
+Click on the Modify button in the bottom-right corner (or Install if it's a fresh Visual Studio installation), then wait for the feature to finish downloading and installing.
+
+Once that is complete, you are ready to move on to the next build steps.
+
+## Building
+To build the project in full, simply navigate to the root folder of your cloned git repo in a Powershell window and type:
+
+```powershell
+.\build.ps1
+```
+
+This will build the entire project as whole. This includes the Dotnet CLI app **apollo-spc-program**, as well as the standalone Zig library **apollo.dll**.
+
+Note: If this is the first time running a Powershell script on your system, you may get an error message about the script execution being blocked due to the execution policy. If this occurs, update the execution policy to "RemoteSigned":
+
+```powershell
+Set-ExecutionPolicy RemoteSigned
+```
+
+If the build is successful—and assuming you have already met the prerequisites for running the app itself—you can now run the freshly built app from the `bin\` folder by entering:
+```powershell
+bin\apollo-spc-program.exe "<path-to-your-spc-file.spc>"
+```
+
+## Building the Library Only
+If you do not wish to install the dotnet SDK onto your machine, you can choose to build **apollo.dll** only (the Zig standalone library).
+
+You can build this using the following command (in either cmd or Powershell):
+
+```powershell
+src\zig-build-lib.bat
+```
