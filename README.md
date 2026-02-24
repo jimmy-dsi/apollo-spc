@@ -24,7 +24,7 @@ Running the player is as simple as invoking the **apollo-spc-program** app with 
 
 ## Compiling
 
-TODO: Fill out this section
+See [COMPILING-Windows.md](COMPILING-Windows.md) or [COMPILING-Linux.md](COMPILING-Linux.md)
 
 ## Other Useful Information
 - [Apollo extended Script700 commands](./doc/apollo-specific-script700-commands.md)
