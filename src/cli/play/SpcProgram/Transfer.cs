@@ -25,7 +25,7 @@ public static class Transfer {
 		Script700_Data  = 1 << 11,
 	}
 	
-	public static volatile bool Signal = false;
+	public static AutoResetEvent Signal = new(false);
 	
 	static object requestLock = new();
 	
@@ -149,7 +149,7 @@ public static class Transfer {
 		});
 		
 		// After that's done, give the main thread the go ahead signal to display said data
-		Signal = true;
+		Signal.Set();
 	}
 	
 	public static void RequestEmuData(Requests reqs, UInt16 startAddress, UInt16 length) {

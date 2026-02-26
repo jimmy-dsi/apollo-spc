@@ -64,7 +64,9 @@ public static partial class CliMain {
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
 	
-	static long curCycle = 0;
+	static long   curCycle     = 0;
+	static long   barCycle     = 0;
+	static object barCycleLock = new();
 	
 	static long frame     = 0;
 	static long prevFrame = 0;
@@ -285,6 +287,9 @@ public static partial class CliMain {
 		// Display Seek Bar
 		if (buffer is not null || state == State.Init) {
 			curCycle = buffer?.DSPCycle ?? 0;
+			lock (barCycleLock) {
+				barCycle = curCycle;
+			}
 			
 			Display.ClearLine(Display.Height - 3);
 			Display.Write(formatTime((int) (curCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);

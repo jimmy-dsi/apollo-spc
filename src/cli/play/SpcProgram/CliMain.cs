@@ -163,8 +163,9 @@ public static partial class CliMain {
 				return;
 			}
 			
-			while (!Transfer.Signal) {
-				Thread.Sleep(1); // 1 millisecond sleep to reduce CPU load
+			var signalReceived = false;
+			while (!signalReceived) {
+				signalReceived = Transfer.Signal.WaitOne(500); // Timeout of 500ms
 				if (TerminateRequest) {
 					return;
 				}
@@ -178,7 +179,7 @@ public static partial class CliMain {
 				buffer = container.Buffer.Clone();
 			});
 				
-			Transfer.Signal = false;
+			Transfer.Signal.Reset();
 			
 			if (buffer is null /*|| buffer.DSPCycle < lastCycle*/) {
 				continue;
@@ -219,7 +220,7 @@ public static partial class CliMain {
 			lock (seekBarLock) {
 				runAheadEmu = RunAheadEmu;
 			}
-			var cycles = 2048000 / 60;
+			var cycles = 2048000 / 8;
 			
 			if (runAheadEmu.Script700.IsRunning) {
 				runAheadEmu.StepNCycles(cycles);
@@ -228,8 +229,33 @@ public static partial class CliMain {
 				runAheadEmu.StepNCyclesFast(cycles);
 			}
 			
+			long playCycle;
+			lock (barCycleLock) {
+				playCycle = barCycle;
+			}
+			
 			var cycle = runAheadEmu.DSP.CurrentCycle;
 			RunAheadCycle = cycle;
+			
+			var throttleFactor = 0;
+			
+			// Sleep for a bit if run ahead is far ahead of current play position
+			if (cycle >= playCycle + 120 * 2048000) {
+				throttleFactor = 8;
+			}
+			else if (cycle >= playCycle + 60 * 2048000) {
+				throttleFactor = 5;
+			}
+			else if (cycle >= playCycle + 40 * 2048000) {
+				throttleFactor = 3;
+			}
+			else if (cycle >= playCycle + 20 * 2048000) {
+				throttleFactor = 2;
+			}
+			
+			if (throttleFactor > 0) {
+				Thread.Sleep(8 * throttleFactor);
+			}
 			
 			if (runAheadEmu.DSP.CurrentCycle <= (long) 2048000 * 60 * 12) { // Hard cutoff of run-ahead snapshots after 12 minutes
 				seekBarSnapshot(cycle, runAheadEmu);
