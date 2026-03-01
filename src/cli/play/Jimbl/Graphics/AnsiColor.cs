@@ -1,6 +1,6 @@
-namespace Jimbl;
+namespace Jimbl.Graphics;
 
-public class Color {
+public class AnsiColor {
 	uint value;
 	
 	public byte Red   => (byte) (value >> 16);
@@ -13,7 +13,7 @@ public class Color {
 	public double C { get; private set; }
 	public double H { get; private set; }
 	
-	public static Color FromLCH(double L, double C, double H, bool bg = false) {
+	public static AnsiColor FromLCH(double L, double C, double H, bool bg = false) {
 		// Convert to Lab
 		double a = C * Math.Cos(H);
 		double b = C * Math.Sin(H);
@@ -25,7 +25,7 @@ public class Color {
 		return color;
 	}
 	
-	public static Color FromLab(double L, double a, double b, bool bg = false) {
+	public static AnsiColor FromLab(double L, double a, double b, bool bg = false) {
 		double y = (L + 16) / 116;
 		double x = a / 500 + y;
 		double z = y - b / 200;
@@ -84,7 +84,7 @@ public class Color {
 			blue *= 12.92;
 		}
 		
-		Color col = new(
+		AnsiColor col = new(
 			(byte) Math.Clamp(red   * 255, 0, 255),
 			(byte) Math.Clamp(green * 255, 0, 255),
 			(byte) Math.Clamp(blue  * 255, 0, 255),
@@ -118,34 +118,34 @@ public class Color {
 	
 	public bool IsBG => value >> 24 == 1;
 	
-	public static Color Black      = new(ansiCode: 30);
-	public static Color CRed       = new(ansiCode: 31);
-	public static Color CGreen     = new(ansiCode: 32);
-	public static Color Yellow     = new(ansiCode: 33);
-	public static Color CBlue      = new(ansiCode: 34);
-	public static Color Magenta    = new(ansiCode: 35);
-	public static Color Cyan       = new(ansiCode: 36);
-	public static Color Grey       = new(ansiCode: 37);
+	public static AnsiColor Black      = new(ansiCode: 30);
+	public static AnsiColor CRed       = new(ansiCode: 31);
+	public static AnsiColor CGreen     = new(ansiCode: 32);
+	public static AnsiColor Yellow     = new(ansiCode: 33);
+	public static AnsiColor CBlue      = new(ansiCode: 34);
+	public static AnsiColor Magenta    = new(ansiCode: 35);
+	public static AnsiColor Cyan       = new(ansiCode: 36);
+	public static AnsiColor Grey       = new(ansiCode: 37);
 	
-	public static Color DarkGrey   = new(ansiCode: 90);
+	public static AnsiColor DarkGrey   = new(ansiCode: 90);
 	
-	public static Color BGBlack    = new(ansiCode: 40);
-	public static Color BGRed      = new(ansiCode: 41);
-	public static Color BGGreen    = new(ansiCode: 42);
-	public static Color BGYellow   = new(ansiCode: 43);
-	public static Color BGBlue     = new(ansiCode: 44);
-	public static Color BGMagenta  = new(ansiCode: 45);
-	public static Color BGCyan     = new(ansiCode: 46);
-	public static Color BGGrey     = new(ansiCode: 47);
+	public static AnsiColor BGBlack    = new(ansiCode: 40);
+	public static AnsiColor BGRed      = new(ansiCode: 41);
+	public static AnsiColor BGGreen    = new(ansiCode: 42);
+	public static AnsiColor BGYellow   = new(ansiCode: 43);
+	public static AnsiColor BGBlue     = new(ansiCode: 44);
+	public static AnsiColor BGMagenta  = new(ansiCode: 45);
+	public static AnsiColor BGCyan     = new(ansiCode: 46);
+	public static AnsiColor BGGrey     = new(ansiCode: 47);
 	
-	public static Color BGDarkGrey = new(ansiCode: 100);
-	public static Color BGWhite    = new(ansiCode: 107);
+	public static AnsiColor BGDarkGrey = new(ansiCode: 100);
+	public static AnsiColor BGWhite    = new(ansiCode: 107);
 	
-	public Color(byte ansiCode) {
+	public AnsiColor(byte ansiCode) {
 		value = (uint) ansiCode << 24;
 	}
 	
-	public Color(double red, double green, double blue, bool bg = false):
+	public AnsiColor(double red, double green, double blue, bool bg = false):
 		this(
 			(byte) Math.Clamp(red   * 255, 0, 255),
 			(byte) Math.Clamp(green * 255, 0, 255),
@@ -153,11 +153,11 @@ public class Color {
 			bg: bg
 		) { }
 	
-	public Color(byte red, byte green, byte blue): this(red, green, blue, bg: false) { }
+	public AnsiColor(byte red, byte green, byte blue): this(red, green, blue, bg: false) { }
 	
-	public Color(byte red, byte green, byte blue, bool bg): this(red, green, blue, bg, compLab: true) { }
+	public AnsiColor(byte red, byte green, byte blue, bool bg): this(red, green, blue, bg, compLab: true) { }
 	
-	Color(byte red, byte green, byte blue, bool bg, bool compLab) {
+	AnsiColor(byte red, byte green, byte blue, bool bg, bool compLab) {
 		value = (uint) (red << 16 | green << 8 | blue);
 		if (bg) {
 			value |= 0x01_000000;

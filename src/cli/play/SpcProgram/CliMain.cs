@@ -1,7 +1,7 @@
 namespace SpcProgram;
 
 using Apollo;
-using Jimbl;
+using Jimbl.Graphics;
 
 public static partial class CliMain {
 	public static Emulator PrimaryEmu  { get; private set; }
@@ -306,7 +306,7 @@ public static partial class CliMain {
 		return $"{(int) length.TotalHours:D2}:{length.Minutes:D2}:{length.Seconds:D2}.{length.Milliseconds:D3}";
 	}
 	
-	static (string, Color?) drawTextField(string? text, Color? col = null) {
+	static (string, AnsiColor?) drawTextField(string? text, AnsiColor? col = null) {
 		if ((text ?? "") == "") {
 			return ("<none>", new(ansiCode: 32));
 		}

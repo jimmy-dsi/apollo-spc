@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Jimbl;
 
 using System.Globalization;
@@ -149,4 +151,73 @@ public static class Exts {
 	
 	public static char ToLower(this char c) => char.ToLower(c);
 	public static char ToUpper(this char c) => char.ToUpper(c);
+	
+	public static bool FitsInt32(this Type type) {
+		return type == typeof(char)
+		    || type == typeof(byte)
+		    || type == typeof(sbyte)
+		    || type == typeof(UInt16)
+		    || type == typeof(Int16)
+		    || type == typeof(Int32);
+	}
+	
+	public static bool FitsUInt32(this Type type) {
+		return type == typeof(char)
+		    || type == typeof(byte)
+		    || type == typeof(UInt16)
+		    || type == typeof(UInt32);
+	}
+	
+	public static bool FitsInt64(this Type type) {
+		return type.FitsInt32()
+		    || type == typeof(UInt32)
+		    || type == typeof(Int64);
+	}
+	
+	public static bool FitsUInt64(this Type type) {
+		return type.FitsUInt32()
+		    || type == typeof(UInt64);
+	}
+	
+	public static bool FitsInt128(this Type type) {
+		return type.FitsInt64()
+		    || type == typeof(UInt64)
+		    || type == typeof(Int128);
+	}
+	
+	public static bool FitsUInt128(this Type type) {
+		return type.FitsUInt64()
+		    || type == typeof(UInt128);
+	}
+	
+	public static bool FitsBigInteger(this Type type) {
+		return type.FitsInt128()
+		    || type == typeof(UInt128)
+		    || type == typeof(BigInteger);
+	}
+	
+	public static bool FitsFloat32(this Type type) {
+		return type == typeof(byte)
+		    || type == typeof(sbyte)
+		    || type == typeof(UInt16)
+		    || type == typeof(Int16)
+		    || type == typeof(float);
+	}
+	
+	public static bool FitsFloat64(this Type type) {
+		return type.FitsInt32()
+		    || type.FitsFloat32()
+		    || type == typeof(double);
+	}
+	
+	public static bool FitsDecimal(this Type type) {
+		return type.FitsInt64()
+		    || type == typeof(UInt64)
+		    || type == typeof(decimal);
+	}
+	
+	public static bool FitsComplex(this Type type) {
+		return type.FitsFloat64()
+		    || type == typeof(Complex);
+	}
 }

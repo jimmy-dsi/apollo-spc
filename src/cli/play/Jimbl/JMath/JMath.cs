@@ -1,4 +1,4 @@
-namespace Jimbl;
+namespace Jimbl.JMath;
 
 using System.Numerics;
 

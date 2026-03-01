@@ -1,7 +1,7 @@
 namespace SpcProgram;
 
 using Apollo;
-using Jimbl;
+using Jimbl.Graphics;
 
 public static partial class CliMain {
 	static void showHelpMenu() {
@@ -39,7 +39,7 @@ public static partial class CliMain {
 		y++;
 		
 		Display.Write("Toggle heat map", 1, y); Display.Write("Ctrl+E+T", x, y);
-		Display.Write("[Warning: may produce rapid flashing]", x * 2, y, Color.Yellow);
+		Display.Write("[Warning: may produce rapid flashing]", x * 2, y, AnsiColor.Yellow);
 		y++;
 		Display.Write($"Display cycle count in {(cyclesInSpcClocks ? "DSP" : "SPC")} clocks", 1, y); Display.Write("Ctrl+D", x, y); y++;
 		y++;

@@ -3,22 +3,23 @@ namespace SpcProgram;
 using System.Text;
 
 using Jimbl;
+using Jimbl.Graphics;
 
 public static class Display {
 	// For scrollable display region
-	static List<List<char>>    charBuffer;
-	static List<List<Color?>> colorBuffer;
+	static List<List<char>>       charBuffer;
+	static List<List<AnsiColor?>> colorBuffer;
 	
 	// For static display
-	static   char[][]  charGrid;
-	static Color?[][] colorGrid;
+	static       char[][]  charGrid;
+	static AnsiColor?[][] colorGrid;
 	
 	// Previous static display color buffers
-	static Color?[][][] prevColorGrids;
+	static AnsiColor?[][][] prevColorGrids;
 	
 	static int x = 0;
 	static int y = 0;
-	static Color? color = null;
+	static AnsiColor? color = null;
 	
 	static long frame     = 0;
 	static long prevFrame = 0;
@@ -26,7 +27,7 @@ public static class Display {
 	public static int Width  { get; private set; }
 	public static int Height { get; private set; }
 	
-	public static Color? Color {
+	public static AnsiColor? Color {
 		get => color;
 		set => color = value;
 	}
@@ -45,34 +46,34 @@ public static class Display {
 		Width  = width;
 		Height = height;
 		
-		charGrid  = new   char[height][];
-		colorGrid = new Color?[height][];
+		charGrid  = new       char[height][];
+		colorGrid = new AnsiColor?[height][];
 		
-		List<Color?[][]> pcg = new();
+		List<AnsiColor?[][]> pcg = new();
 		
 		for (var i = 0; i < 4; i++) {
-			pcg.Add(new Color?[][]{ });
+			pcg.Add(new AnsiColor?[][]{ });
 		}
 		
 		prevColorGrids = pcg.ToArray();
 			
 		for (var i = 0; i < 4; i++) {
-			prevColorGrids[i] = new Color?[height][];
+			prevColorGrids[i] = new AnsiColor?[height][];
 		}
 		
 		for (var y = 0; y < height; y++) {
-			charGrid[y]  = new   char[width];
-			colorGrid[y] = new Color?[width];
+			charGrid[y]  = new       char[width];
+			colorGrid[y] = new AnsiColor?[width];
 			
 			for (var i = 0; i < 4; i++) {
-				prevColorGrids[i][y] = new Color?[width];
+				prevColorGrids[i][y] = new AnsiColor?[width];
 			}
 		}
 		
 		Clear();
 	}
 	
-	public static void Clear(Color? col = null) {
+	public static void Clear(AnsiColor? col = null) {
 		for (var y = 0; y < Height; y++) {
 			for (var x = 0; x < Width; x++) {
 				charGrid[y][x]  = ' ';
@@ -84,7 +85,7 @@ public static class Display {
 		y = 0;
 	}
 	
-	public static void Write(string text, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void Write(string text, int? x_ = null, int? y_ = null, AnsiColor? col = null, bool writeThruToScrollBuf = false) {
 		if (x_ != null) x = x_.Value;
 		if (y_ != null) y = y_.Value;
 		
@@ -122,7 +123,7 @@ public static class Display {
 		}
 	}
 	
-	public static void WriteBox(string[] lines, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void WriteBox(string[] lines, int? x_ = null, int? y_ = null, AnsiColor? col = null, bool writeThruToScrollBuf = false) {
 		var initX = x_ ?? x;
 		var initY = y_ ?? y;
 		
@@ -139,7 +140,7 @@ public static class Display {
 		}
 	}
 	
-	public static void ClearLine(int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void ClearLine(int? y_ = null, AnsiColor? col = null, bool writeThruToScrollBuf = false) {
 		if (y_ != null) y = y_.Value;
 		var initY = y;
 		
@@ -148,7 +149,7 @@ public static class Display {
 		y = initY + 1;
 	}
 	
-	public static void ClearBox(int width, int height, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void ClearBox(int width, int height, int? x_ = null, int? y_ = null, AnsiColor? col = null, bool writeThruToScrollBuf = false) {
 		var initX = x_ ?? x;
 		var initY = y_ ?? y;
 		
@@ -158,7 +159,7 @@ public static class Display {
 		}
 	}
 	
-	public static void DrawOutline(int x, int y, int width, int height, Color? col = null, bool removeSides = false) {
+	public static void DrawOutline(int x, int y, int width, int height, AnsiColor? col = null, bool removeSides = false) {
 		var left   = x;
 		var right  = x + width - 1;
 		var top    = y;
@@ -195,7 +196,7 @@ public static class Display {
 			sb.Append(colorGrid[0][0]!.AnsiString);
 		}
 		
-		Color? prevColor = null;
+		AnsiColor? prevColor = null;
 				
 		// Update positions
 		var offset0 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr1 / 0x10;
@@ -416,7 +417,7 @@ public static class Display {
 		return sb.ToString();
 	}
 	
-	static void writeChar(char c, int x, int y, Color? color) {
+	static void writeChar(char c, int x, int y, AnsiColor? color) {
 		if (x >= Width || y >= Height) return;
 		
 		charGrid[y][x]  = c;
@@ -433,12 +434,12 @@ public static class Display {
 	
 	const double Gamma = 2.2;
 	
-	static Color? blendColors(Color c1, Color? c2, Color? c3, Color? c4, Color? c5) {
+	static AnsiColor? blendColors(AnsiColor c1, AnsiColor? c2, AnsiColor? c3, AnsiColor? c4, AnsiColor? c5) {
 		if (!c1.IsRGB || !c1.IsBG) {
 			return c1;
 		}
 		
-		Color lastColor = c1;
+		AnsiColor lastColor = c1;
 		
 		var (red, green, blue) = (0.0, 0.0, 0.0);
 		

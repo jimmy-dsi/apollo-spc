@@ -4,6 +4,8 @@ using System.Diagnostics;
 
 using Apollo;
 using Jimbl;
+using Jimbl.Graphics;
+using Jimbl.JMath;
 
 public static partial class CliMain {
 	static void showDSPViewer1(EmuDataBuffer buffer) {
@@ -19,7 +21,7 @@ public static partial class CliMain {
 			x = 27 * (v % 4);
 			y = yBase + 10 * (v / 4);
 			
-			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			Display.WriteBox([
 				"left volume:",
@@ -31,7 +33,7 @@ public static partial class CliMain {
 				"gain:",
 				"envx:",
 				"outx:",
-			], x + 4, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], x + 4, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 		
 			var xhm = x;
 		
@@ -61,7 +63,7 @@ public static partial class CliMain {
 				$"{buffer.DSP_Voice![v].Gain:X2}",
 				$"{buffer.DSP_Voice![v].ENVX:X2}",
 				$"{buffer.DSP_RegisterMem![v << 4 | 9]:X2}",
-			], xhm + 18, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], xhm + 18, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 		}
 		
 		showColorCoding();
@@ -175,13 +177,13 @@ public static partial class CliMain {
 		var specX = firX + 37;
 		var specY = Display.Y - 6;
 		
-		Color? darkBlue = null; //heatMapColor(BusSize.Bit8, false, 1, 12);
-		Color? boxColor = null;
+		AnsiColor? darkBlue = null; //heatMapColor(BusSize.Bit8, false, 1, 12);
+		AnsiColor? boxColor = null;
 		
 		Display.ClearBox(20, 8, specX + 1, specY + 1);
-		Display.Write(new('_', 21), specX, specY + 2, col: Color.DarkGrey);
-		Display.Write(new('_', 21), specX, specY + 4, col: Color.Grey);
-		Display.Write(new('_', 21), specX, specY + 6, col: Color.DarkGrey);
+		Display.Write(new('_', 21), specX, specY + 2, col: AnsiColor.DarkGrey);
+		Display.Write(new('_', 21), specX, specY + 4, col: AnsiColor.Grey);
+		Display.Write(new('_', 21), specX, specY + 6, col: AnsiColor.DarkGrey);
 		
 		var firFFT = JMath.FFT_Gain(buffer.DSP_State!.FIR.Select(x => (int) x).ToArray(), 0x80);
 		const double MaxDB = 16;
@@ -282,7 +284,7 @@ public static partial class CliMain {
 			x = 28 * (v % 4);
 			y = yBase + 15 * (v / 4);
 			
-			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			Display.WriteBox([
 				"buff. offset:",
@@ -295,7 +297,7 @@ public static partial class CliMain {
 				"env. mode:",
 				"env. level:",
 				"decode buffer:",
-			], x + 4, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], x + 4, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			var envName = buffer.DSP_DebugState!.Voice[v].EnvMode switch {
 				DSP.EnvelopeMode.Attack  => "att.",
@@ -315,7 +317,7 @@ public static partial class CliMain {
 				$"{ buffer.DSP_DebugState!.Voice[v]    .PitchModOn   } ",
 				$"{ envName } ",
 				$"{(buffer.DSP_DebugState!.Voice[v].EnvLevel >> 4):X2}.{(buffer.DSP_DebugState!.Voice[v].EnvLevel & 0xF):X1}",
-			], x + 21, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], x + 21, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			var nextY   = Display.Y;
 			var colMult = voiceOnStates[v] ? 1.0 : 0.125;
@@ -348,7 +350,7 @@ public static partial class CliMain {
 			for (var by = 0; by < 3; by++) {
 				for (var bx = 0; bx < 4; bx++) {
 					var val = (UInt16) buffer.DSP_DebugState!.Voice[v].Buffer[4 * by + bx];
-					Display.Write($"{val:X4} ", x + 6 + 5 * bx, col: heatMapEnabled ? heatMapColor(BusSize.Bit16, signed: true, scale: colMult, val) : voiceOnStates[v] ? null : Color.DarkGrey);
+					Display.Write($"{val:X4} ", x + 6 + 5 * bx, col: heatMapEnabled ? heatMapColor(BusSize.Bit16, signed: true, scale: colMult, val) : voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 				}
 				Display.Y++;
 			}
@@ -358,8 +360,8 @@ public static partial class CliMain {
 	}
 		
 	static void showDSPMem(EmuDataBuffer buffer) {
-		var coloring = new Color?[0x80];
-		var color    = Color.DarkGrey;
+		var coloring = new AnsiColor?[0x80];
+		var color    = AnsiColor.DarkGrey;
 		
 		for (var c = 0; c < 8; c++) {
 			coloring[c * 0x10 + 0xA] = color;

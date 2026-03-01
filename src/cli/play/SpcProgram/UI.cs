@@ -5,6 +5,7 @@ using System.Text;
 
 using Apollo;
 using Jimbl;
+using Jimbl.Graphics;
 
 public static partial class CliMain {
 	const int ScrollAreaRows = 0x1E;
@@ -292,7 +293,7 @@ public static partial class CliMain {
 			}
 			
 			Display.ClearLine(Display.Height - 3);
-			Display.Write(formatTime((int) (curCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
+			Display.Write(formatTime((int) (curCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, AnsiColor.Cyan);
 			
 			var fullTimeInCycles = (long) (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12)  * 2048000;
 			var barLength        = Display.Width - 1 - 14;
@@ -303,15 +304,15 @@ public static partial class CliMain {
 			cursorPos  = Math  .Min(cursorPos,                          Display.Width - 1);
 			cursorPos2 = Math.Clamp(cursorPos2, Math.Max(1, cursorPos), Display.Width);
 			
-			Display.Write(new string('=', cursorPos) + '|',                         14,                 Display.Height - 3, Color    .Cyan);
-			Display.Write(new string('=', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, Color.DarkGrey);
+			Display.Write(new string('=', cursorPos) + '|',                         14,                 Display.Height - 3, AnsiColor    .Cyan);
+			Display.Write(new string('=', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, AnsiColor.DarkGrey);
 		}
 		
-		Display.Write("[", 13,                Display.Height - 3, Color.Cyan);
-		Display.Write("]", Display.Width - 1, Display.Height - 3, Color.Cyan);
+		Display.Write("[", 13,                Display.Height - 3, AnsiColor.Cyan);
+		Display.Write("]", Display.Width - 1, Display.Height - 3, AnsiColor.Cyan);
 		
 		// Display Menu Bar
-		var barColor = menuBarError ? Color.BGRed : Color.BGBlue;
+		var barColor = menuBarError ? AnsiColor.BGRed : AnsiColor.BGBlue;
 		Display.ClearLine(Display.Height - 1, barColor);
 		
 		if (tempMsgTime is not null && tempMsgTime.ElapsedMilliseconds >= 3000) {
@@ -334,28 +335,28 @@ public static partial class CliMain {
 		if (state == State.NonFatalError) {
 			setStatusMsg(StatusMSG.Script700_Error, error: true);
 			
-			Display.DrawOutline(20, 8, Display.Width - 40, Display.Height - 18, Color.Yellow);
+			Display.DrawOutline(20, 8, Display.Width - 40, Display.Height - 18, AnsiColor.Yellow);
 			Display.ClearBox(Display.Width - 42, Display.Height - 20, 21, 9);
 			
-			Display.Write(" Error ", Display.Width / 2 - 3, 8, Color.Yellow);
+			Display.Write(" Error ", Display.Width / 2 - 3, 8, AnsiColor.Yellow);
 			
 			var errorText = Display.WordWrap("A non-fatal error has occurred during the processing of Script700 code.", Display.Width - 36, 3);
-			Display.WriteBox(errorText, 23, 10, Color.Yellow);
+			Display.WriteBox(errorText, 23, 10, AnsiColor.Yellow);
 			Display.Y++;
 			Display.WriteBox([
 				"Error reason: ",
 				"    Script700 execution timed out",
 				""
-			], col: Color.Yellow);
+			], col: AnsiColor.Yellow);
 			
 			var explainText = Display.WordWrap(
 				"This error can occur from either an infinite loop, or the execution of a long stretch of non-yielding Script700 code " +
 				"(i.e. no `w` command)",
 				Display.Width - 42 - 4, 3
 			);
-			Display.Write("Explanation: ", col: Color.Yellow);
+			Display.Write("Explanation: ", col: AnsiColor.Yellow);
 			Display.Y++;
-			Display.WriteBox(explainText, x_: 22 + 4, col: Color.Yellow);
+			Display.WriteBox(explainText, x_: 22 + 4, col: AnsiColor.Yellow);
 			Display.Y += 2;
 			
 			var displayY = Display.Y;
@@ -364,8 +365,8 @@ public static partial class CliMain {
 				var region = menuRegions[i];
 				var option = menuOptions[i];
 				
-				Display.ClearBox(region.W + 2, region.H, region.X - 1, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
-				Display.WriteBox(option, region.X, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
+				Display.ClearBox(region.W + 2, region.H, region.X - 1, region.Y + displayY, col: selectedItem == i ? AnsiColor.BGBlue : AnsiColor.Cyan);
+				Display.WriteBox(option, region.X, region.Y + displayY, col: selectedItem == i ? AnsiColor.BGBlue : AnsiColor.Cyan);
 			}
 		}
 		
@@ -907,7 +908,7 @@ public static partial class CliMain {
 	                           int startRow,
 	                           int endRow,
 	                           byte[] data,
-	                           Color?[]? colorData = null,
+	                           AnsiColor?[]? colorData = null,
 	                           bool useHeatMap = false)
 	{
 		Display.X = 0;
@@ -964,7 +965,7 @@ public static partial class CliMain {
 	static byte[] heatValues = [0x50, 0x68, 0xA0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0];
 	
 	static void showBar(double value, int displayHeight, int x, int y) {
-		var color  = Color.CRed;
+		var color  = AnsiColor.CRed;
 		var height = (int) Math.Round(value * displayHeight * 8);
 		
 		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF);
@@ -973,8 +974,8 @@ public static partial class CliMain {
 		
 		if (height > 0) {
 			for (var i = 0; i < displayHeight; i++) {
-				Color bgcol;
-				Color fgCol;
+				AnsiColor bgcol;
+				AnsiColor fgCol;
 				
 				if (i >= displayHeight / 2) {
 					var interp = (double) (displayHeight - i) / (displayHeight / 2 + 1);
@@ -982,7 +983,7 @@ public static partial class CliMain {
 					
 					bgcol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i]);
 					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
-					fgCol = Color.FromLCH(
+					fgCol = AnsiColor.FromLCH(
 						refColor.L * interp + fgCol.L * (1 - interp),
 						refColor.C * interp + fgCol.C * (1 - interp),
 						refColor.H * interp + fgCol.H * (1 - interp)
@@ -1062,7 +1063,7 @@ public static partial class CliMain {
 		}
 	}
 	
-	static Color heatMapColor(BusSize dataSize, bool signed, double scale, long value) {
+	static AnsiColor heatMapColor(BusSize dataSize, bool signed, double scale, long value) {
 		double interp;
 		
 		switch (dataSize) {
@@ -1147,11 +1148,11 @@ public static partial class CliMain {
 			interp = -Math.Pow(-interp, 1 / 1.9);
 		}
 		
-		Color zero = Color.FromLCH(0.1, 70, (280 - 360) * 2 * Math.PI / 360); //new(0, 31, 82);
+		AnsiColor zero = AnsiColor.FromLCH(0.1, 70, (280 - 360) * 2 * Math.PI / 360); //new(0, 31, 82);
 		
-		Color maxUns = Color.FromLCH(85.5, 47, 4.8     * Math.PI /   3); //new(242, 222, 255);
-		Color maxPos = Color.FromLCH(94.0, 97, 125 * 2 * Math.PI / 360); //new(225, 249, 122);
-		Color maxNeg = Color.FromLCH(89.0, 87, 2.0     * Math.PI /   6); //new(255, 201,  93);
+		AnsiColor maxUns = AnsiColor.FromLCH(85.5, 47, 4.8     * Math.PI /   3); //new(242, 222, 255);
+		AnsiColor maxPos = AnsiColor.FromLCH(94.0, 97, 125 * 2 * Math.PI / 360); //new(225, 249, 122);
+		AnsiColor maxNeg = AnsiColor.FromLCH(89.0, 87, 2.0     * Math.PI /   6); //new(255, 201,  93);
 		
 		double L;
 		double C;
@@ -1218,7 +1219,7 @@ public static partial class CliMain {
 			bm = 1.0; //1.1; //1.0 + origInterp * 0.35;
 		}
 		
-		var col = Color.FromLCH(L, C, H);
+		var col = AnsiColor.FromLCH(L, C, H);
 		
 		return new(
 			(byte) Math.Clamp(col.Red   * rm, 0, 255),
