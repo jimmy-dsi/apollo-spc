@@ -308,7 +308,7 @@ public static partial class CliMain {
 	
 	static (string, AnsiColor?) drawTextField(string? text, AnsiColor? col = null) {
 		if ((text ?? "") == "") {
-			return ("<none>", new(ansiCode: 32));
+			return ("<none>", AnsiColor.Green);
 		}
 		else {
 			return (text!, col);

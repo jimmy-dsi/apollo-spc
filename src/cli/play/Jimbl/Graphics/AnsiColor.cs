@@ -1,243 +1,243 @@
 namespace Jimbl.Graphics;
 
 public class AnsiColor {
-	uint value;
-	
-	public byte Red   => (byte) (value >> 16);
-	public byte Green => (byte) (value >>  8 & 0xFF);
-	public byte Blue  => (byte) (value       & 0xFF);
-	
-	public double L { get; private set; }
-	public double A { get; private set; }
-	public double B { get; private set; }
-	public double C { get; private set; }
-	public double H { get; private set; }
-	
-	public static AnsiColor FromLCH(double L, double C, double H, bool bg = false) {
-		// Convert to Lab
-		double a = C * Math.Cos(H);
-		double b = C * Math.Sin(H);
-		
-		var color = FromLab(L, a, b, bg: bg);
-		color.C = C;
-		color.H = H;
-		
-		return color;
+	public enum Code {
+		Black    =  0,       Red,       Green,       Yellow,       Blue,       Magenta,       Cyan,  Grey,
+		DarkGrey = 60, BrightRed, BrightGreen, BrightYellow, BrightBlue, BrightMagenta, BrightCyan, White,
+		Invalid  = 255
 	}
 	
-	public static AnsiColor FromLab(double L, double a, double b, bool bg = false) {
-		double y = (L + 16) / 116;
-		double x = a / 500 + y;
-		double z = y - b / 200;
-		
-		if (Math.Pow(y, 3) > 0.008856) {
-			y = Math.Pow(y, 3);
-		}
-		else {
-			y = (y  - 16.0 / 116) / 7.787;
-		}
-		
-		if (Math.Pow(x, 3) > 0.008856) {
-			x = Math.Pow(x, 3);
-		}
-		else {
-			x = (x  - 16.0 / 116) / 7.787;
-		}
-		
-		if (Math.Pow(z, 3) > 0.008856) {
-			z = Math.Pow(z, 3);
-		}
-		else {
-			z = (z  - 16.0 / 116) / 7.787;
-		}
-		
-		x *= 95.047;
-		y *= 100;
-		z *= 108.883;
-		
-		x /= 100;
-		y /= 100;
-		z /= 100;
-		
-		double red    = x *  3.2406 + y * -1.5372 + z * -0.4986;
-		double green  = x * -0.9689 + y *  1.8758 + z *  0.0415;
-		double blue   = x *  0.0557 + y * -0.2040 + z *  1.0570;
-		
-		if (red > 0.0031308) {
-			red = 1.055 * Math.Pow(red, 1 / 2.4) - 0.055;
-		}
-		else {
-			red *= 12.92;
-		}
-		
-		if (green > 0.0031308) {
-			green = 1.055 * Math.Pow(green, 1 / 2.4) - 0.055;
-		}
-		else {
-			green *= 12.92;
-		}
-		
-		if (blue > 0.0031308) {
-			blue = 1.055 * Math.Pow(blue, 1 / 2.4) - 0.055;
-		}
-		else {
-			blue *= 12.92;
-		}
-		
-		AnsiColor col = new(
-			(byte) Math.Clamp(red   * 255, 0, 255),
-			(byte) Math.Clamp(green * 255, 0, 255),
-			(byte) Math.Clamp(blue  * 255, 0, 255),
-			bg: bg
-		) {
-			L = L,
-			A = a,
-			B = b
-		};
-		
-		col.calcLCH(compLab: false);
-		return col;
-	}
+	object? foregroundColor;
+	object? backgroundColor;
 	
 	public string AnsiString {
 		get {
-			if (value >> 24 > 1) {
-				var code = value >> 24;
-				return $"\x1B[{code}m";
+			var fgCode = (byte) (ForegroundANSI ?? Code.Invalid);
+			var bgCode = (byte) (BackgroundANSI ?? Code.Invalid);
+			
+			var str = "";
+			
+			if (fgCode < 255) {
+				str += $"\x1B[{fgCode + 30}m";
 			}
-			else if (value >> 24 == 1) {
-				return $"\x1B[48;2;{Red};{Green};{Blue}m";
+			else if (foregroundColor is Color c) {
+				var (r, g, b) = c;
+				str += $"\x1B[38;2;{r};{g};{b}m";
 			}
-			else {
-				return $"\x1B[38;2;{Red};{Green};{Blue}m";
+			
+			if (bgCode < 255) {
+				str += $"\x1B[{bgCode + 40}m";
 			}
+			else if (backgroundColor is Color c) {
+				var (r, g, b) = c;
+				str += $"\x1B[48;2;{r};{g};{b}m";
+			}
+			
+			return str;
 		}
 	}
 	
-	public bool IsRGB => value >> 24 <= 1;
+	public bool IsRGB => foregroundColor is null or Color 
+	                  && backgroundColor is null or Color;
 	
-	public bool IsBG => value >> 24 == 1;
+	public bool IsBG => foregroundColor is     null 
+	                 && backgroundColor is not null;
 	
-	public static AnsiColor Black      = new(ansiCode: 30);
-	public static AnsiColor CRed       = new(ansiCode: 31);
-	public static AnsiColor CGreen     = new(ansiCode: 32);
-	public static AnsiColor Yellow     = new(ansiCode: 33);
-	public static AnsiColor CBlue      = new(ansiCode: 34);
-	public static AnsiColor Magenta    = new(ansiCode: 35);
-	public static AnsiColor Cyan       = new(ansiCode: 36);
-	public static AnsiColor Grey       = new(ansiCode: 37);
+	public bool IsFG => foregroundColor is not null 
+	                 && backgroundColor is     null;
 	
-	public static AnsiColor DarkGrey   = new(ansiCode: 90);
+	public static AnsiColor Black   = new(Code.Black);
+	public static AnsiColor Red     = new(Code.Red);
+	public static AnsiColor Green   = new(Code.Green);
+	public static AnsiColor Yellow  = new(Code.Yellow);
+	public static AnsiColor Blue    = new(Code.Blue);
+	public static AnsiColor Magenta = new(Code.Magenta);
+	public static AnsiColor Cyan    = new(Code.Cyan);
+	public static AnsiColor Grey    = new(Code.Grey);
 	
-	public static AnsiColor BGBlack    = new(ansiCode: 40);
-	public static AnsiColor BGRed      = new(ansiCode: 41);
-	public static AnsiColor BGGreen    = new(ansiCode: 42);
-	public static AnsiColor BGYellow   = new(ansiCode: 43);
-	public static AnsiColor BGBlue     = new(ansiCode: 44);
-	public static AnsiColor BGMagenta  = new(ansiCode: 45);
-	public static AnsiColor BGCyan     = new(ansiCode: 46);
-	public static AnsiColor BGGrey     = new(ansiCode: 47);
+	public static AnsiColor DarkGrey      = new(Code.DarkGrey);
+	public static AnsiColor BrightRed     = new(Code.BrightRed);
+	public static AnsiColor BrightGreen   = new(Code.BrightGreen);
+	public static AnsiColor BrightYellow  = new(Code.BrightYellow);
+	public static AnsiColor BrightBlue    = new(Code.BrightBlue);
+	public static AnsiColor BrightMagenta = new(Code.BrightMagenta);
+	public static AnsiColor BrightCyan    = new(Code.BrightCyan);
+	public static AnsiColor White         = new(Code.White);
 	
-	public static AnsiColor BGDarkGrey = new(ansiCode: 100);
-	public static AnsiColor BGWhite    = new(ansiCode: 107);
+	public static AnsiColor BGBlack   = new(Code.Black,   isBG: true);
+	public static AnsiColor BGRed     = new(Code.Red,     isBG: true);
+	public static AnsiColor BGGreen   = new(Code.Green,   isBG: true);
+	public static AnsiColor BGYellow  = new(Code.Yellow,  isBG: true);
+	public static AnsiColor BGBlue    = new(Code.Blue,    isBG: true);
+	public static AnsiColor BGMagenta = new(Code.Magenta, isBG: true);
+	public static AnsiColor BGCyan    = new(Code.Cyan,    isBG: true);
+	public static AnsiColor BGGrey    = new(Code.Grey,    isBG: true);
 	
-	public AnsiColor(byte ansiCode) {
-		value = (uint) ansiCode << 24;
+	public static AnsiColor BGDarkGrey      = new(Code.DarkGrey,      isBG: true);
+	public static AnsiColor BGBrightRed     = new(Code.BrightRed,     isBG: true);
+	public static AnsiColor BGBrightGreen   = new(Code.BrightGreen,   isBG: true);
+	public static AnsiColor BGBrightYellow  = new(Code.BrightYellow,  isBG: true);
+	public static AnsiColor BGBrightBlue    = new(Code.BrightBlue,    isBG: true);
+	public static AnsiColor BGBrightMagenta = new(Code.BrightMagenta, isBG: true);
+	public static AnsiColor BGBrightCyan    = new(Code.BrightCyan,    isBG: true);
+	public static AnsiColor BGWhite         = new(Code.White,         isBG: true);
+	
+	public Color? ForegroundRGB {
+		get => foregroundColor as Color;
+		private init {
+			foregroundColor = value;
+		}
 	}
 	
-	public AnsiColor(double red, double green, double blue, bool bg = false):
-		this(
-			(byte) Math.Clamp(red   * 255, 0, 255),
-			(byte) Math.Clamp(green * 255, 0, 255),
-			(byte) Math.Clamp(blue  * 255, 0, 255),
-			bg: bg
-		) { }
-	
-	public AnsiColor(byte red, byte green, byte blue): this(red, green, blue, bg: false) { }
-	
-	public AnsiColor(byte red, byte green, byte blue, bool bg): this(red, green, blue, bg, compLab: true) { }
-	
-	AnsiColor(byte red, byte green, byte blue, bool bg, bool compLab) {
-		value = (uint) (red << 16 | green << 8 | blue);
-		if (bg) {
-			value |= 0x01_000000;
-		}
-		
-		if (compLab) {
-			calcLCH();
+	public Code? ForegroundANSI {
+		get => (Code?) (foregroundColor as byte?);
+		private init {
+			foregroundColor = value is null ? null : (byte) value;
 		}
 	}
 	
-	void calcLab() {
-		double red   = (double) Red   / 255;
-		double green = (double) Green / 255;
-		double blue  = (double) Blue  / 255;
-		
-		if (red > 0.04045) {
-			red = Math.Pow((red + 0.055) / 1.055, 2.4);
+	public Color? BackgroundRGB {
+		get => backgroundColor as Color;
+		private init {
+			backgroundColor = value;
 		}
-		else {
-			red /= 12.92;
-		}
-		
-		if (green > 0.04045) {
-			green = Math.Pow((green + 0.055) / 1.055, 2.4);
-		}
-		else {
-			green /= 12.92;
-		}
-		
-		if (blue > 0.04045) {
-			blue = Math.Pow((blue + 0.055) / 1.055, 2.4);
-		}
-		else {
-			blue /= 12.92;
-		}
-		
-		red   *= 100;
-		green *= 100;
-		blue  *= 100;
-		
-		double x = red * 0.4124 + green * 0.3576 + blue * 0.1805;
-		double y = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-		double z = red * 0.0193 + green * 0.1192 + blue * 0.9505;
-		
-		x /= 95.047;
-		y /= 100.0;
-		z /= 108.883;
-		
-		if (x > 0.008856) {
-			x = Math.Pow(x, 1.0 / 3);
-		}
-		else {
-			x = 7.787 * x + 16.0 / 116;
-		}
-		
-		if (y > 0.008856) {
-			y = Math.Pow(y, 1.0 / 3);
-		}
-		else {
-			y = 7.787 * y + 16.0 / 116;
-		}
-		
-		if (z > 0.008856) {
-			z = Math.Pow(z, 1.0 / 3);
-		}
-		else {
-			z = 7.787 * z + 16.0 / 116;
-		}
-		
-		L = 116 * y - 16;
-		A = 500 * (x - y);
-		B = 200 * (y - z);
 	}
 	
-	void calcLCH(bool compLab = true) {
-		if (compLab) {
-			calcLab();
+	public Code? BackgroundANSI {
+		get => (Code?) (backgroundColor as byte?);
+		private init {
+			backgroundColor = value is null ? null : (byte) value;
+		}
+	}
+	
+	public AnsiColor(Color color, bool isBG = false) {
+		if (isBG) {
+			BackgroundRGB = color;
+		}
+		else {
+			ForegroundRGB = color;
+		}
+	}
+	
+	public AnsiColor(byte red, byte green, byte blue, bool isBG = false) {
+		if (isBG) {
+			BackgroundRGB = (red, green, blue);
+		}
+		else {
+			ForegroundRGB = (red, green, blue);
+		}
+	}
+	
+	public AnsiColor(double red, double green, double blue, bool isBG = false) {
+		if (isBG) {
+			BackgroundRGB = (red, green, blue);
+		}
+		else {
+			ForegroundRGB = (red, green, blue);
+		}
+	}
+	
+	public AnsiColor(Code code, bool isBG = false) {
+		if (isBG) {
+			BackgroundANSI = code;
+		}
+		else {
+			ForegroundANSI = code;
+		}
+	}
+	
+	public AnsiColor(Color foreground, Color background) {
+		ForegroundRGB = foreground;
+		BackgroundRGB = background;
+	}
+	
+	public AnsiColor(Color foreground, Code background) {
+		ForegroundRGB  = foreground;
+		BackgroundANSI = background;
+	}
+	
+	public AnsiColor(Code foreground, Color background) {
+		ForegroundANSI = foreground;
+		BackgroundRGB  = background;
+	}
+	
+	public AnsiColor(Code foreground, Code background) {
+		ForegroundANSI = foreground;
+		BackgroundANSI = background;
+	}
+	
+	public AnsiColor(byte fgRed, byte fgGreen, byte fgBlue, byte bgRed, byte bgGreen, byte bgBlue) {
+		ForegroundRGB = (fgRed, fgGreen, fgBlue);
+		BackgroundRGB = (bgRed, bgGreen, bgBlue);
+	}
+	
+	public AnsiColor(double fgRed, double fgGreen, double fgBlue, double bgRed, double bgGreen, double bgBlue) {
+		ForegroundRGB = (fgRed, fgGreen, fgBlue);
+		BackgroundRGB = (bgRed, bgGreen, bgBlue);
+	}
+	
+	public AnsiColor(byte fgRed, byte fgGreen, byte fgBlue, Code background) {
+		ForegroundRGB  = (fgRed, fgGreen, fgBlue);
+		BackgroundANSI = background;
+	}
+	
+	public AnsiColor(double fgRed, double fgGreen, double fgBlue, Code background) {
+		ForegroundRGB  = (fgRed, fgGreen, fgBlue);
+		BackgroundANSI = background;
+	}
+	
+	public AnsiColor(Code foreground, byte bgRed, byte bgGreen, byte bgBlue) {
+		ForegroundANSI = foreground;
+		BackgroundRGB  = (bgRed, bgGreen, bgBlue);
+	}
+	
+	public AnsiColor(Code foreground, double bgRed, double bgGreen, double bgBlue) {
+		ForegroundANSI = foreground;
+		BackgroundRGB  = (bgRed, bgGreen, bgBlue);
+	}
+	
+	public static bool operator == (AnsiColor? lhs, AnsiColor? rhs) {
+		if (lhs is null && rhs is null) {
+			return true;
 		}
 		
-		C = Math.Sqrt(A * A + B * B);
-		H = Math.Atan2(B, A);
+		if (lhs is null || rhs is null) {
+			return false;
+		}
+		
+		if ((lhs.foregroundColor is null) != (rhs.foregroundColor is null)) {
+			return false;
+		}
+		
+		if ((lhs.backgroundColor is null) != (rhs.backgroundColor is null)) {
+			return false;
+		}
+		
+		var fgMatch = false;
+		var bgMatch = false;
+		
+		if (lhs.foregroundColor is null && rhs.foregroundColor is null) {
+			fgMatch = true;
+		}
+		else if (lhs.foregroundColor is byte codef1 && rhs.foregroundColor is byte codef2) {
+			fgMatch = codef1 == codef2;
+		}
+		else if (lhs.foregroundColor is Color colorf1 && rhs.foregroundColor is Color colorf2) {
+			fgMatch = colorf1 == colorf2;
+		}
+		
+		if (lhs.backgroundColor is null && rhs.backgroundColor is null) {
+			bgMatch = true;
+		}
+		else if (lhs.backgroundColor is byte codeb1 && rhs.backgroundColor is byte codeb2) {
+			bgMatch = codeb1 == codeb2;
+		}
+		else if (lhs.backgroundColor is Color colorb1 && rhs.backgroundColor is Color colorb2) {
+			bgMatch = colorb1 == colorb2;
+		}
+		
+		return fgMatch && bgMatch;
 	}
+	
+	public static bool operator != (AnsiColor? lhs, AnsiColor? rhs) => !(lhs == rhs);
 }

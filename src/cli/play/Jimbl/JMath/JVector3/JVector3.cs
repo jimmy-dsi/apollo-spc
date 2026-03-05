@@ -5,12 +5,51 @@ using System.Numerics;
 public interface JVector3: JVector {
 	int JVector.Count => 3;
 	
+	public object X { get; }
+	public object Y { get; }
+	public object Z { get; }
+	
+	object[] JVector.AsArray => AsArray;
+	
+	public     (object, object, object) AsTuple => (X, Y, Z);
+	public new object[]                 AsArray => [X, Y, Z];
+	
+	JVector JVector.    Copy(Func<object, object> transformation) => Copy(transformation);
+	public new JVector3 Copy(Func<object, object> transformation);
+	
 	JVector JVector.Negate() => Negate();
 	public new JVector3 Negate();
 	
 	JVector JVector  .Multiply(double other) =>   Multiply(other);
 	JVector JVector    .Divide(double other) =>     Divide(other);
 	JVector JVector.DivideFrom(double other) => DivideFrom(other);
+	
+	JVector JVector.Add(JVector other) {
+		if (other is JVector3 v3) {
+			return Add(v3);
+		}
+		else {
+			throw new NotImplementedException();
+		}
+	}
+	
+	JVector JVector.Subtract(JVector other) {
+		if (other is JVector3 v3) {
+			return Subtract(v3);
+		}
+		else {
+			throw new NotImplementedException();
+		}
+	}
+	
+	JVector JVector.SubtractFrom(JVector other) {
+		if (other is JVector3 v3) {
+			return Subtract(v3);
+		}
+		else {
+			throw new NotImplementedException();
+		}
+	}
 	
 	public new JVector3          Add(JVector3 other);
 	public new JVector3     Subtract(JVector3 other) => Add(other.Negate());
@@ -36,7 +75,7 @@ public interface JVector3: JVector {
 			return ((JVector3D) v1, (JVector3D) v2);
 		}
 		else {
-			throw new ArgumentException("Could not auto-promote JVector2. Please cast to an explicit type.");
+			throw new ArgumentException("Could not auto-promote JVector3. Please cast to an explicit type.");
 		}
 	}
 	
@@ -81,11 +120,26 @@ public interface JVector3: JVector {
 }
 
 public interface JVector3<T>: JVector3, JVector<T> where T: INumber<T> {
-	int JVector.Count => 3;
+	object JVector3.X => X;
+	object JVector3.Y => Y;
+	object JVector3.Z => Z;
 	
-	public T X { get; set; }
-	public T Y { get; set; }
-	public T Z { get; set; }
+	public new T X { get; set; }
+	public new T Y { get; set; }
+	public new T Z { get; set; }
+	
+	object[] JVector.AsArray => AsArray.Cast<object>().ToArray();
+	T[] JVector<T>.  AsArray => AsArray;
+	
+	(object, object, object) JVector3.AsTuple => AsTuple;
+	object[]                 JVector3.AsArray => AsArray.Cast<object>().ToArray();
+	
+	public new (T, T, T) AsTuple => Defaults.AsTuple(this);
+	public new T[]       AsArray => Defaults.AsArray(this);
+	
+	object JVector.this[int itemIndex] {
+		get => this[itemIndex];
+	}
 	
 	T JVector<T>.this[int itemIndex] {
 		get => this[itemIndex];
@@ -93,22 +147,18 @@ public interface JVector3<T>: JVector3, JVector<T> where T: INumber<T> {
 	}
 	
 	public new T this[int itemIndex] {
-		get {
-			if (itemIndex == 0) return X;
-			if (itemIndex == 1) return Y;
-			if (itemIndex == 2) return Z;
-			throw new ArgumentOutOfRangeException();
-		}
-		set {
-			if (itemIndex == 0) X = value;
-			if (itemIndex == 1) Y = value;
-			if (itemIndex == 2) Z = value;
-			throw new ArgumentOutOfRangeException();
-		}
+		get => Defaults.GetThis(this, itemIndex);
+		set => Defaults.SetThis(this, itemIndex, value);
 	}
 	
+	JVector     JVector.Copy(Func<object, object> transformation) => Copy(x => transformation(x));
+	JVector  JVector<T>.Copy<R>(Func<T, R> transformation)        => Copy(transformation);
+	JVector3   JVector3.Copy(Func<object, object> transformation) => Copy(x => transformation(x));
+	
+	public new JVector3 Copy<R>(Func<T, R> transformation);
+	
 	double JVector.Magnitude => Magnitude;
-	public new double Magnitude => Math.Sqrt((double) (object) (X * X + Y * Y + Z * Z));
+	public new double Magnitude => Defaults.Magnitude(this);
 	
 	public static virtual JVector3<T> operator + (JVector3<T> self) => self;
 	public static virtual JVector3    operator - (JVector3<T> self) => self.Negate();
@@ -122,4 +172,32 @@ public interface JVector3<T>: JVector3, JVector<T> where T: INumber<T> {
 	public static virtual double   operator * (JVector3<T> lhs, JVector3<T> rhs) => lhs.Multiply(rhs);
 	public static virtual double   operator * (JVector3<T> lhs, JVector     rhs) => lhs.Multiply(rhs);
 	public static virtual double   operator * (JVector     lhs, JVector3<T> rhs) => lhs.Multiply(rhs);
+	
+	// Default implementations
+	public new static class Defaults {
+		public static double Magnitude(JVector3<T> self) {
+			return Math.Sqrt((self.X * self.X + self.Y * self.Y + self.Z * self.Z).UnboxCast<double>());
+		}
+		
+		public static (T, T, T) AsTuple(JVector3<T> self) => (self.X, self.Y, self.Z);
+		public static T[]       AsArray(JVector3<T> self) => [self.X, self.Y, self.Z];
+		
+		public static T GetThis(JVector3<T> self, int itemIndex) {
+			switch (itemIndex) {
+				case 0:  return self.X;
+				case 1:  return self.Y;
+				case 2:  return self.Z;
+				default: throw new ArgumentOutOfRangeException();
+			}
+		}
+		
+		public static void SetThis(JVector3<T> self, int itemIndex, T value) {
+			switch (itemIndex) {
+				case 0:  self.X = value; break;
+				case 1:  self.Y = value; break;
+				case 2:  self.Z = value; break;
+				default: throw new ArgumentOutOfRangeException();
+			}
+		}
+	}
 }

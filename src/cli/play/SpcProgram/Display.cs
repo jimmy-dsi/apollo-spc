@@ -227,24 +227,24 @@ public static class Display {
 				if (cl is not null) {
 					var (y0, y1, y2, y3) = (y + offset0, y + offset1, y + offset2, y + offset3);
 					
-					if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
-						cl = blendColors(
-							cl,
-							prevColorGrids[0][y0][x],
-							prevColorGrids[1][y1][x],
-							prevColorGrids[2][y2][x],
-							prevColorGrids[3][y3][x]
-						);
-					}
-					else {
-						cl = blendColors(
-							cl,
-							prevColorGrids[0][y][x],
-							prevColorGrids[1][y][x],
-							prevColorGrids[2][y][x],
-							prevColorGrids[3][y][x]
-						);
-					}
+					//if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
+					//	cl = blendColors(
+					//		cl,
+					//		prevColorGrids[0][y0][x],
+					//		prevColorGrids[1][y1][x],
+					//		prevColorGrids[2][y2][x],
+					//		prevColorGrids[3][y3][x]
+					//	);
+					//}
+					//else {
+					//	cl = blendColors(
+					//		cl,
+					//		prevColorGrids[0][y][x],
+					//		prevColorGrids[1][y][x],
+					//		prevColorGrids[2][y][x],
+					//		prevColorGrids[3][y][x]
+					//	);
+					//}
 				}
 				
 				if (cl != prevColor) {
@@ -434,51 +434,21 @@ public static class Display {
 	
 	const double Gamma = 2.2;
 	
-	static AnsiColor? blendColors(AnsiColor c1, AnsiColor? c2, AnsiColor? c3, AnsiColor? c4, AnsiColor? c5) {
-		if (!c1.IsRGB || !c1.IsBG) {
-			return c1;
+	static AnsiColor? blendColors(AnsiColor color1, params AnsiColor?[] colors) {
+		if (color1.BackgroundRGB is null) {
+			return color1;
 		}
 		
-		AnsiColor lastColor = c1;
-		
-		var (red, green, blue) = (0.0, 0.0, 0.0);
-		
-		red   += Math.Pow(c1.Red   / 255.0, 1 / Gamma) * blendFilter[0];
-		green += Math.Pow(c1.Green / 255.0, 1 / Gamma) * blendFilter[0];
-		blue  += Math.Pow(c1.Blue  / 255.0, 1 / Gamma) * blendFilter[0];
-		
-		if (c2 is not null && c2.IsRGB && c2.IsBG) {
-			lastColor = c2;
+		List<Color> prevColors = [];
+		foreach (var col in colors) {
+			if (col?.BackgroundRGB is Color c) {
+				prevColors.Add(c);
+			}
+			else {
+				break;
+			}
 		}
 		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[1];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[1];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[1];
-		
-		if (c3 is not null && c3.IsRGB && c3.IsBG) {
-			lastColor = c3;
-		}
-		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[2];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[2];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[2];
-		
-		if (c4 is not null && c4.IsRGB && c4.IsBG) {
-			lastColor = c4;
-		}
-		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[3];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[3];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[3];
-		
-		if (c5 is not null && c5.IsRGB && c5.IsBG) {
-			lastColor = c5;
-		}
-		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[4];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[4];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[4];
-		
-		return new(Math.Pow(red, 2.2), Math.Pow(green, 2.2), Math.Pow(blue, 2.2), bg: true);
+		return new(color1.BackgroundRGB.Filter(prevColors, blendFilter), isBG: true);
 	}
 }

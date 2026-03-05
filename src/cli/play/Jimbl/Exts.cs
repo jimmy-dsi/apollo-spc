@@ -1,7 +1,8 @@
-using System.Numerics;
+using System.Diagnostics;
 
 namespace Jimbl;
 
+using System.Numerics;
 using System.Globalization;
 
 using  Range = Jimbl.DataStructs.Range;
@@ -152,6 +153,15 @@ public static class Exts {
 	public static char ToLower(this char c) => char.ToLower(c);
 	public static char ToUpper(this char c) => char.ToUpper(c);
 	
+	public static bool IsNumeric(this Type type) {
+		return type.FitsInt32()   || type.FitsUInt32()
+		    || type.FitsInt64()   || type.FitsUInt64()
+		    || type.FitsInt128()  || type.FitsUInt128()
+		    || type.FitsBigInteger()
+		    || type.FitsFloat32() || type.FitsFloat64()
+		    || type.FitsDecimal() || type.FitsComplex();
+	}
+	
 	public static bool FitsInt32(this Type type) {
 		return type == typeof(char)
 		    || type == typeof(byte)
@@ -219,5 +229,257 @@ public static class Exts {
 	public static bool FitsComplex(this Type type) {
 		return type.FitsFloat64()
 		    || type == typeof(Complex);
+	}
+	
+	static HashSet<Type> nativeNumTypes = new() {
+		typeof(byte),   typeof(sbyte),  typeof(UInt16), typeof(Int16),
+		typeof(UInt32), typeof(Int32),  typeof(UInt64), typeof(Int64),
+		typeof(nuint),  typeof(nint),   typeof(char),
+		typeof(float),  typeof(double), typeof(decimal)
+	};
+	
+	public static T UnboxCast<T>(this object obj) {
+		if (nativeNumTypes.Contains(typeof(T))) {
+			return obj.toNumType<T>();
+		}
+		else {
+			// TODO: Handle user-defined conversions
+			return (T) obj;
+		}
+	}
+	
+	public static    byte    ToByte(this object obj) =>    toByte(obj);
+	public static   sbyte   ToSByte(this object obj) =>   toSByte(obj);
+	public static  UInt16  ToUInt16(this object obj) =>  toUInt16(obj);
+	public static   Int16   ToInt16(this object obj) =>   toInt16(obj);
+	public static  UInt32  ToUInt32(this object obj) =>  toUInt32(obj);
+	public static   Int32   ToInt32(this object obj) =>   toInt32(obj);
+	public static  UInt64  ToUInt64(this object obj) =>  toUInt64(obj);
+	public static   Int64   ToInt64(this object obj) =>   toInt64(obj);
+	public static   nuint   ToNUInt(this object obj) =>   toNUInt(obj);
+	public static    nint    ToNInt(this object obj) =>    toNInt(obj);
+	public static    char    ToChar(this object obj) =>    toChar(obj);
+	public static   float   ToFloat(this object obj) =>   toFloat(obj);
+	public static  double  ToDouble(this object obj) =>  toDouble(obj);
+	public static decimal ToDecimal(this object obj) => toDecimal(obj);
+	
+	static T toNumType<T>(this object obj) {
+		T dummy = default(T);
+		
+		object result = dummy switch {
+			   byte =>    toByte(obj),
+			  sbyte =>   toSByte(obj),
+			 UInt16 =>  toUInt16(obj),
+			  Int16 =>   toInt16(obj),
+			 UInt32 =>  toUInt32(obj),
+			  Int32 =>   toInt32(obj),
+			 UInt64 =>  toUInt64(obj),
+			  Int64 =>   toInt64(obj),
+			  nuint =>   toNUInt(obj),
+			   nint =>    toNInt(obj),
+			   char =>    toChar(obj),
+			  float =>   toFloat(obj),
+			 double =>  toDouble(obj),
+			decimal => toDecimal(obj),
+			_ => throw new UnreachableException()
+		};
+		
+		return (T) result;
+	}
+	
+	static byte toByte(object obj) {
+		switch (obj) {
+			case    byte n: return (byte) n;  case   sbyte n: return (byte) n;
+			case  UInt16 n: return (byte) n;  case   Int16 n: return (byte) n;
+			case  UInt32 n: return (byte) n;  case   Int32 n: return (byte) n;
+			case  UInt64 n: return (byte) n;  case   Int64 n: return (byte) n;
+			case   nuint n: return (byte) n;  case    nint n: return (byte) n;
+			case    char n: return (byte) n;  case   float n: return (byte) n;
+			case  double n: return (byte) n;  case decimal n: return (byte) n;
+		}
+		
+		return (byte) obj;
+	}
+	
+	static sbyte toSByte(object obj) {
+		switch (obj) {
+			case    byte n: return (sbyte) n;  case   sbyte n: return (sbyte) n;
+			case  UInt16 n: return (sbyte) n;  case   Int16 n: return (sbyte) n;
+			case  UInt32 n: return (sbyte) n;  case   Int32 n: return (sbyte) n;
+			case  UInt64 n: return (sbyte) n;  case   Int64 n: return (sbyte) n;
+			case   nuint n: return (sbyte) n;  case    nint n: return (sbyte) n;
+			case    char n: return (sbyte) n;  case   float n: return (sbyte) n;
+			case  double n: return (sbyte) n;  case decimal n: return (sbyte) n;
+		}
+		
+		return (sbyte) obj;
+	}
+	
+	static UInt16 toUInt16(object obj) {
+		switch (obj) {
+			case    byte n: return (UInt16) n;  case   sbyte n: return (UInt16) n;
+			case  UInt16 n: return (UInt16) n;  case   Int16 n: return (UInt16) n;
+			case  UInt32 n: return (UInt16) n;  case   Int32 n: return (UInt16) n;
+			case  UInt64 n: return (UInt16) n;  case   Int64 n: return (UInt16) n;
+			case   nuint n: return (UInt16) n;  case    nint n: return (UInt16) n;
+			case    char n: return (UInt16) n;  case   float n: return (UInt16) n;
+			case  double n: return (UInt16) n;  case decimal n: return (UInt16) n;
+		}
+		
+		return (UInt16) obj;
+	}
+	
+	static Int16 toInt16(object obj) {
+		switch (obj) {
+			case    byte n: return (Int16) n;  case   sbyte n: return (Int16) n;
+			case  UInt16 n: return (Int16) n;  case   Int16 n: return (Int16) n;
+			case  UInt32 n: return (Int16) n;  case   Int32 n: return (Int16) n;
+			case  UInt64 n: return (Int16) n;  case   Int64 n: return (Int16) n;
+			case   nuint n: return (Int16) n;  case    nint n: return (Int16) n;
+			case    char n: return (Int16) n;  case   float n: return (Int16) n;
+			case  double n: return (Int16) n;  case decimal n: return (Int16) n;
+		}
+		
+		return (Int16) obj;
+	}
+	
+	static UInt32 toUInt32(object obj) {
+		switch (obj) {
+			case    byte n: return (UInt32) n;  case   sbyte n: return (UInt32) n;
+			case  UInt16 n: return (UInt32) n;  case   Int16 n: return (UInt32) n;
+			case  UInt32 n: return (UInt32) n;  case   Int32 n: return (UInt32) n;
+			case  UInt64 n: return (UInt32) n;  case   Int64 n: return (UInt32) n;
+			case   nuint n: return (UInt32) n;  case    nint n: return (UInt32) n;
+			case    char n: return (UInt32) n;  case   float n: return (UInt32) n;
+			case  double n: return (UInt32) n;  case decimal n: return (UInt32) n;
+		}
+		
+		return (UInt32) obj;
+	}
+	
+	static Int32 toInt32(object obj) {
+		switch (obj) {
+			case    byte n: return (Int32) n;  case   sbyte n: return (Int32) n;
+			case  UInt16 n: return (Int32) n;  case   Int16 n: return (Int32) n;
+			case  UInt32 n: return (Int32) n;  case   Int32 n: return (Int32) n;
+			case  UInt64 n: return (Int32) n;  case   Int64 n: return (Int32) n;
+			case   nuint n: return (Int32) n;  case    nint n: return (Int32) n;
+			case    char n: return (Int32) n;  case   float n: return (Int32) n;
+			case  double n: return (Int32) n;  case decimal n: return (Int32) n;
+		}
+		
+		return (Int32) obj;
+	}
+	
+	static UInt64 toUInt64(object obj) {
+		switch (obj) {
+			case    byte n: return (UInt64) n;  case   sbyte n: return (UInt64) n;
+			case  UInt16 n: return (UInt64) n;  case   Int16 n: return (UInt64) n;
+			case  UInt32 n: return (UInt64) n;  case   Int32 n: return (UInt64) n;
+			case  UInt64 n: return (UInt64) n;  case   Int64 n: return (UInt64) n;
+			case   nuint n: return (UInt64) n;  case    nint n: return (UInt64) n;
+			case    char n: return (UInt64) n;  case   float n: return (UInt64) n;
+			case  double n: return (UInt64) n;  case decimal n: return (UInt64) n;
+		}
+		
+		return (UInt64) obj;
+	}
+	
+	static Int64 toInt64(object obj) {
+		switch (obj) {
+			case    byte n: return (Int64) n;  case   sbyte n: return (Int64) n;
+			case  UInt16 n: return (Int64) n;  case   Int16 n: return (Int64) n;
+			case  UInt32 n: return (Int64) n;  case   Int32 n: return (Int64) n;
+			case  UInt64 n: return (Int64) n;  case   Int64 n: return (Int64) n;
+			case   nuint n: return (Int64) n;  case    nint n: return (Int64) n;
+			case    char n: return (Int64) n;  case   float n: return (Int64) n;
+			case  double n: return (Int64) n;  case decimal n: return (Int64) n;
+		}
+		
+		return (Int64) obj;
+	}
+	
+	static nuint toNUInt(object obj) {
+		switch (obj) {
+			case    byte n: return (nuint) n;  case   sbyte n: return (nuint) n;
+			case  UInt16 n: return (nuint) n;  case   Int16 n: return (nuint) n;
+			case  UInt32 n: return (nuint) n;  case   Int32 n: return (nuint) n;
+			case  UInt64 n: return (nuint) n;  case   Int64 n: return (nuint) n;
+			case   nuint n: return (nuint) n;  case    nint n: return (nuint) n;
+			case    char n: return (nuint) n;  case   float n: return (nuint) n;
+			case  double n: return (nuint) n;  case decimal n: return (nuint) n;
+		}
+		
+		return (nuint) obj;
+	}
+	
+	static nint toNInt(object obj) {
+		switch (obj) {
+			case    byte n: return (nint) n;  case   sbyte n: return (nint) n;
+			case  UInt16 n: return (nint) n;  case   Int16 n: return (nint) n;
+			case  UInt32 n: return (nint) n;  case   Int32 n: return (nint) n;
+			case  UInt64 n: return (nint) n;  case   Int64 n: return (nint) n;
+			case   nuint n: return (nint) n;  case    nint n: return (nint) n;
+			case    char n: return (nint) n;  case   float n: return (nint) n;
+			case  double n: return (nint) n;  case decimal n: return (nint) n;
+		}
+		
+		return (nint) obj;
+	}
+	
+	static char toChar(object obj) {
+		switch (obj) {
+			case    byte n: return (char) n;  case   sbyte n: return (char) n;
+			case  UInt16 n: return (char) n;  case   Int16 n: return (char) n;
+			case  UInt32 n: return (char) n;  case   Int32 n: return (char) n;
+			case  UInt64 n: return (char) n;  case   Int64 n: return (char) n;
+			case   nuint n: return (char) n;  case    nint n: return (char) n;
+			case    char n: return (char) n;  case   float n: return (char) n;
+			case  double n: return (char) n;  case decimal n: return (char) n;
+		}
+		
+		return (char) obj;
+	}
+	
+	static float toFloat(object obj) {
+		switch (obj) {
+			case    byte n: return (float) n;  case   sbyte n: return (float) n;
+			case  UInt16 n: return (float) n;  case   Int16 n: return (float) n;
+			case  UInt32 n: return (float) n;  case   Int32 n: return (float) n;
+			case  UInt64 n: return (float) n;  case   Int64 n: return (float) n;
+			case   nuint n: return (float) n;  case    nint n: return (float) n;
+			case    char n: return (float) n;  case   float n: return (float) n;
+			case  double n: return (float) n;  case decimal n: return (float) n;
+		}
+		
+		return (float) obj;
+	}
+	
+	static double toDouble(object obj) {
+		switch (obj) {
+			case    byte n: return (double) n;  case   sbyte n: return (double) n;
+			case  UInt16 n: return (double) n;  case   Int16 n: return (double) n;
+			case  UInt32 n: return (double) n;  case   Int32 n: return (double) n;
+			case  UInt64 n: return (double) n;  case   Int64 n: return (double) n;
+			case   nuint n: return (double) n;  case    nint n: return (double) n;
+			case    char n: return (double) n;  case   float n: return (double) n;
+			case  double n: return (double) n;  case decimal n: return (double) n;
+		}
+		
+		return (double) obj;
+	}
+	
+	static decimal toDecimal(object obj) {
+		switch (obj) {
+			case    byte n: return (decimal) n;  case   sbyte n: return (decimal) n;
+			case  UInt16 n: return (decimal) n;  case   Int16 n: return (decimal) n;
+			case  UInt32 n: return (decimal) n;  case   Int32 n: return (decimal) n;
+			case  UInt64 n: return (decimal) n;  case   Int64 n: return (decimal) n;
+			case   nuint n: return (decimal) n;  case    nint n: return (decimal) n;
+			case    char n: return (decimal) n;  case   float n: return (decimal) n;
+			case  double n: return (decimal) n;  case decimal n: return (decimal) n;
+		}
+		
+		return (decimal) obj;
 	}
 }

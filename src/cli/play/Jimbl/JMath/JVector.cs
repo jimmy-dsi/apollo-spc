@@ -8,6 +8,12 @@ public interface JVector {
 	public int    Count     { get; }
 	public double Magnitude { get; }
 	
+	public object[] AsArray { get; }
+	
+	public object this[int itemIndex] { get; }
+	
+	public JVector Copy(Func<object, object> transformation);
+	
 	public JVector Negate();
 	
 	public JVector          Add(JVector other);
@@ -74,9 +80,19 @@ public interface JVector {
 }
 
 public interface JVector<T>: JVector where T: INumber<T> {
-	Type JVector.InnerType => typeof(T);
+	Type JVector.InnerType => InnerType;
+	public new Type InnerType => Defaults.InnerType();
 	
-	public T this[int itemIndex] { get; set; }
+	object[] JVector.AsArray => AsArray.Cast<object>().ToArray();
+	public new T[] AsArray { get; }
+	
+	object JVector.this[int itemIndex] => this[itemIndex];
+	public new T this[int itemIndex] { get; set; }
+	
+	JVector JVector.Copy(Func<object, object> transformation) => Copy(x => transformation((T) x));
+	public JVector Copy<R>(Func<T, R> transformation);
+	
+	public void Transform(Func<T, T> transformation) => Defaults.Transform(this, transformation);
 	
 	public static virtual JVector<T> operator + (JVector<T> self) => self;
 	public static virtual JVector    operator - (JVector<T> self) => self.Negate();
@@ -95,4 +111,14 @@ public interface JVector<T>: JVector where T: INumber<T> {
 	public static virtual JVector operator * (double     lhs, JVector<T> rhs) => rhs.Multiply(lhs);
 	public static virtual JVector operator / (JVector<T> lhs, double     rhs) => lhs.Divide(rhs);
 	public static virtual JVector operator / (double     lhs, JVector<T> rhs) => rhs.DivideFrom(lhs);
+	
+	// Default implementations
+	public static class Defaults {
+		public static Type InnerType() => typeof(T);
+		public static void Transform(JVector<T> self, Func<T, T> transformation) {
+			for (var i = 0; i < self.Count; i++) {
+				self[i] = transformation(self[i]);
+			}
+		}
+	}
 }

@@ -1,8 +1,37 @@
 namespace Jimbl.JMath;
 
-public struct JVector2B: JVector2<byte> {
-	public byte X { get; set; }
-	public byte Y { get; set; }
+using System.Numerics;
+
+public struct JVector2B: JVector2<byte>, IEquatable<JVector2B> {
+	byte x;
+	byte y;
+	Action<int, byte>? setterHook = null;
+	
+	public Type InnerType => JVector<byte>.Defaults.InnerType();
+	
+	public (byte, byte) AsTuple => JVector2<byte>.Defaults.AsTuple(this);
+	public byte[]       AsArray => JVector2<byte>.Defaults.AsArray(this);
+	
+	public byte X {
+		get => x;
+		set {
+			x = value;
+			setterHook?.Invoke(0, value);
+		}
+	}
+
+	public byte Y {
+		get => y;
+		set {
+			y = value;
+			setterHook?.Invoke(1, value);
+		}
+	}
+	
+	internal Action<int, byte>? SetterHook {
+		get => setterHook;
+		set => setterHook = value;
+	}
 	
 	public static implicit operator JVector2I (JVector2B vec) => new(vec.X, vec.Y);
 	public static implicit operator JVector2L (JVector2B vec) => new(vec.X, vec.Y);
@@ -15,17 +44,87 @@ public struct JVector2B: JVector2<byte> {
 	public static implicit operator JVector3F (JVector2B vec) => new(vec.X, vec.Y, 0);
 	public static implicit operator JVector3D (JVector2B vec) => new(vec.X, vec.Y, 0);
 	
+	public static implicit operator JVector2B ((byte, byte) tup) => new(tup.Item1, tup.Item2);
+	public static implicit operator JVector2B (byte[] arr) => new(arr[0], arr[1]);
+	
 	public JVector2B(byte x, byte y) {
 		X = x;
 		Y = y;
 	}
-
-	public byte this[int itemIndex] {
-		get => ((JVector2<byte>) this)[itemIndex];
-		set => ((JVector2<byte>) this)[itemIndex] = value;
+	
+	JVector2 JVector2<byte>.Copy<R>(Func<byte, R> transformation) {
+		JVector2 result;
+		
+		if (typeof(R) == typeof(byte)) {
+			result = Copy(x => (byte) (object) transformation(x));
+		}
+		else if (typeof(R).FitsInt32()) {
+			result = Copy(x => (Int32) (object) transformation(x));
+		}
+		else if (typeof(R).FitsInt64()) {
+			result = Copy(x => (Int64) (object) transformation(x));
+		}
+		else if (typeof(R).FitsFloat32()) {
+			result = Copy(x => (float) (object) transformation(x));
+		}
+		else if (typeof(R).FitsFloat64()) {
+			result = Copy(x => (double) (object) transformation(x));
+		}
+		else {
+			throw new ArgumentException();
+		}
+		
+		return result;
 	}
 	
-	public double Magnitude => ((JVector2<byte>) this).Magnitude;
+	public JVector2B Copy(Func<byte, byte> transformation) {
+		JVector2B result = new();
+		for (var i = 0; i < 2; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector2I Copy(Func<byte, Int32> transformation) {
+		JVector2I result = new();
+		for (var i = 0; i < 2; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector2L Copy(Func<byte, Int64> transformation) {
+		JVector2L result = new();
+		for (var i = 0; i < 2; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector2F Copy(Func<byte, float> transformation) {
+		JVector2F result = new();
+		for (var i = 0; i < 2; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector2D Copy(Func<byte, double> transformation) {
+		JVector2D result = new();
+		for (var i = 0; i < 2; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public void Transform(Func<byte, byte> transformation) => JVector<byte>.Defaults.Transform(this, transformation);
+	
+	public byte this[int itemIndex] {
+		get => JVector2<byte>.Defaults.GetThis(this, itemIndex);
+		set => JVector2<byte>.Defaults.SetThis(this, itemIndex, value);
+	}
+	
+	public double Magnitude => JVector2<byte>.Defaults.Magnitude(this);
 	
 	JVector2 JVector2.Negate() => Negate();
 	
@@ -178,6 +277,99 @@ public struct JVector2B: JVector2<byte> {
 	public JVector2L DivideFrom(long other) {
 		return new(other / X, other / Y);
 	}
+
+	public override int GetHashCode() {
+		return (X, Y).GetHashCode();
+	}
+
+	bool IEquatable<JVector2B>.Equals(JVector2B other) => Equals(other);
+	
+	public override bool Equals(object? other) {
+		if (other is JVector2 v2) {
+			return Equals(v2);
+		}
+		else {
+			return false;
+		}
+	}
+	
+	public bool Equals(JVector2 other) {
+		if (!InnerType.IsNumeric() || !InnerType.IsNumeric()) {
+			return (object) X == other.X
+			    && (object) Y == other.Y;
+		}
+		
+		var (v1, v2) = JVector2.Promote(this, other);
+		
+		if (v2.InnerType.FitsInt32()) {
+			return Equals((JVector2<Int32>) v2);
+		}
+		else if (v2.InnerType.FitsInt64()) {
+			return Equals((JVector2<Int64>) v2);
+		}
+		else if (v2.InnerType.FitsFloat32()) {
+			return Equals((JVector2<float>) v2);
+		}
+		else if (v2.InnerType.FitsFloat64()) {
+			return Equals((JVector2<double>) v2);
+		}
+		else {
+			throw new ArgumentException("Cannot compare JVector2B to JVector2");
+		}
+	}
+	
+	public bool Equals<T>(JVector2<T> other) where T: INumber<T> {
+		var type = JVector.PromoteType(this, other);
+		
+		if (type == typeof(Int32)) {
+			return X == (Int32) (object) other.X
+			    && Y == (Int32) (object) other.Y;
+		}
+		else if (type == typeof(UInt32)) {
+			return X == (UInt32) (object) other.X
+			    && Y == (UInt32) (object) other.Y;
+		}
+		else if (type == typeof(Int64)) {
+			return X == (Int64) (object) other.X
+			    && Y == (Int64) (object) other.Y;
+		}
+		else if (type == typeof(UInt64)) {
+			return X == (UInt64) (object) other.X
+			    && Y == (UInt64) (object) other.Y;
+		}
+		else if (type == typeof(Int128)) {
+			return X == (Int128) (object) other.X
+			    && Y == (Int128) (object) other.Y;
+		}
+		else if (type == typeof(UInt128)) {
+			return X == (UInt128) (object) other.X
+			    && Y == (UInt128) (object) other.Y;
+		}
+		else if (type == typeof(BigInteger)) {
+			return (BigInteger) X == (BigInteger) (object) other.X
+			    && (BigInteger) Y == (BigInteger) (object) other.Y;
+		}
+		else if (type == typeof(float)) {
+			return X == (float) (object) other.X
+			    && Y == (float) (object) other.Y;
+		}
+		else if (type == typeof(double)) {
+			return X == (double) (object) other.X
+			    && Y == (double) (object) other.Y;
+		}
+		else if (type == typeof(decimal)) {
+			return X == (decimal) (object) other.X
+			    && Y == (decimal) (object) other.Y;
+		}
+		else if (type == typeof(Complex)) {
+			return X == (Complex) (object) other.X
+			    && Y == (Complex) (object) other.Y;
+		}
+		else {
+			return (object) X == (object) other.X
+			    && (object) Y == (object) other.Y;
+		}
+	}
 	
 	// Operators
 	public static JVector2B operator + (JVector2B self) => self;
@@ -218,4 +410,12 @@ public struct JVector2B: JVector2<byte> {
 	public static JVector2L operator * (long      lhs, JVector2B rhs) => rhs.Multiply(lhs);
 	public static JVector2L operator / (JVector2B lhs, long      rhs) => lhs.Divide(rhs);
 	public static JVector2L operator / (long      lhs, JVector2B rhs) => rhs.DivideFrom(lhs);
+	
+	// Equality operator
+	public static bool operator == (JVector2B lhs, JVector2B rhs) =>  ((IEquatable<JVector2B>) lhs).Equals(rhs);
+	public static bool operator == (JVector2B lhs, JVector2  rhs) =>  lhs.Equals(rhs);
+	public static bool operator == (JVector2  lhs, JVector2B rhs) =>  rhs.Equals(lhs);
+	public static bool operator != (JVector2B lhs, JVector2B rhs) => !((IEquatable<JVector2B>) lhs).Equals(rhs);
+	public static bool operator != (JVector2B lhs, JVector2  rhs) => !lhs.Equals(rhs);
+	public static bool operator != (JVector2  lhs, JVector2B rhs) => !rhs.Equals(lhs);
 }

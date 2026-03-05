@@ -12,7 +12,7 @@
         <DebugType>none</DebugType>
         <DebugSymbols>false</DebugSymbols>
         <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
-        
+
         <IlcGenerateDebugInfo>false</IlcGenerateDebugInfo>
         <StripSymbols>false</StripSymbols>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

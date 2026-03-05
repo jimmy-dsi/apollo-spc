@@ -965,38 +965,34 @@ public static partial class CliMain {
 	static byte[] heatValues = [0x50, 0x68, 0xA0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0];
 	
 	static void showBar(double value, int displayHeight, int x, int y) {
-		var color  = AnsiColor.CRed;
+		var color  = AnsiColor.Red;
 		var height = (int) Math.Round(value * displayHeight * 8);
 		
-		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF);
+		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF).BackgroundRGB!;
 		
 		x -= 1;
 		
 		if (height > 0) {
 			for (var i = 0; i < displayHeight; i++) {
-				AnsiColor bgcol;
-				AnsiColor fgCol;
+				AnsiColor fgAnsi;
 				
 				if (i >= displayHeight / 2) {
 					var interp = (double) (displayHeight - i) / (displayHeight / 2 + 1);
 					interp = Math.Pow(interp, 2);
 					
-					bgcol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i]);
-					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
-					fgCol = AnsiColor.FromLCH(
-						refColor.L * interp + fgCol.L * (1 - interp),
-						refColor.C * interp + fgCol.C * (1 - interp),
-						refColor.H * interp + fgCol.H * (1 - interp)
-					);
+					var bgCol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i]).BackgroundRGB!;
+					var fgCol = refColor.Blend(bgCol, interp, Color.Space.LCh);
+					
+					fgAnsi = new(fgCol);
 				}
 				else {
-					bgcol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i]);
-					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
+					var bgCol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i]).BackgroundRGB!;
+					fgAnsi = new(bgCol);
 				}
 				
 				#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
 					if (i < height / 8) {
-						Display.Write("███", x, y - i - 1, fgCol);
+						Display.Write("███", x, y - i - 1, fgAnsi);
 					}
 					else if (i == height / 8 && height % 8 > 0) {
 						var barString = (height % 8) switch {
@@ -1009,11 +1005,11 @@ public static partial class CliMain {
 							7 => "▇▇▇",
 							_ => throw new UnreachableException()
 						};
-						Display.Write(barString, x, y - i - 1, fgCol);
+						Display.Write(barString, x, y - i - 1, fgAnsi);
 					}
 				#else
 					if (i < height / 8) {
-						Display.Write("███", x, y - i - 1, fgCol);
+						Display.Write("███", x, y - i - 1, fgAnsi);
 					}
 					else if (i == height / 8 && height % 8 >= 4) {
 						var barString = (height % 8) switch {
@@ -1023,7 +1019,7 @@ public static partial class CliMain {
 							7 => "▄▄▄",
 							_ => throw new UnreachableException()
 						};
-						Display.Write(barString, x, y - i - 1, fgCol);
+						Display.Write(barString, x, y - i - 1, fgAnsi);
 					}
 				#endif
 			}
@@ -1148,85 +1144,27 @@ public static partial class CliMain {
 			interp = -Math.Pow(-interp, 1 / 1.9);
 		}
 		
-		AnsiColor zero = AnsiColor.FromLCH(0.1, 70, (280 - 360) * 2 * Math.PI / 360); //new(0, 31, 82);
+		var zero = Color.FromLCh(0.1, 70, 280);
 		
-		AnsiColor maxUns = AnsiColor.FromLCH(85.5, 47, 4.8     * Math.PI /   3); //new(242, 222, 255);
-		AnsiColor maxPos = AnsiColor.FromLCH(94.0, 97, 125 * 2 * Math.PI / 360); //new(225, 249, 122);
-		AnsiColor maxNeg = AnsiColor.FromLCH(89.0, 87, 2.0     * Math.PI /   6); //new(255, 201,  93);
+		var maxUns = Color.FromLCh(85.5, 47, 288);
+		var maxPos = Color.FromLCh(94.0, 97, 125);
+		var maxNeg = Color.FromLCh(89.0, 87,  60);
 		
-		double L;
-		double C;
-		double H;
-		
-		double rm;
-		double gm;
-		double bm;
+		Color col;
 		
 		if (signed) {
 			if (interp >= 0) {
-				var h = maxPos.H;
-				
-				if (maxPos.H - zero.H > Math.PI) {
-					h -= 2 * Math.PI;
-				}
-				else if (zero.H - maxPos.H < -Math.PI) {
-					h += 2 * Math.PI;
-				}
-				
-				L = maxPos.L *  interp + zero.L * (1 -  interp);
-				C = maxPos.C *  interp + zero.C * (1 -  interp);
-				H = h        *  interp + zero.H * (1 -  interp);
-				
-				rm = 1.0; //1.0 + origInterp * 0.4;
-				gm = 1.0; //1.1;
-				bm = 1.0; //1.0 + origInterp * 0.45;
+				col = maxPos.Blend(zero, Math.Abs(interp), Color.Space.LCh);
 			}
 			else {
-				var h = maxNeg.H;
-				
-				if (maxNeg.H - zero.H > Math.PI) {
-					h -= 2 * Math.PI;
-				}
-				else if (zero.H - maxNeg.H < -Math.PI) {
-					h += 2 * Math.PI;
-				}
-				
-				L = maxNeg.L * -interp + zero.L * (1 - -interp);
-				C = maxNeg.C * -interp + zero.C * (1 - -interp);
-				H = h        * -interp + zero.H * (1 - -interp);
-				
-				rm = 1.0; //1.0 + -origInterp * 0.4;
-				gm = 1.0; //1.1;
-				bm = 1.0; //1.0 + -origInterp * 0.45;
+				col = maxNeg.Blend(zero, Math.Abs(interp), Color.Space.LCh);
 			}
 		}
 		else {
-			var h = maxUns.H;
-				
-			if (maxUns.H - zero.H > Math.PI) {
-				h -= 2 * Math.PI;
-			}
-			else if (zero.H - maxUns.H < -Math.PI) {
-				h += 2 * Math.PI;
-			}
-			
-			L = maxUns.L * interp + zero.L * (1 - interp);
-			C = maxUns.C * interp + zero.C * (1 - interp);
-			H = h        * interp + zero.H * (1 - interp);
-				
-			rm = 1.0; //1.0 + origInterp * 0.3;
-			gm = 1.0; //1.1;
-			bm = 1.0; //1.1; //1.0 + origInterp * 0.35;
+			col = maxUns.Blend(zero, Math.Abs(interp), Color.Space.LCh);
 		}
 		
-		var col = AnsiColor.FromLCH(L, C, H);
-		
-		return new(
-			(byte) Math.Clamp(col.Red   * rm, 0, 255),
-			(byte) Math.Clamp(col.Green * gm, 0, 255),
-			(byte) Math.Clamp(col.Blue  * bm, 0, 255),
-			bg: true
-		);
+		return new(col, isBG: true);
 	}
 	
 	static void softFadeHeatmap(byte[] dataBuffer, byte[] progBuffer) {

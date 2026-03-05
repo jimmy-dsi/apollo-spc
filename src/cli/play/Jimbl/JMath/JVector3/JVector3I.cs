@@ -1,9 +1,46 @@
 namespace Jimbl.JMath;
 
-public struct JVector3I: JVector3<int> {
-	public int X { get; set; }
-	public int Y { get; set; }
-	public int Z { get; set; }
+using System.Numerics;
+
+public struct JVector3I: JVector3<int>, IEquatable<JVector3I> {
+	int x;
+	int y;
+	int z;
+	Action<int, int>? setterHook = null;
+	
+	public Type InnerType => JVector<int>.Defaults.InnerType();
+	
+	public (int, int, int) AsTuple => JVector3<int>.Defaults.AsTuple(this);
+	public int[]           AsArray => JVector3<int>.Defaults.AsArray(this);
+	
+	public int X {
+		get => x;
+		set {
+			x = value;
+			setterHook?.Invoke(0, value);
+		}
+	}
+
+	public int Y {
+		get => y;
+		set {
+			y = value;
+			setterHook?.Invoke(1, value);
+		}
+	}
+
+	public int Z {
+		get => z;
+		set {
+			z = value;
+			setterHook?.Invoke(2, value);
+		}
+	}
+	
+	internal Action<int, int>? SetterHook {
+		get => setterHook;
+		set => setterHook = value;
+	}
 	
 	public static explicit operator JVector2B (JVector3I vec) => new((byte) vec.X, (byte) vec.Y);
 	public static explicit operator JVector2I (JVector3I vec) => new(       vec.X,        vec.Y);
@@ -16,18 +53,88 @@ public struct JVector3I: JVector3<int> {
 	public static explicit operator JVector3F (JVector3I vec) => new(       vec.X,        vec.Y,        vec.Z);
 	public static implicit operator JVector3D (JVector3I vec) => new(       vec.X,        vec.Y,        vec.Z);
 	
+	public static implicit operator JVector3I ((int, int, int) tup) => new(tup.Item1, tup.Item2, tup.Item3);
+	public static implicit operator JVector3I (int[] arr) => new(arr[0], arr[1], arr[2]);
+	
 	public JVector3I(int x, int y, int z) {
 		X = x;
 		Y = y;
 		Z = z;
 	}
-
-	public int this[int itemIndex] {
-		get => ((JVector3<int>) this)[itemIndex];
-		set => ((JVector3<int>) this)[itemIndex] = value;
+	
+	JVector3 JVector3<Int32>.Copy<R>(Func<Int32, R> transformation) {
+		JVector3 result;
+		
+		if (typeof(R) == typeof(byte)) {
+			result = Copy(x => (byte) (object) transformation(x));
+		}
+		else if (typeof(R).FitsInt32()) {
+			result = Copy(x => (Int32) (object) transformation(x));
+		}
+		else if (typeof(R).FitsInt64()) {
+			result = Copy(x => (Int64) (object) transformation(x));
+		}
+		else if (typeof(R).FitsFloat32()) {
+			result = Copy(x => (float) (object) transformation(x));
+		}
+		else if (typeof(R).FitsFloat64()) {
+			result = Copy(x => (double) (object) transformation(x));
+		}
+		else {
+			throw new ArgumentException();
+		}
+		
+		return result;
 	}
 	
-	public double Magnitude => ((JVector3<int>) this).Magnitude;
+	public JVector3B Copy(Func<Int32, byte> transformation) {
+		JVector3B result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3I Copy(Func<Int32, Int32> transformation) {
+		JVector3I result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3L Copy(Func<Int32, Int64> transformation) {
+		JVector3L result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3F Copy(Func<Int32, float> transformation) {
+		JVector3F result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3D Copy(Func<Int32, double> transformation) {
+		JVector3D result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public void Transform(Func<Int32, Int32> transformation) => JVector<Int32>.Defaults.Transform(this, transformation);
+	
+	public Int32 this[int itemIndex] {
+		get => JVector3<Int32>.Defaults.GetThis(this, itemIndex);
+		set => JVector3<Int32>.Defaults.SetThis(this, itemIndex, value);
+	}
+	
+	public double Magnitude => JVector3<Int32>.Defaults.Magnitude(this);
 	
 	JVector3 JVector3.Negate() => Negate();
 	
@@ -236,6 +343,89 @@ public struct JVector3I: JVector3<int> {
 	public JVector3L DivideFrom(long other) {
 		return new(other / X, other / Y, other / Z);
 	}
+
+	public override int GetHashCode() {
+		return (X, Y, Z).GetHashCode();
+	}
+
+	bool IEquatable<JVector3I>.Equals(JVector3I other) => Equals(other);
+	
+	public override bool Equals(object? other) {
+		if (other is JVector3 v3) {
+			return Equals(v3);
+		}
+		else {
+			return false;
+		}
+	}
+	
+	public bool Equals(JVector3 other) {
+		if (!InnerType.IsNumeric() || !InnerType.IsNumeric()) {
+			return (object) X == other.X
+			    && (object) Y == other.Y
+			    && (object) Z == other.Z;
+		}
+		
+		var (v1, v2) = JVector3.Promote(this, other);
+		
+		if (v2.InnerType.FitsInt32()) {
+			return Equals((JVector3<Int32>) v2);
+		}
+		else if (v2.InnerType.FitsInt64()) {
+			return Equals((JVector3<Int64>) v2);
+		}
+		else if (v2.InnerType.FitsFloat64()) {
+			return Equals((JVector3<double>) v2);
+		}
+		else {
+			throw new ArgumentException("Cannot compare JVector3I to JVector3");
+		}
+	}
+	
+	public bool Equals<T>(JVector3<T> other) where T: INumber<T> {
+		var type = JVector.PromoteType(this, other);
+		
+		if (type == typeof(Int32)) {
+			return X == other.X.UnboxCast<Int32>()
+			    && Y == other.Y.UnboxCast<Int32>()
+			    && Z == other.Z.UnboxCast<Int32>();
+		}
+		else if (type == typeof(Int64)) {
+			return X == other.X.UnboxCast<Int64>()
+			    && Y == other.Y.UnboxCast<Int64>()
+			    && Z == other.Z.UnboxCast<Int64>();
+		}
+		else if (type == typeof(Int128)) {
+			return X == other.X.UnboxCast<Int128>()
+			    && Y == other.Y.UnboxCast<Int128>()
+			    && Z == other.Z.UnboxCast<Int128>();
+		}
+		else if (type == typeof(BigInteger)) {
+			return (BigInteger) X == other.X.UnboxCast<BigInteger>()
+			    && (BigInteger) Y == other.Y.UnboxCast<BigInteger>()
+			    && (BigInteger) Z == other.Z.UnboxCast<BigInteger>();
+		}
+		else if (type == typeof(double)) {
+			return X == other.X.UnboxCast<double>()
+			    && Y == other.Y.UnboxCast<double>()
+			    && Z == other.Z.UnboxCast<double>();
+		}
+		else if (type == typeof(decimal)) {
+			return X == other.X.UnboxCast<decimal>()
+			    && Y == other.Y.UnboxCast<decimal>()
+			    && Z == other.Z.UnboxCast<decimal>();
+		}
+		else if (type == typeof(Complex)) {
+			return X == other.X.UnboxCast<Complex>()
+			    && Y == other.Y.UnboxCast<Complex>()
+			    && Z == other.Z.UnboxCast<Complex>();
+		}
+		else {
+			return (object) X == (object) other.X
+			    && (object) Y == (object) other.Y
+			    && (object) Z == (object) other.Z;
+		}
+	}
 	
 	// Unary
 	public static JVector3I operator + (JVector3I self) => self;
@@ -298,4 +488,12 @@ public struct JVector3I: JVector3<int> {
 	public static JVector3L operator * (long      lhs, JVector3I rhs) => rhs.Multiply(lhs);
 	public static JVector3L operator / (JVector3I lhs, long      rhs) => lhs.Divide(rhs);
 	public static JVector3L operator / (long      lhs, JVector3I rhs) => rhs.DivideFrom(lhs);
+	
+	// Equality operator
+	public static bool operator == (JVector3I lhs, JVector3I rhs) =>  ((IEquatable<JVector3I>) lhs).Equals(rhs);
+	public static bool operator == (JVector3I lhs, JVector3  rhs) =>  lhs.Equals(rhs);
+	public static bool operator == (JVector3  lhs, JVector3I rhs) =>  rhs.Equals(lhs);
+	public static bool operator != (JVector3I lhs, JVector3I rhs) => !((IEquatable<JVector3I>) lhs).Equals(rhs);
+	public static bool operator != (JVector3I lhs, JVector3  rhs) => !lhs.Equals(rhs);
+	public static bool operator != (JVector3  lhs, JVector3I rhs) => !rhs.Equals(lhs);
 }

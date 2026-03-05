@@ -1,9 +1,46 @@
 namespace Jimbl.JMath;
 
-public struct JVector3F: JVector3<float> {
-	public float X { get; set; }
-	public float Y { get; set; }
-	public float Z { get; set; }
+using System.Numerics;
+
+public struct JVector3F: JVector3<float>, IEquatable<JVector3F> {
+	float x;
+	float y;
+	float z;
+	Action<int, float>? setterHook = null;
+	
+	public Type InnerType => JVector<float>.Defaults.InnerType();
+	
+	public (float, float, float) AsTuple => JVector3<float>.Defaults.AsTuple(this);
+	public float[]               AsArray => JVector3<float>.Defaults.AsArray(this);
+	
+	public float X {
+		get => x;
+		set {
+			x = value;
+			setterHook?.Invoke(0, value);
+		}
+	}
+
+	public float Y {
+		get => y;
+		set {
+			y = value;
+			setterHook?.Invoke(1, value);
+		}
+	}
+
+	public float Z {
+		get => z;
+		set {
+			z = value;
+			setterHook?.Invoke(2, value);
+		}
+	}
+	
+	internal Action<int, float>? SetterHook {
+		get => setterHook;
+		set => setterHook = value;
+	}
 	
 	public static explicit operator JVector2B (JVector3F vec) => new((byte) vec.X, (byte) vec.Y);
 	public static explicit operator JVector2I (JVector3F vec) => new((int)  vec.X, (int)  vec.Y);
@@ -16,18 +53,88 @@ public struct JVector3F: JVector3<float> {
 	public static explicit operator JVector3L (JVector3F vec) => new((long) vec.X, (long) vec.Y, (long) vec.Z);
 	public static implicit operator JVector3D (JVector3F vec) => new(       vec.X,        vec.Y,        vec.Z);
 	
+	public static implicit operator JVector3F ((float, float, float) tup) => new(tup.Item1, tup.Item2, tup.Item3);
+	public static implicit operator JVector3F (float[] arr) => new(arr[0], arr[1], arr[2]);
+	
 	public JVector3F(float x, float y, float z) {
 		X = x;
 		Y = y;
 		Z = z;
 	}
-
-	public float this[int itemIndex] {
-		get => ((JVector3<float>) this)[itemIndex];
-		set => ((JVector3<float>) this)[itemIndex] = value;
+	
+	JVector3 JVector3<float>.Copy<R>(Func<float, R> transformation) {
+		JVector3 result;
+		
+		if (typeof(R) == typeof(byte)) {
+			result = Copy(x => (byte) (object) transformation(x));
+		}
+		else if (typeof(R).FitsInt32()) {
+			result = Copy(x => (Int32) (object) transformation(x));
+		}
+		else if (typeof(R).FitsInt64()) {
+			result = Copy(x => (Int64) (object) transformation(x));
+		}
+		else if (typeof(R).FitsFloat32()) {
+			result = Copy(x => (float) (object) transformation(x));
+		}
+		else if (typeof(R).FitsFloat64()) {
+			result = Copy(x => (double) (object) transformation(x));
+		}
+		else {
+			throw new ArgumentException();
+		}
+		
+		return result;
 	}
 	
-	public double Magnitude => ((JVector3<float>) this).Magnitude;
+	public JVector3B Copy(Func<float, byte> transformation) {
+		JVector3B result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3I Copy(Func<float, Int32> transformation) {
+		JVector3I result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3L Copy(Func<float, Int64> transformation) {
+		JVector3L result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3F Copy(Func<float, float> transformation) {
+		JVector3F result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public JVector3D Copy(Func<float, double> transformation) {
+		JVector3D result = new();
+		for (var i = 0; i < 3; i++) {
+			result[i] = transformation(this[i]);
+		}
+		return result;
+	}
+	
+	public void Transform(Func<float, float> transformation) => JVector<float>.Defaults.Transform(this, transformation);
+	
+	public float this[int itemIndex] {
+		get => JVector3<float>.Defaults.GetThis(this, itemIndex);
+		set => JVector3<float>.Defaults.SetThis(this, itemIndex, value);
+	}
+	
+	public double Magnitude => JVector3<float>.Defaults.Magnitude(this);
 	
 	JVector3 JVector3.Negate() => Negate();
 	
@@ -236,6 +343,66 @@ public struct JVector3F: JVector3<float> {
 	public JVector3F DivideFrom(float other) {
 		return new(other / X, other / Y, other / Z);
 	}
+
+	public override int GetHashCode() {
+		return (X, Y, Z).GetHashCode();
+	}
+
+	bool IEquatable<JVector3F>.Equals(JVector3F other) => Equals(other);
+	
+	public override bool Equals(object? other) {
+		if (other is JVector3 v3) {
+			return Equals(v3);
+		}
+		else {
+			return false;
+		}
+	}
+	
+	public bool Equals(JVector3 other) {
+		if (!InnerType.IsNumeric() || !InnerType.IsNumeric()) {
+			return (object) X == other.X
+			    && (object) Y == other.Y
+			    && (object) Z == other.Z;
+		}
+		
+		var (v1, v2) = JVector3.Promote(this, other);
+		
+		if (v2.InnerType.FitsFloat32()) {
+			return Equals((JVector3<float>) v2);
+		}
+		else if (v2.InnerType.FitsFloat64()) {
+			return Equals((JVector3<double>) v2);
+		}
+		else {
+			throw new ArgumentException("Cannot compare JVector3F to JVector3");
+		}
+	}
+	
+	public bool Equals<T>(JVector3<T> other) where T: INumber<T> {
+		var type = JVector.PromoteType(this, other);
+		
+		if (type == typeof(float)) {
+			return X == other.X.UnboxCast<float>()
+			    && Y == other.Y.UnboxCast<float>()
+			    && Z == other.Z.UnboxCast<float>();
+		}
+		else if (type == typeof(double)) {
+			return X == other.X.UnboxCast<double>()
+			    && Y == other.Y.UnboxCast<double>()
+			    && Z == other.Z.UnboxCast<double>();
+		}
+		else if (type == typeof(Complex)) {
+			return X == other.X.UnboxCast<Complex>()
+			    && Y == other.Y.UnboxCast<Complex>()
+			    && Z == other.Z.UnboxCast<Complex>();
+		}
+		else {
+			return (object) X == (object) other.X
+			    && (object) Y == (object) other.Y
+			    && (object) Z == (object) other.Z;
+		}
+	}
 	
 	// Unary
 	public static JVector3F operator + (JVector3F self) => self;
@@ -298,4 +465,12 @@ public struct JVector3F: JVector3<float> {
 	public static JVector3F operator * (float     lhs, JVector3F rhs) => rhs.Multiply(lhs);
 	public static JVector3F operator / (JVector3F lhs, float     rhs) => lhs.Divide(rhs);
 	public static JVector3F operator / (float     lhs, JVector3F rhs) => rhs.DivideFrom(lhs);
+	
+	// Equality operator
+	public static bool operator == (JVector3F lhs, JVector3F rhs) =>  ((IEquatable<JVector3F>) lhs).Equals(rhs);
+	public static bool operator == (JVector3F lhs, JVector3  rhs) =>  lhs.Equals(rhs);
+	public static bool operator == (JVector3  lhs, JVector3F rhs) =>  rhs.Equals(lhs);
+	public static bool operator != (JVector3F lhs, JVector3F rhs) => !((IEquatable<JVector3F>) lhs).Equals(rhs);
+	public static bool operator != (JVector3F lhs, JVector3  rhs) => !lhs.Equals(rhs);
+	public static bool operator != (JVector3  lhs, JVector3F rhs) => !rhs.Equals(lhs);
 }

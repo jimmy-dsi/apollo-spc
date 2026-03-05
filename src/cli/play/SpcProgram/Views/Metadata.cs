@@ -16,19 +16,19 @@ public static partial class CliMain {
 		var commentsField = Display.WordWrap(PrimaryEmu.SpcMetadata.Comments, maxFieldWidth, 3);
 		
 		if (titleField[0].TrimEnd() != "")  Display.WriteBox(titleField,  17, 1);
-		else                                Display.WriteBox(["<none>"],  17, 1, AnsiColor.CGreen);
+		else                                Display.WriteBox(["<none>"],  17, 1, AnsiColor.Green);
 		if (gameField[0].TrimEnd() != "")   Display.WriteBox(gameField,   17, 2);
-		else                                Display.WriteBox(["<none>"],  17, 2, AnsiColor.CGreen);
+		else                                Display.WriteBox(["<none>"],  17, 2, AnsiColor.Green);
 		if (artistField[0].TrimEnd() != "") Display.WriteBox(artistField, 17, 3);
-		else                                Display.WriteBox(["<none>"],  17, 3, AnsiColor.CGreen);
+		else                                Display.WriteBox(["<none>"],  17, 3, AnsiColor.Green);
 		if (dumperField[0].TrimEnd() != "") Display.WriteBox(dumperField, 17, 4);
-		else                                Display.WriteBox(["<none>"],  17, 4, AnsiColor.CGreen);
+		else                                Display.WriteBox(["<none>"],  17, 4, AnsiColor.Green);
 		
 		if (commentsField.Length > 1 || commentsField[0].TrimEnd() != "") {
 			Display.WriteBox(commentsField, 17, 5);
 		}
 		else {
-			Display.WriteBox(["<none>"], 17, 5, AnsiColor.CGreen);
+			Display.WriteBox(["<none>"], 17, 5, AnsiColor.Green);
 		}
 		
 		var y = 5 + commentsField.Length;
