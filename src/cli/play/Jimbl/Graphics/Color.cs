@@ -387,7 +387,7 @@ public class Color {
 		var f  = filter    .ToArray();
 		
 		for (var i = 0; i < f.Length; i++) {
-			var col  = i >= pc.Length ? pc[^1] : pc[i];
+			var col  = pc.Length == 0 ? this : i >= pc.Length ? pc[^1] : pc[i];
 			var samp = f[i];
 			
 			var c = col.Multiply(samp, colorSpace);
@@ -396,6 +396,11 @@ public class Color {
 		}
 		
 		return resultColor;
+	}
+	
+	public Color AsClamped() {
+		var (r, g, b) = RGB.Unwrap().AsTuple;
+		return new(r, g, b);
 	}
 	
 	public override int GetHashCode() {

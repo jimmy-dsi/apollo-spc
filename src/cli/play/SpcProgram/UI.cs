@@ -981,7 +981,7 @@ public static partial class CliMain {
 					interp = Math.Pow(interp, 2);
 					
 					var bgCol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i]).BackgroundRGB!;
-					var fgCol = refColor.Blend(bgCol, interp, Color.Space.LCh);
+					var fgCol = refColor.Blend(bgCol, 1 - interp, Color.Space.LCh);
 					
 					fgAnsi = new(fgCol);
 				}
