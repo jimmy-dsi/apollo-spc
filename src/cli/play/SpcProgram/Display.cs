@@ -432,8 +432,6 @@ public static class Display {
 		0.10,
 	];
 	
-	const double Gamma = 2.2;
-	
 	static AnsiColor? blendColors(AnsiColor color1, params AnsiColor?[] colors) {
 		if (color1.BackgroundRGB is null) {
 			return color1;
@@ -449,6 +447,6 @@ public static class Display {
 			}
 		}
 		
-		return new(color1.BackgroundRGB.Filter(prevColors, blendFilter), isBG: true);
+		return new(color1.BackgroundRGB.Filter(prevColors, blendFilter, Jimbl.Graphics.Color.Space.RGB), isBG: true);
 	}
 }

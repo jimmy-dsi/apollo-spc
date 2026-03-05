@@ -195,6 +195,8 @@ public class Color {
 		init();
 	}
 	
+	public Color(JVector3D xyz, double a = 1.0, Space colorSpace = Space.RGB): this(xyz.X, xyz.Y, xyz.Z, a, colorSpace) { }
+	
 	public Color(double x, double y, double z, double a = 1.0, Space colorSpace = Space.RGB) {
 		JVector3D input = (x, y, z);
 			
@@ -279,7 +281,7 @@ public class Color {
 	
 	public Color Add(Color other, Space colorSpace) {
 		return colorSpace switch {
-			Space .RGB =>  FromRGB(RGB .Unwrap() + other .RGB.Unwrap()),
+			Space .RGB =>      new(SRGB.Unwrap() + other.SRGB.Unwrap()),
 			Space.LRGB => FromLRGB(LRGB.Unwrap() + other.LRGB.Unwrap()),
 			Space .Lab =>  FromLab(Lab .Unwrap() + other .Lab.Unwrap()),
 			_          => throw new NotSupportedException()
@@ -290,7 +292,7 @@ public class Color {
 	
 	public Color Subtract(Color other, Space colorSpace) {
 		return colorSpace switch {
-			Space .RGB =>  FromRGB(RGB .Unwrap() - other .RGB.Unwrap()),
+			Space .RGB =>      new(SRGB.Unwrap() - other.SRGB.Unwrap()),
 			Space.LRGB => FromLRGB(LRGB.Unwrap() - other.LRGB.Unwrap()),
 			Space .Lab =>  FromLab(Lab .Unwrap() - other .Lab.Unwrap()),
 			_          => throw new NotSupportedException()
@@ -301,7 +303,7 @@ public class Color {
 	
 	public Color Multiply(Color other, Space colorSpace) {
 		return colorSpace switch {
-			Space .RGB =>  FromRGB(SRGB[0] * other.SRGB[0], SRGB[1] * other.SRGB[1], SRGB[2] * other.SRGB[2]),
+			Space .RGB =>      new(SRGB[0] * other.SRGB[0], SRGB[1] * other.SRGB[1], SRGB[2] * other.SRGB[2]),
 			Space.LRGB => FromLRGB(LRGB[0] * other.LRGB[0], LRGB[1] * other.LRGB[1], LRGB[2] * other.LRGB[2]),
 			Space .Lab =>  FromLab(
 				Lab[0] * other.Lab[0] / 100,
@@ -316,7 +318,7 @@ public class Color {
 	
 	public Color Multiply(double other, Space colorSpace) {
 		return colorSpace switch {
-			Space .RGB =>  FromRGB(RGB .Unwrap() * other),
+			Space .RGB =>      new(SRGB.Unwrap() * other),
 			Space.LRGB => FromLRGB(LRGB.Unwrap() * other),
 			Space .Lab =>  FromLab(Lab .Unwrap() * other),
 			_          => throw new NotSupportedException()
@@ -327,7 +329,7 @@ public class Color {
 	
 	public Color Divide(double other, Space colorSpace) {
 		return colorSpace switch {
-			Space .RGB =>  FromRGB(RGB .Unwrap() / other),
+			Space .RGB =>      new(SRGB.Unwrap() * other),
 			Space.LRGB => FromLRGB(LRGB.Unwrap() / other),
 			Space .Lab =>  FromLab(Lab .Unwrap() / other),
 			_          => throw new NotSupportedException()
@@ -338,7 +340,7 @@ public class Color {
 	
 	public Color DivideFrom(double other, Space colorSpace) {
 		return colorSpace switch {
-			Space .RGB =>  FromRGB(other / RGB .Unwrap()),
+			Space .RGB =>      new(SRGB.Unwrap() * other),
 			Space.LRGB => FromLRGB(other / LRGB.Unwrap()),
 			Space .Lab =>  FromLab(other / Lab .Unwrap()),
 			_          => throw new NotSupportedException()
@@ -351,7 +353,7 @@ public class Color {
 		amount = Math.Clamp(amount, 0, 1);
 		
 		return colorSpace switch {
-			Space .RGB =>  FromRGB(RGB .Unwrap() * (1 - amount) + other.RGB .Unwrap() * amount),
+			Space .RGB =>      new(SRGB.Unwrap() * (1 - amount) + other.SRGB.Unwrap() * amount),
 			Space.LRGB => FromLRGB(LRGB.Unwrap() * (1 - amount) + other.LRGB.Unwrap() * amount),
 			Space. HSV =>  FromHSV(
 				lerpAngle(HSV[0], other.HSV[0], amount),
@@ -386,8 +388,8 @@ public class Color {
 		var pc = prevColors.ToArray();
 		var f  = filter    .ToArray();
 		
-		for (var i = 0; i < f.Length; i++) {
-			var col  = pc.Length == 0 ? this : i >= pc.Length ? pc[^1] : pc[i];
+		for (var i = 1; i < f.Length; i++) {
+			var col  = pc.Length == 0 ? this : i - 1 >= pc.Length ? pc[^1] : pc[i - 1];
 			var samp = f[i];
 			
 			var c = col.Multiply(samp, colorSpace);
@@ -401,6 +403,20 @@ public class Color {
 	public Color AsClamped() {
 		var (r, g, b) = RGB.Unwrap().AsTuple;
 		return new(r, g, b);
+	}
+	
+	public Color AsCompressed(double ratio = 0.5) {
+		var v = SRGB.Unwrap();
+		var (n, max) = v.AsArray.Enum().OrderByDescending(x => Math.Abs(x.Item2)).First();
+		
+		if (max > 1) {
+			var overshoot    = max - 1;
+			var adjOvershoot = overshoot * (1 - ratio);
+		
+			v /= (1 + adjOvershoot);
+		}
+		
+		return new(v[0], v[1], v[2]);
 	}
 	
 	public override int GetHashCode() {
