@@ -247,14 +247,14 @@ public class Color {
 		var self = this;
 		
 		// Setup other vector representations
-		rgb  = new((JVector3B) vec,     (i, v) => self.vec[i] = v);
-		srgb = new(vec.Copy(normalize), (i, v) => self.vec[i] = denormalize(v));
-		lrgb = new(vec.Copy(toLinear),  (i, v) => self.vec[i] = denormalize(fromLinear(v)));
-		hsv  = new(rgbToHSV(vec),       () => self.vec = hsvToRGB(hsv));
-		hsl  = new(rgbToHSL(vec),       () => self.vec = hslToRGB(hsl));
-		xyz  = new(rgbToXYZ(vec),       () => self.vec = xyzToRGB(xyz));
-		lab  = new(rgbToLab(vec),       () => self.vec = labToRGB(lab));
-		lch  = new(rgbToLCh(vec),       () => self.vec = lchToRGB(lch));
+		rgb  = new(vec.Copy(n => (byte) Math.Clamp(n, 0, 255)), (i, v) => self.vec[i] = v);
+		srgb = new(vec.Copy(normalize),                         (i, v) => self.vec[i] = denormalize(v));
+		lrgb = new(vec.Copy(toLinear),                          (i, v) => self.vec[i] = denormalize(fromLinear(v)));
+		hsv  = new(rgbToHSV(vec),                               () => self.vec = hsvToRGB(hsv));
+		hsl  = new(rgbToHSL(vec),                               () => self.vec = hslToRGB(hsl));
+		xyz  = new(rgbToXYZ(vec),                               () => self.vec = xyzToRGB(xyz));
+		lab  = new(rgbToLab(vec),                               () => self.vec = labToRGB(lab));
+		lch  = new(rgbToLCh(vec),                               () => self.vec = lchToRGB(lch));
 	}
 	
 	public byte this[int channel] {
