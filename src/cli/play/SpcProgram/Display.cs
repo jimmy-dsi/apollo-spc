@@ -227,24 +227,24 @@ public static class Display {
 				if (cl is not null) {
 					var (y0, y1, y2, y3) = (y + offset0, y + offset1, y + offset2, y + offset3);
 					
-					//if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
-					//	cl = blendColors(
-					//		cl,
-					//		prevColorGrids[0][y0][x],
-					//		prevColorGrids[1][y1][x],
-					//		prevColorGrids[2][y2][x],
-					//		prevColorGrids[3][y3][x]
-					//	);
-					//}
-					//else {
-					//	cl = blendColors(
-					//		cl,
-					//		prevColorGrids[0][y][x],
-					//		prevColorGrids[1][y][x],
-					//		prevColorGrids[2][y][x],
-					//		prevColorGrids[3][y][x]
-					//	);
-					//}
+					if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
+						cl = blendColors(
+							cl,
+							prevColorGrids[0][y0][x],
+							prevColorGrids[1][y1][x],
+							prevColorGrids[2][y2][x],
+							prevColorGrids[3][y3][x]
+						);
+					}
+					else {
+						cl = blendColors(
+							cl,
+							prevColorGrids[0][y][x],
+							prevColorGrids[1][y][x],
+							prevColorGrids[2][y][x],
+							prevColorGrids[3][y][x]
+						);
+					}
 				}
 				
 				if (cl != prevColor) {

@@ -45,7 +45,7 @@ public struct JVector2L: JVector2<long>, IEquatable<JVector2L> {
 	public static implicit operator JVector3D (JVector2L vec) => new(       vec.X,        vec.Y, 0);
 	
 	public static implicit operator JVector2L ((long, long) tup) => new(tup.Item1, tup.Item2);
-	public static implicit operator JVector2L (long[] arr) => new(arr[0], arr[1]);
+	public static explicit operator JVector2L (long[] arr) => new(arr[0], arr[1]);
 	
 	public JVector2L(long x, long y) {
 		X = x;
@@ -117,11 +117,11 @@ public struct JVector2L: JVector2<long>, IEquatable<JVector2L> {
 		return result;
 	}
 	
-	public void Transform(Func<Int64, Int64> transformation) => JVector<Int64>.Defaults.Transform(this, transformation);
+	public void Transform(Func<Int64, Int64> transformation) => JVector<Int64>.Defaults.Transform(ref this, transformation);
 
 	public Int64 this[int itemIndex] {
 		get => JVector2<Int64>.Defaults.GetThis(this, itemIndex);
-		set => JVector2<Int64>.Defaults.SetThis(this, itemIndex, value);
+		set => JVector2<Int64>.Defaults.SetThis(ref this, itemIndex, value);
 	}
 	
 	public double Magnitude => JVector2<Int64>.Defaults.Magnitude(this);

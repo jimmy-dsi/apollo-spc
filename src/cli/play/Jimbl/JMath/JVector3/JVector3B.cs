@@ -54,7 +54,7 @@ public struct JVector3B: JVector3<byte>, IEquatable<JVector3B> {
 	public static implicit operator JVector3D (JVector3B vec) => new(vec.X, vec.Y, vec.Z);
 	
 	public static implicit operator JVector3B ((byte, byte, byte) tup) => new(tup.Item1, tup.Item2, tup.Item3);
-	public static implicit operator JVector3B (byte[] arr) => new(arr[0], arr[1], arr[2]);
+	public static explicit operator JVector3B (byte[] arr) => new(arr[0], arr[1], arr[2]);
 	
 	public JVector3B(byte x, byte y, byte z) {
 		X = x;
@@ -127,11 +127,11 @@ public struct JVector3B: JVector3<byte>, IEquatable<JVector3B> {
 		return result;
 	}
 	
-	public void Transform(Func<byte, byte> transformation) => JVector<byte>.Defaults.Transform(this, transformation);
+	public void Transform(Func<byte, byte> transformation) => JVector<byte>.Defaults.Transform(ref this, transformation);
 	
 	public byte this[int itemIndex] {
 		get => JVector3<byte>.Defaults.GetThis(this, itemIndex);
-		set => JVector3<byte>.Defaults.SetThis(this, itemIndex, value);
+		set => JVector3<byte>.Defaults.SetThis(ref this, itemIndex, value);
 	}
 	
 	public double Magnitude => JVector3<byte>.Defaults.Magnitude(this);

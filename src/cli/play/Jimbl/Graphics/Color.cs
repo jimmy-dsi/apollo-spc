@@ -132,7 +132,7 @@ public class Color {
 	public static Color FromLCh(double L, double c, double h) => new(L, c, h, colorSpace: Space.LCh);
 	public static Color FromLCh(JVector3D lch)                => FromLCh(lch[0], lch[1], lch[2]);
 	
-	JVector3B vec = new();
+	JVector3I vec = new();
 	
 	// Other vector representations
 	Vec3B rgb;
@@ -157,17 +157,17 @@ public class Color {
 	public Space FilterSpace { get; set; } = Space.LRGB;
 	
 	public byte Red {
-		get => vec.X;
+		get => (byte) Math.Clamp(vec.X, 0, 255);
 		set => vec.X = value;
 	}
 	
 	public byte Green {
-		get => vec.Y;
+		get => (byte) Math.Clamp(vec.Y, 0, 255);
 		set => vec.Y = value;
 	}
 	
 	public byte Blue {
-		get => vec.Z;
+		get => (byte) Math.Clamp(vec.Z, 0, 255);
 		set => vec.Z = value;
 	}
 	
@@ -239,7 +239,7 @@ public class Color {
 			}
 		}
 		
-		Alpha = denormalize(a);
+		Alpha = (byte) Math.Clamp(denormalize(a), 0, 255);
 		init();
 	}
 	
@@ -247,7 +247,7 @@ public class Color {
 		var self = this;
 		
 		// Setup other vector representations
-		rgb  = new(vec,                 (i, v) => self.vec[i] = v);
+		rgb  = new((JVector3B) vec,     (i, v) => self.vec[i] = v);
 		srgb = new(vec.Copy(normalize), (i, v) => self.vec[i] = denormalize(v));
 		lrgb = new(vec.Copy(toLinear),  (i, v) => self.vec[i] = denormalize(fromLinear(v)));
 		hsv  = new(rgbToHSV(vec),       () => self.vec = hsvToRGB(hsv));
@@ -258,7 +258,7 @@ public class Color {
 	}
 	
 	public byte this[int channel] {
-		get => vec[channel];
+		get => (byte) Math.Clamp(vec[channel], 0, 255);
 		set => vec[channel] = value;
 	}
 	
@@ -271,7 +271,7 @@ public class Color {
 	public static implicit operator Color ((double, double, double) rgb) => new(rgb.Item1, rgb.Item2, rgb.Item3);
 	public static explicit operator Color (double[]                 rgb) => new(rgb[0],    rgb[1],    rgb[2]   );
 	
-	public static explicit operator JVector3B (Color col) => col.vec;
+	public static explicit operator JVector3B (Color col) => (JVector3B) col.vec;
 	public static explicit operator JVector3D (Color col) => col.SRGB.Unwrap();
 	
 	// Operations
@@ -365,7 +365,7 @@ public class Color {
 			),
 			Space .XYZ =>  FromLab(XYZ .Unwrap() * (1 - amount) + other.XYZ .Unwrap() * amount),
 			Space .Lab =>  FromLab(Lab .Unwrap() * (1 - amount) + other.Lab .Unwrap() * amount),
-			Space. LCh =>  FromHSL(
+			Space. LCh =>  FromLCh(
 				LCh[0] * (1 - amount) + other.LCh[0] * amount,
 				LCh[1] * (1 - amount) + other.LCh[1] * amount,
 				lerpAngle(LCh[2], other.LCh[2], amount)
@@ -412,15 +412,15 @@ public class Color {
 	}
 	
 	public void Deconstruct(out byte red, out byte green, out byte blue) {
-		red   = vec[0];
-		green = vec[1];
-		blue  = vec[2];
+		red   = Red;
+		green = Green;
+		blue  = Blue;
 	}
 	
 	public void Deconstruct(out byte red, out byte green, out byte blue, out byte alpha) {
-		red   = vec[0];
-		green = vec[1];
-		blue  = vec[2];
+		red   = Red;
+		green = Green;
+		blue  = Blue;
 		alpha = 255;
 	}
 
@@ -453,7 +453,7 @@ public class Color {
 	}
 	
 	// Transformations
-	static double toLinear(byte rgbChannelValue) {
+	static double toLinear(int rgbChannelValue) {
 		return toLinear(normalize(rgbChannelValue));
 	}
 	
@@ -465,42 +465,23 @@ public class Color {
 		return Math.Pow(lrgbChannelValue, 1 / Gamma);
 	}
 	
-	static double normalize(byte rgbaChannelValue) {
-		if (rgbaChannelValue == 255) {
-			return 1.0;
-		}
-		else {
-			return rgbaChannelValue / 256.0;
-		}
+	static double normalize(int rgbaChannelValue) {
+		return rgbaChannelValue / 255.0;
 	}
 	
-	static byte denormalize(double rgbaNormalized) {
-		//if (rgbaNormalized is < 0 or > 1) {
-		//	throw new ArgumentException("Normalized color channel value must be between 0 and 1.");
-		//}
-		
-		return (byte) Math.Clamp(rgbaNormalized * 256, 0, 255);
+	static int denormalize(double rgbaNormalized) {
+		return (int) (rgbaNormalized * 255);
 	}
 	
-	static JVector3D normalize(JVector3B rgb) {
-		for (var i = 0; i < 3; i++) {
-			if (rgb[i] == 255) rgb[i]++;
-		}
-		
-		return rgb / 256.0;
+	static JVector3D normalize(JVector3I rgb) {
+		return rgb / 255.0;
 	}
 	
-	static JVector3B denormalize(JVector3D srgb) {
-		JVector3B rgb = new();
-		
-		for (var i = 0; i < 3; i++) {
-			rgb[i] = (byte) Math.Clamp(srgb[i] * 256, 0, 255);
-		}
-		
-		return rgb;
+	static JVector3I denormalize(JVector3D srgb) {
+		return (JVector3I) (srgb * 255);
 	}
 	
-	static JVector3D rgbToHSV(JVector3B rgb) {
+	static JVector3D rgbToHSV(JVector3I rgb) {
 		return rgbToHSV(normalize(rgb));
 	}
 	
@@ -537,7 +518,7 @@ public class Color {
 		return hsv;
 	}
 	
-	static JVector3D rgbToHSL(JVector3B rgb) {
+	static JVector3D rgbToHSL(JVector3I rgb) {
 		return rgbToHSL(normalize(rgb));
 	}
 	
@@ -575,7 +556,7 @@ public class Color {
 		return hsl;
 	}
 	
-	static JVector3D rgbToLab(JVector3B rgb) {
+	static JVector3D rgbToLab(JVector3I rgb) {
 		return rgbToLab(normalize(rgb));
 	}
 	
@@ -589,7 +570,7 @@ public class Color {
 	                                    [0.2126, 0.7152, 0.0722],
 	                                    [0.0193, 0.1192, 0.9505]];
 	
-	static JVector3D rgbToXYZ(JVector3B rgb) {
+	static JVector3D rgbToXYZ(JVector3I rgb) {
 		return rgbToXYZ(normalize(rgb));
 	}
 	
@@ -607,7 +588,7 @@ public class Color {
 		rgb *= 100;
 		
 		for (var i = 0; i < 3; i++) {
-			xyz[i] = rgb * rgbToXyzMatrix[i];
+			xyz[i] = rgb * (JVector3D) rgbToXyzMatrix[i];
 		}
 		
 		return xyz;
@@ -638,7 +619,7 @@ public class Color {
 		return lab;
 	}
 	
-	static JVector3D rgbToLCh(JVector3B rgb) {
+	static JVector3D rgbToLCh(JVector3I rgb) {
 		return rgbToLCh(normalize(rgb));
 	}
 	
@@ -658,7 +639,7 @@ public class Color {
 		return lch;
 	}
 	
-	static JVector3B hsvToRGB(JVector3D hsv) {
+	static JVector3I hsvToRGB(JVector3D hsv) {
 		var rgb = hsvToSRGB(hsv);
 		return rgb.Copy(denormalize);
 	}
@@ -698,7 +679,7 @@ public class Color {
 		return rgb;
 	}
 	
-	static JVector3B hslToRGB(JVector3D hsl) {
+	static JVector3I hslToRGB(JVector3D hsl) {
 		var rgb = hslToSRGB(hsl);
 		return rgb.Copy(denormalize);
 	}
@@ -738,7 +719,7 @@ public class Color {
 		return rgb;
 	}
 	
-	static JVector3B labToRGB(JVector3D lab) {
+	static JVector3I labToRGB(JVector3D lab) {
 		var rgb = labToSRGB(lab);
 		return rgb.Copy(denormalize);
 	}
@@ -778,7 +759,7 @@ public class Color {
 	                                    [-0.9689,  1.8758,  0.0415],
 	                                    [ 0.0557, -0.2040,  1.0570]];
 	
-	static JVector3B xyzToRGB(JVector3D xyz) {
+	static JVector3I xyzToRGB(JVector3D xyz) {
 		var rgb = labToSRGB(xyz);
 		return rgb.Copy(denormalize);
 	}
@@ -787,7 +768,7 @@ public class Color {
 		JVector3D rgb = new();
 		
 		for (var i = 0; i < 3; i++) {
-			rgb[i] = xyz * xyzToRgbMatrix[i];
+			rgb[i] = xyz * (JVector3D) xyzToRgbMatrix[i];
 		}
 		
 		rgb.Transform(n => {
@@ -802,7 +783,7 @@ public class Color {
 		return rgb;
 	}
 	
-	static JVector3B lchToRGB(JVector3D lch) {
+	static JVector3I lchToRGB(JVector3D lch) {
 		var rgb = lchToSRGB(lch);
 		return rgb.Copy(denormalize);
 	}
@@ -817,8 +798,10 @@ public class Color {
 		JVector3D lab = lch;
 		var (L, c, h) = lch.AsTuple;
 		
-		lab[1] = c * Math.Cos(double.DegreesToRadians(h));
-		lab[2] = c * Math.Sin(double.DegreesToRadians(h));
+		var rad = double.DegreesToRadians(h);
+		
+		lab[1] = c * Math.Cos(rad);
+		lab[2] = c * Math.Sin(rad);
 		
 		return lab;
 	}

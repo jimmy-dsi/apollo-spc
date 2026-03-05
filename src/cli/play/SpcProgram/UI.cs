@@ -60,7 +60,7 @@ public static partial class CliMain {
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer];
 	
-	static bool heatMapEnabled    = false;
+	static bool heatMapEnabled    = true;
 	static bool cyclesInSpcClocks = false;
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
@@ -1154,14 +1154,14 @@ public static partial class CliMain {
 		
 		if (signed) {
 			if (interp >= 0) {
-				col = maxPos.Blend(zero, Math.Abs(interp), Color.Space.LCh);
+				col = maxPos.Blend(zero, 1 - Math.Abs(interp), Color.Space.LCh);
 			}
 			else {
-				col = maxNeg.Blend(zero, Math.Abs(interp), Color.Space.LCh);
+				col = maxNeg.Blend(zero, 1 - Math.Abs(interp), Color.Space.LCh);
 			}
 		}
 		else {
-			col = maxUns.Blend(zero, Math.Abs(interp), Color.Space.LCh);
+			col = maxUns.Blend(zero, 1 - Math.Abs(interp), Color.Space.LCh);
 		}
 		
 		return new(col, isBG: true);

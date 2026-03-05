@@ -148,7 +148,14 @@ public interface JVector3<T>: JVector3, JVector<T> where T: INumber<T> {
 	
 	public new T this[int itemIndex] {
 		get => Defaults.GetThis(this, itemIndex);
-		set => Defaults.SetThis(this, itemIndex, value);
+		set {
+			switch (itemIndex) {
+				case 0:  X = value; break;
+				case 1:  Y = value; break;
+				case 2:  Z = value; break;
+				default: throw new ArgumentOutOfRangeException();
+			}
+		}
 	}
 	
 	JVector     JVector.Copy(Func<object, object> transformation) => Copy(x => transformation(x));
@@ -191,7 +198,7 @@ public interface JVector3<T>: JVector3, JVector<T> where T: INumber<T> {
 			}
 		}
 		
-		public static void SetThis(JVector3<T> self, int itemIndex, T value) {
+		public static void SetThis<TSelf>(ref TSelf self, int itemIndex, T value) where TSelf: struct, JVector3<T> {
 			switch (itemIndex) {
 				case 0:  self.X = value; break;
 				case 1:  self.Y = value; break;

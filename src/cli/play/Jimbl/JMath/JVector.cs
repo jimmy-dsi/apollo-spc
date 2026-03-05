@@ -92,7 +92,11 @@ public interface JVector<T>: JVector where T: INumber<T> {
 	JVector JVector.Copy(Func<object, object> transformation) => Copy(x => transformation((T) x));
 	public JVector Copy<R>(Func<T, R> transformation);
 	
-	public void Transform(Func<T, T> transformation) => Defaults.Transform(this, transformation);
+	public void Transform(Func<T, T> transformation) {
+		for (var i = 0; i < Count; i++) {
+			this[i] = transformation(this[i]);
+		}
+	}
 	
 	public static virtual JVector<T> operator + (JVector<T> self) => self;
 	public static virtual JVector    operator - (JVector<T> self) => self.Negate();
@@ -115,7 +119,7 @@ public interface JVector<T>: JVector where T: INumber<T> {
 	// Default implementations
 	public static class Defaults {
 		public static Type InnerType() => typeof(T);
-		public static void Transform(JVector<T> self, Func<T, T> transformation) {
+		public static void Transform<TSelf>(ref TSelf self, Func<T, T> transformation) where TSelf: struct, JVector<T> {
 			for (var i = 0; i < self.Count; i++) {
 				self[i] = transformation(self[i]);
 			}
