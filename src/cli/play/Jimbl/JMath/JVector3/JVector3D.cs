@@ -53,6 +53,12 @@ public struct JVector3D: JVector3<double>, IEquatable<JVector3D> {
 	public static explicit operator JVector3L (JVector3D vec) => new((long)  vec.X, (long)  vec.Y, (long)  vec.Z);
 	public static explicit operator JVector3F (JVector3D vec) => new((float) vec.X, (float) vec.Y, (float) vec.Z);
 	
+	public static explicit operator JVector4B (JVector3D vec) => new((byte)  vec.X, (byte)  vec.Y, (byte)  vec.Z, 0);
+	public static explicit operator JVector4I (JVector3D vec) => new((int)   vec.X, (int)   vec.Y, (int)   vec.Z, 0);
+	public static explicit operator JVector4L (JVector3D vec) => new((long)  vec.X, (long)  vec.Y, (long)  vec.Z, 0);
+	public static explicit operator JVector4F (JVector3D vec) => new((float) vec.X, (float) vec.Y, (float) vec.Z, 0);
+	public static implicit operator JVector4D (JVector3D vec) => new(        vec.X,         vec.Y,         vec.Z, 0);
+	
 	public static implicit operator JVector3D ((double, double, double) tup) => new(tup.Item1, tup.Item2, tup.Item3);
 	public static explicit operator JVector3D (double[] arr) => new(arr[0], arr[1], arr[2]);
 	

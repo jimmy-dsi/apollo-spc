@@ -44,6 +44,12 @@ public struct JVector2B: JVector2<byte>, IEquatable<JVector2B> {
 	public static implicit operator JVector3F (JVector2B vec) => new(vec.X, vec.Y, 0);
 	public static implicit operator JVector3D (JVector2B vec) => new(vec.X, vec.Y, 0);
 	
+	public static implicit operator JVector4B (JVector2B vec) => new(vec.X, vec.Y, 0, 0);
+	public static implicit operator JVector4I (JVector2B vec) => new(vec.X, vec.Y, 0, 0);
+	public static implicit operator JVector4L (JVector2B vec) => new(vec.X, vec.Y, 0, 0);
+	public static implicit operator JVector4F (JVector2B vec) => new(vec.X, vec.Y, 0, 0);
+	public static implicit operator JVector4D (JVector2B vec) => new(vec.X, vec.Y, 0, 0);
+	
 	public static implicit operator JVector2B ((byte, byte) tup) => new(tup.Item1, tup.Item2);
 	public static explicit operator JVector2B (byte[] arr) => new(arr[0], arr[1]);
 	

@@ -969,6 +969,8 @@ public static partial class CliMain {
 			eqInsideColor = heatMapColor(BusSize.Bit8, false, 1, 0);
 		}
 		
+		var eqInsideRGB = eqInsideColor.BackgroundRGB!.Multiply(5.0 / 7);
+		
 		var color  = AnsiColor.Red;
 		var height = (int) Math.Round(value * displayHeight * 8);
 		
@@ -992,12 +994,12 @@ public static partial class CliMain {
 					
 					midColor = refColor.Blend(bgCol, 1 - interp2, Color.Space.LCh);
 					
-					fgAnsi = new(fgCol, eqInsideColor.BackgroundRGB!);
+					fgAnsi = new(fgCol, eqInsideRGB);
 				}
 				else {
 					var bgCol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2    ]).BackgroundRGB!;
 					midColor  = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2 + 1]).BackgroundRGB!;
-					fgAnsi    = new(bgCol, eqInsideColor.BackgroundRGB!);
+					fgAnsi    = new(bgCol, eqInsideRGB);
 				}
 				
 				#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
