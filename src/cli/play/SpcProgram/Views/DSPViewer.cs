@@ -69,7 +69,13 @@ public static partial class CliMain {
 		showColorCoding();
 	}
 	
+	static AnsiColor? eqInsideColor = null;
+	
 	static void showDSPViewer2(EmuDataBuffer buffer) {
+		if (eqInsideColor is null) {
+			eqInsideColor = heatMapColor(BusSize.Bit8, false, 1, 0);
+		}
+		
 		showDSPMem(buffer);
 		var baseY = Display.Y + 1;
 		
@@ -177,13 +183,21 @@ public static partial class CliMain {
 		var specX = firX + 37;
 		var specY = Display.Y - 6;
 		
-		AnsiColor? darkBlue = null; //heatMapColor(BusSize.Bit8, false, 1, 12);
-		AnsiColor? boxColor = null;
+		AnsiColor? darkBlue    = null; //heatMapColor(BusSize.Bit8, false, 1, 12);
+		AnsiColor? boxColor    = null;
+		
+		AnsiColor  darkLine = new(AnsiColor.Code.DarkGrey, eqInsideColor.BackgroundRGB!);
+		AnsiColor lightLine = new(AnsiColor.Code.    Grey, eqInsideColor.BackgroundRGB!);
 		
 		Display.ClearBox(20, 8, specX + 1, specY + 1);
-		Display.Write(new('_', 21), specX, specY + 2, col: AnsiColor.DarkGrey);
-		Display.Write(new('_', 21), specX, specY + 4, col: AnsiColor.Grey);
-		Display.Write(new('_', 21), specX, specY + 6, col: AnsiColor.DarkGrey);
+		Display.Write(new(' ', 21), specX, specY + 1, col: eqInsideColor);
+		Display.Write(new('_', 21), specX, specY + 2, col: darkLine);
+		Display.Write(new(' ', 21), specX, specY + 3, col: eqInsideColor);
+		Display.Write(new('_', 21), specX, specY + 4, col: lightLine);
+		Display.Write(new(' ', 21), specX, specY + 5, col: eqInsideColor);
+		Display.Write(new('_', 21), specX, specY + 6, col: darkLine);
+		Display.Write(new(' ', 21), specX, specY + 7, col: eqInsideColor);
+		Display.Write(new(' ', 21), specX, specY + 8, col: eqInsideColor);
 		
 		var firFFT = JMath.FFT_Gain(buffer.DSP_State!.FIR.Select(x => (int) x).ToArray(), 0x80);
 		const double MaxDB = 16;
@@ -198,9 +212,9 @@ public static partial class CliMain {
 		}
 		
 		Display.DrawOutline(specX - 1, specY, 23, 10, col: boxColor);
-		Display.Write(new(' ', 23), specX -  1, specY);
-		Display.Write(new(' ', 21), specX,      specY,     col: darkBlue);
-		Display.Write(new(' ', 23), specX -  1, specY + 9);
+		Display.Write(new(' ', 23), specX -  1, specY, col: eqInsideColor);
+		Display.Write(new(' ', 21), specX,      specY, col: darkBlue);
+		Display.Write(new(' ', 23), specX -  1, specY + 9, col: eqInsideColor);
 		Display.Write(" ",          specX -  1, specY, col: boxColor);
 		Display.Write(" ",          specX + 21, specY, col: boxColor);
 		

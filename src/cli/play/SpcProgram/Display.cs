@@ -224,7 +224,7 @@ public static class Display {
 				var ch =  charGrid[y][x];
 				var cl = colorGrid[y][x];
 				
-				if (cl is not null) {
+				if (cl is not null && cl.IsBG) {
 					var (y0, y1, y2, y3) = (y + offset0, y + offset1, y + offset2, y + offset3);
 					
 					if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {

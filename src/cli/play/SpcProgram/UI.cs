@@ -60,7 +60,7 @@ public static partial class CliMain {
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer];
 	
-	static bool heatMapEnabled    = true;
+	static bool heatMapEnabled    = false;
 	static bool cyclesInSpcClocks = false;
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
@@ -962,9 +962,13 @@ public static partial class CliMain {
 		}
 	}
 	
-	static byte[] heatValues = [0x50, 0x68, 0xA0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0];
+	static byte[] heatValues = [0x48, 0x50, 0x5C, 0x68, 0x84, 0xA0, 0xC0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0];
 	
 	static void showBar(double value, int displayHeight, int x, int y) {
+		if (eqInsideColor is null) {
+			eqInsideColor = heatMapColor(BusSize.Bit8, false, 1, 0);
+		}
+		
 		var color  = AnsiColor.Red;
 		var height = (int) Math.Round(value * displayHeight * 8);
 		
@@ -975,24 +979,31 @@ public static partial class CliMain {
 		if (height > 0) {
 			for (var i = 0; i < displayHeight; i++) {
 				AnsiColor fgAnsi;
+				Color midColor;
 				
 				if (i >= displayHeight / 2) {
-					var interp = (double) (displayHeight - i) / (displayHeight / 2 + 1);
-					interp = Math.Pow(interp, 2);
+					var interp  = (double) (displayHeight         - i) / (displayHeight / 2 + 1);
+					var interp2 = (double) (displayHeight - (i + 0.5)) / (displayHeight / 2 + 1);
+					interp  = Math.Pow(interp,  2);
+					interp2 = Math.Pow(interp2, 2);
 					
-					var bgCol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i]).BackgroundRGB!;
+					var bgCol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i * 2]).BackgroundRGB!;
 					var fgCol = refColor.Blend(bgCol, 1 - interp, Color.Space.LCh);
 					
-					fgAnsi = new(fgCol);
+					midColor = refColor.Blend(bgCol, 1 - interp2, Color.Space.LCh);
+					
+					fgAnsi = new(fgCol, eqInsideColor.BackgroundRGB!);
 				}
 				else {
-					var bgCol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i]).BackgroundRGB!;
-					fgAnsi = new(bgCol);
+					var bgCol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2    ]).BackgroundRGB!;
+					midColor  = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2 + 1]).BackgroundRGB!;
+					fgAnsi    = new(bgCol, eqInsideColor.BackgroundRGB!);
 				}
 				
 				#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
 					if (i < height / 8) {
-						Display.Write("███", x, y - i - 1, fgAnsi);
+						fgAnsi = new(fgAnsi.ForegroundRGB!, midColor);
+						Display.Write("▄▄▄", x, y - i - 1, fgAnsi);
 					}
 					else if (i == height / 8 && height % 8 > 0) {
 						var barString = (height % 8) switch {
@@ -1009,7 +1020,8 @@ public static partial class CliMain {
 					}
 				#else
 					if (i < height / 8) {
-						Display.Write("███", x, y - i - 1, fgAnsi);
+						fgAnsi = new(fgAnsi.ForegroundRGB!, midColor);
+						Display.Write("▄▄▄", x, y - i - 1, fgAnsi);
 					}
 					else if (i == height / 8 && height % 8 >= 4) {
 						var barString = (height % 8) switch {
