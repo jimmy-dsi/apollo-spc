@@ -106,7 +106,8 @@ public class Color {
 	}
 	
 	public const double Gamma = 2.2;
-	//static Cache<JVector3B, JVector3D> rgbToLabCache = new(sizeLimit: 256);
+	//static Cache<(JVector3I, Space), JVector3D> rgbToOtherCache = new(sizeLimit: 512);
+	//static Cache<(JVector3D, Space), JVector3I> otherToRgbCache = new(sizeLimit: 512);
 	
 	public static Color FromRGB(byte r, byte g, byte b)       => new(r, g, b);
 	public static Color FromRGB(double r, double g, double b) => new(r, g, b);
@@ -135,14 +136,16 @@ public class Color {
 	JVector3I vec = new();
 	
 	// Other vector representations
-	Vec3B rgb;
-	Vec3D srgb;
-	Vec3D lrgb;
-	Vec3D hsv;
-	Vec3D hsl;
-	Vec3D xyz;
-	Vec3D lab;
-	Vec3D lch;
+	Vec3B? rgb  = null;
+	Vec3D? srgb = null;
+	Vec3D? lrgb = null;
+	Vec3D? hsv  = null;
+	Vec3D? hsl  = null;
+	Vec3D? xyz  = null;
+	Vec3D? lab  = null;
+	Vec3D? lch  = null;
+	
+	bool inited = false;
 
 	public Space DefaultSpace {
 		set {
@@ -177,14 +180,38 @@ public class Color {
 	}
 	
 	// Other vector representations
-	public Vec3B RGB  { get => rgb;  set => rgb .Inner = value; }
-	public Vec3D SRGB { get => srgb; set => srgb.Inner = value; }
-	public Vec3D LRGB { get => lrgb; set => lrgb.Inner = value; }
-	public Vec3D HSV  { get => hsv;  set => hsv .Inner = value; }
-	public Vec3D HSL  { get => hsl;  set => hsl .Inner = value; }
-	public Vec3D XYZ  { get => xyz;  set => xyz .Inner = value; }
-	public Vec3D Lab  { get => lab;  set => lab .Inner = value; }
-	public Vec3D LCh  { get => lch;  set => lch .Inner = value; }
+	public Vec3B RGB  {
+		get => getRGB();
+		set => getRGB().Inner = value;
+	}
+	public Vec3D SRGB {
+		get => getSRGB();
+		set => getSRGB().Inner = value;
+	}
+	public Vec3D LRGB {
+		get => getLRGB();
+		set => getLRGB().Inner = value;
+	}
+	public Vec3D HSV  {
+		get => getHSV();
+		set => getHSV() .Inner = value;
+	}
+	public Vec3D HSL  {
+		get => getHSL();
+		set => getHSL() .Inner = value;
+	}
+	public Vec3D XYZ  {
+		get => getXYZ();
+		set => getXYZ() .Inner = value;
+	}
+	public Vec3D Lab  {
+		get => getLab();
+		set => getLab() .Inner = value;
+	}
+	public Vec3D LCh  {
+		get => getLCh();
+		set => getLCh() .Inner = value;
+	}
 	
 	public Color(byte r, byte g, byte b, byte a = 255) {
 		Red   = r;
@@ -192,14 +219,14 @@ public class Color {
 		Blue  = b;
 		Alpha = a;
 		
-		init();
+		inited = true;
 	}
 	
 	public Color(JVector3D xyz, double a = 1.0, Space colorSpace = Space.RGB): this(xyz.X, xyz.Y, xyz.Z, a, colorSpace) { }
 	
 	public Color(double x, double y, double z, double a = 1.0, Space colorSpace = Space.RGB) {
 		JVector3D input = (x, y, z);
-			
+		
 		switch (colorSpace) {
 			case Space.RGB: {
 				vec = denormalize(input);
@@ -241,22 +268,80 @@ public class Color {
 			}
 		}
 		
-		Alpha = (byte) Math.Clamp(denormalize(a), 0, 255);
-		init();
+		Alpha  = (byte) Math.Clamp(denormalize(a), 0, 255);
+		inited = true;
 	}
 	
-	void init() {
-		var self = this;
+	Vec3B getRGB() {
+		if (rgb is null) {
+			var self = this;
+			rgb = new(vec.Copy(n => (byte) Math.Clamp(n, 0, 255)), (i, v) => self.vec[i] = v);
+		}
 		
-		// Setup other vector representations
-		rgb  = new(vec.Copy(n => (byte) Math.Clamp(n, 0, 255)), (i, v) => self.vec[i] = v);
-		srgb = new(vec.Copy(normalize),                         (i, v) => self.vec[i] = denormalize(v));
-		lrgb = new(vec.Copy(toLinear),                          (i, v) => self.vec[i] = denormalize(fromLinear(v)));
-		hsv  = new(rgbToHSV(vec),                               () => self.vec = hsvToRGB(hsv));
-		hsl  = new(rgbToHSL(vec),                               () => self.vec = hslToRGB(hsl));
-		xyz  = new(rgbToXYZ(vec),                               () => self.vec = xyzToRGB(xyz));
-		lab  = new(rgbToLab(vec),                               () => self.vec = labToRGB(lab));
-		lch  = new(rgbToLCh(vec),                               () => self.vec = lchToRGB(lch));
+		return rgb;
+	}
+	
+	Vec3D getSRGB() {
+		if (srgb is null) {
+			var self = this;
+			srgb = new(vec.Copy(normalize), (i, v) => self.vec[i] = denormalize(v));
+		}
+		
+		return srgb;
+	}
+	
+	Vec3D getLRGB() {
+		if (lrgb is null) {
+			var self = this;
+			lrgb = new(vec.Copy(toLinear), (i, v) => self.vec[i] = denormalize(fromLinear(v)));
+		}
+		
+		return lrgb;
+	}
+	
+	Vec3D getHSV() {
+		if (hsv is null) {
+			var self = this;
+			hsv = new(rgbToHSV(vec), (i, _) => { if (self.inited || i == 2) self.vec = hsvToRGB(hsv); });
+		}
+		
+		return hsv;
+	}
+	
+	Vec3D getHSL() {
+		if (hsl is null) {
+			var self = this;
+			hsl = new(rgbToHSL(vec), (i, _) => { if (self.inited || i == 2) self.vec = hslToRGB(hsl); });
+		}
+		
+		return hsv;
+	}
+	
+	Vec3D getXYZ() {
+		if (xyz is null) {
+			var self = this;
+			xyz = new(rgbToXYZ(vec), (i, _) => { if (self.inited || i == 2) self.vec = xyzToRGB(xyz); });
+		}
+		
+		return xyz;
+	}
+	
+	Vec3D getLab() {
+		if (lab is null) {
+			var self = this;
+			lab = new(rgbToLab(vec), (i, _) => { if (self.inited || i == 2) self.vec = labToRGB(xyz); });
+		}
+		
+		return lab;
+	}
+	
+	Vec3D getLCh() {
+		if (lch is null) {
+			var self = this;
+			lch = new(rgbToLCh(vec), (i, _) => { if (self.inited || i == 2) self.vec = lchToRGB(lch); });
+		}
+		
+		return lch;
 	}
 	
 	public byte this[int channel] {
@@ -379,14 +464,15 @@ public class Color {
 	public Color Filter(IEnumerable<Color> prevColors, IEnumerable<double> filter) => Filter(prevColors, filter, FilterSpace);
 	
 	public Color Filter(IEnumerable<Color> prevColors, IEnumerable<double> filter, Space colorSpace) {
-		if (!filter.Any()) {
+		var f = filter.ToArray();
+		
+		if (f.Length == 0) {
 			return this;
 		}
 		
-		Color resultColor = Multiply(filter.First(), colorSpace);
+		Color resultColor = Multiply(f[0], colorSpace);
 		
 		var pc = prevColors.ToArray();
-		var f  = filter    .ToArray();
 		
 		for (var i = 1; i < f.Length; i++) {
 			var col  = pc.Length == 0 ? this : i - 1 >= pc.Length ? pc[^1] : pc[i - 1];
