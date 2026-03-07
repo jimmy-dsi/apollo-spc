@@ -1181,24 +1181,72 @@ public static partial class CliMain {
 		return new(col, isBG: true);
 	}
 	
-	static void softFadeHeatmap(byte[] dataBuffer, byte[] progBuffer) {
-		const int FadeStep = 72;
+	static (char Char, AnsiColor Color)[] drawHeatMapFlags(BusSize dataSize, ulong value) {
+		var zero = heatMapColor(BusSize.Bit8, signed: false, scale: 1, value:   0).BackgroundRGB!;
+		var one  = heatMapColor(BusSize.Bit8, signed: false, scale: 1, value: 255).BackgroundRGB!;
 		
-		// Smooth transition to avoid rapid flashing
-		for (var i = 0; i < progBuffer.Length; i++) {
-			var progVal = progBuffer[i];
-			var target  = dataBuffer[i];
-				
-			if (target > progVal + FadeStep) {
-				progBuffer[i] += FadeStep;
+		bool[] flags;
+		int midIndex;
+		
+		switch (dataSize) {
+			case BusSize.Bit8: {
+				flags    = Enumerable.Range(0,  8).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 4;
+				break;
 			}
-			else if (target < progVal - FadeStep) {
-				progBuffer[i] -= FadeStep;
+			
+			case BusSize.Bit16: {
+				flags    = Enumerable.Range(0, 16).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 8;
+				break;
 			}
-			else if (target != progVal) {
-				progBuffer[i] = target;
+			
+			case BusSize.Bit24: {
+				flags    = Enumerable.Range(0, 24).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 12;
+				break;
+			}
+			
+			case BusSize.Bit32: {
+				flags    = Enumerable.Range(0, 32).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 16;
+				break;
+			}
+			
+			case BusSize.Bit64: {
+				flags    = Enumerable.Range(0, 64).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 32;
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
 			}
 		}
+		
+		var result = new (char Char, AnsiColor Color)[midIndex];
+		
+		for (var i = 0; i < midIndex; i++) {
+			var top    = flags[i];
+			var bottom = flags[i + midIndex];
+			
+			if (top && bottom) {
+				result[i].Char = '█';
+			}
+			else if (top && !bottom) {
+				result[i].Char = '▀';
+			}
+			else if (!top && bottom) {
+				result[i].Char = '▄';
+			}
+			else {
+				result[i].Char = ' ';
+			}
+			
+			result[i].Color = new(one, zero);
+		}
+		
+		return result;
 	}
 	
 	static void requestEmuData(Transfer.Requests reqs) {

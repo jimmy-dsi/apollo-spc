@@ -122,6 +122,19 @@ public static class Exts {
 		}
 	}
 	
+	public static bool GetBit<T>(this T v, int b) where T: IBinaryInteger<T> {
+		return (v.ToUInt64() & (1uL << b)) != 0;
+	}
+	
+	public static void SetBit<T>(this ref T v, int b, bool value) where T: struct, IBinaryInteger<T> {
+		if (value) {
+			v = (T)(object) (v.ToUInt64() | (1uL << b));
+		}
+		else {
+			v = (T)(object) (v.ToUInt64() & ~(1uL << b));
+		}
+	}
+	
 	// Char Extension Methods
 	public static UnicodeCategory GetUnicodeCategory(this char c) => char.GetUnicodeCategory(c);
 	

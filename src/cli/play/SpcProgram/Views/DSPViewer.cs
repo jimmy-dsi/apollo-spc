@@ -102,9 +102,15 @@ public static partial class CliMain {
 			Display.Write("  ", xo1, y + 2, col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeLeft ));
 			Display.Write("  ", xo1, y + 3, col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeRight));
 			
-			Display.Write("  ", xo1, y + 5, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalPModEn ));
-			Display.Write("  ", xo1, y + 6, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalNoiseEn));
-			Display.Write("  ", xo1, y + 7, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalEchoEn ));
+			var pFlags = drawHeatMapFlags(BusSize.Bit8,  globalPModEn);
+			var nFlags = drawHeatMapFlags(BusSize.Bit8, globalNoiseEn);
+			var eFlags = drawHeatMapFlags(BusSize.Bit8,  globalEchoEn);
+			
+			for (var i = 0; i < 4; i++) {
+				Display.Write(new(pFlags[i].Char, 1), xo1 - 2 + i, y + 5, col: pFlags[i].Color);
+				Display.Write(new(nFlags[i].Char, 1), xo1 - 2 + i, y + 6, col: nFlags[i].Color);
+				Display.Write(new(eFlags[i].Char, 1), xo1 - 2 + i, y + 7, col: eFlags[i].Color);
+			}
 			
 			Display.Write("  ", xo1, y + 9,  col: heatMapColor(BusSize.Bit8, signed: false, scale: 8,   buffer.DSP_State!.NoiseClock));
 			Display.Write("  ", xo1, y + 10, col: heatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.ReadonlyEcho ? 1 : 0));
