@@ -252,9 +252,15 @@ public static partial class CliMain {
 		xhm = x + xo2;
 		
 		if (heatMapEnabled) {
-			Display.Write("  ", x + xo2, y    , col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalKeyOn ));
-			Display.Write("  ", x + xo2, y + 1, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalKeyOff));
-			Display.Write("  ", x + xo2, y + 2, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalEndx  ));
+			var konFlags  = drawHeatMapFlags(BusSize.Bit8,  globalKeyOn);
+			var koffFlags = drawHeatMapFlags(BusSize.Bit8, globalKeyOff);
+			var endxFlags = drawHeatMapFlags(BusSize.Bit8,   globalEndx);
+			
+			for (var i = 0; i < 4; i++) {
+				Display.Write(new( konFlags[i].Char, 1), x + xo2 - 2 + i, y    , col:  konFlags[i].Color);
+				Display.Write(new(koffFlags[i].Char, 1), x + xo2 - 2 + i, y + 1, col: koffFlags[i].Color);
+				Display.Write(new(endxFlags[i].Char, 1), x + xo2 - 2 + i, y + 2, col: endxFlags[i].Color);
+			}
 			Display.Write("  ", x + xo2, y + 3, col: heatMapColor(BusSize.Bit8, signed:  true, scale: 1, buffer.DSP_State!.EchoFeedback));
 			
 			Display.Write("  ", x + xo2, y + 5, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1,  buffer.DSP_State!.EchoStartPage));

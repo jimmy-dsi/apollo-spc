@@ -30,12 +30,9 @@ public static partial class CliMain {
 		Display.Write("Toggle channel 5-8 echo output", 1, y); Display.Write("Ctrl+F5-F8",          x, y); y++;
 		y++;
 		
-		Display.Write("Scroll up one row",              1, y); Display.Write("UpArrow",             x, y); y++;
-		Display.Write("Scroll down one row",            1, y); Display.Write("DownArrow",           x, y); y++;
-		Display.Write("Scroll up 16 rows",              1, y); Display.Write("PageUp",              x, y); y++;
-		Display.Write("Scroll down 16 rows",            1, y); Display.Write("PageDown",            x, y); y++;
-		Display.Write("Scroll to top",                  1, y); Display.Write("Home",                x, y); y++;
-		Display.Write("Scroll to bottom",               1, y); Display.Write("End",                 x, y); y++;
+		Display.Write("Scroll up / down one row",       1, y); Display.Write("UpArrow / DownArrow", x, y); y++;
+		Display.Write("Scroll up / down 16 rows",       1, y); Display.Write("PageUp / PageDown",   x, y); y++;
+		Display.Write("Scroll to top / bottom",         1, y); Display.Write("Home / End",          x, y); y++;
 		y++;
 		
 		Display.Write("Toggle heat map", 1, y); Display.Write("Ctrl+E+T", x, y);

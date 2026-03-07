@@ -7,14 +7,24 @@ using Jimbl.Graphics;
 
 public static class Display {
 	// For scrollable display region
-	static List<List<char>>       charBuffer;
-	static List<List<AnsiColor?>> colorBuffer;
+	static List<      char[]> charBuffer;
+	static List<AnsiColor?[]> colorBuffer;
+	
+	static bool windowEnabled = false;
+	
+	static int windowTL = 0;
+	static int windowTR = 0;
+	static int windowBL = 0;
+	static int windowBR = 0;
+	
+	static int scrollY = 0;
 	
 	// For static display
 	static       char[][]  charGrid;
 	static AnsiColor?[][] colorGrid;
 	
 	// Previous static display color buffers
+	static       char[][][]  prevCharGrids;
 	static AnsiColor?[][][] prevColorGrids;
 	
 	static int x = 0;
@@ -49,16 +59,20 @@ public static class Display {
 		charGrid  = new       char[height][];
 		colorGrid = new AnsiColor?[height][];
 		
-		List<AnsiColor?[][]> pcg = new();
+		List<AnsiColor?[][]>  pcg = new();
+		List<      char[][]> pchg = new();
 		
 		for (var i = 0; i < 4; i++) {
-			pcg.Add(new AnsiColor?[][]{ });
+			pcg .Add(new AnsiColor?[][]{ });
+			pchg.Add(new       char[][]{ });
 		}
 		
-		prevColorGrids = pcg.ToArray();
+		prevColorGrids = pcg .ToArray();
+		prevCharGrids  = pchg.ToArray();
 			
 		for (var i = 0; i < 4; i++) {
 			prevColorGrids[i] = new AnsiColor?[height][];
+			prevCharGrids [i] = new       char[height][];
 		}
 		
 		for (var y = 0; y < height; y++) {
@@ -67,6 +81,7 @@ public static class Display {
 			
 			for (var i = 0; i < 4; i++) {
 				prevColorGrids[i][y] = new AnsiColor?[width];
+				prevCharGrids [i][y] = new       char[width];
 			}
 		}
 		
@@ -204,17 +219,24 @@ public static class Display {
 		var offset2 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr3 / 0x10;
 		var offset3 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr4 / 0x10;
 		
-		// Update color grids
+		// Update color and char grids
 		for (var i = 0; i < framesSinceLastDisplay; i++) {
 			for (var y = 0; y < Height; y++) {
 				for (var x = 0; x < Width; x++) {
 					var cl = colorGrid[y][x];
+					var ch =  charGrid[y][x];
 				
 					// Update color grids
 					prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
 					prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
 					prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
 					prevColorGrids[0][y][x] = cl;
+				
+					// Update char grids
+					prevCharGrids[3][y][x] = prevCharGrids[2][y][x];
+					prevCharGrids[2][y][x] = prevCharGrids[1][y][x];
+					prevCharGrids[1][y][x] = prevCharGrids[0][y][x];
+					prevCharGrids[0][y][x] = ch;
 				}
 			}
 		}
@@ -224,26 +246,58 @@ public static class Display {
 				var ch =  charGrid[y][x];
 				var cl = colorGrid[y][x];
 				
-				if (cl is not null && cl.IsBG) {
+				var isMulti = cl is not null
+				           && cl.BackgroundRGB is not null && cl.ForegroundRGB is not null
+				           && ch is ' ' or '▄' or '▀' or '█';
+				
+				var isMultiBlended = false;
+				
+				if (cl is not null && cl.IsBG || isMulti) {
 					var (y0, y1, y2, y3) = (y + offset0, y + offset1, y + offset2, y + offset3);
 					
 					if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
-						cl = blendColors(
-							cl,
-							prevColorGrids[0][y0][x],
-							prevColorGrids[1][y1][x],
-							prevColorGrids[2][y2][x],
-							prevColorGrids[3][y3][x]
-						);
+						if (isMulti) {
+							isMultiBlended = true;
+							
+							cl = blendDualColors(
+								(cl!, ch),
+								(prevColorGrids[0][y0][x], prevCharGrids[0][y0][x]),
+								(prevColorGrids[1][y1][x], prevCharGrids[1][y1][x]),
+								(prevColorGrids[2][y2][x], prevCharGrids[2][y2][x]),
+								(prevColorGrids[3][y3][x], prevCharGrids[3][y3][x])
+							);
+						}
+						else {
+							cl = blendColors(
+								cl,
+								prevColorGrids[0][y0][x],
+								prevColorGrids[1][y1][x],
+								prevColorGrids[2][y2][x],
+								prevColorGrids[3][y3][x]
+							);
+						}
 					}
 					else {
-						cl = blendColors(
-							cl,
-							prevColorGrids[0][y][x],
-							prevColorGrids[1][y][x],
-							prevColorGrids[2][y][x],
-							prevColorGrids[3][y][x]
-						);
+						if (isMulti) {
+							isMultiBlended = true;
+							
+							cl = blendDualColors(
+								(cl!, ch),
+								(prevColorGrids[0][y][x], prevCharGrids[0][y][x]),
+								(prevColorGrids[1][y][x], prevCharGrids[1][y][x]),
+								(prevColorGrids[2][y][x], prevCharGrids[2][y][x]),
+								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
+							);
+						}
+						else {
+							cl = blendColors(
+								cl,
+								prevColorGrids[0][y][x],
+								prevColorGrids[1][y][x],
+								prevColorGrids[2][y][x],
+								prevColorGrids[3][y][x]
+							);
+						}
 					}
 				}
 				
@@ -257,7 +311,7 @@ public static class Display {
 					prevColor = cl;
 				}
 				
-				sb.Append(ch);
+				sb.Append(isMultiBlended ? '▀' : ch);
 			}
 			
 			if (y < Height - 1) {
@@ -432,12 +486,19 @@ public static class Display {
 		0.10,
 	];
 	
-	static AnsiColor? blendColors(AnsiColor color1, params AnsiColor?[] colors) {
-		if (color1.BackgroundRGB is null) {
-			return color1;
+	static AnsiColor? blendColors(params AnsiColor?[] colors) {
+		if (colors.Length == 0) {
+			return null;
+		}
+		
+		var cc1 = colors[0];
+		
+		if (cc1?.BackgroundRGB is null && cc1?.ForegroundRGB is null) {
+			return cc1;
 		}
 		
 		List<Color> prevColors = [];
+		
 		foreach (var col in colors) {
 			if (col?.BackgroundRGB is Color c) {
 				prevColors.Add(c);
@@ -447,6 +508,53 @@ public static class Display {
 			}
 		}
 		
-		return new(color1.BackgroundRGB.Filter(prevColors, blendFilter, Jimbl.Graphics.Color.Space.RGB), isBG: true);
+		var blended = prevColors[0].Filter(prevColors[1..], blendFilter, Jimbl.Graphics.Color.Space.RGB);
+		return new(blended, isBG: true);
+	}
+	
+	static AnsiColor? blendDualColors(params (AnsiColor? Color, char Char)[] colors) {
+		if (colors.Length == 0) {
+			return null;
+		}
+		
+		var cc1 = colors[0];
+		
+		if (cc1.Color?.BackgroundRGB is null && cc1.Color?.ForegroundRGB is null) {
+			return cc1.Color;
+		}
+		
+		List<Color> topPrevColors    = [];
+		List<Color> bottomPrevColors = [];
+		
+		// Top blending
+		foreach (var col in colors) {
+			if (col.Char is ' ' or '▄' && col.Color?.BackgroundRGB is Color bc) {
+				topPrevColors.Add(bc);
+			}
+			else if (col.Char is '█' or '▀' && col.Color?.ForegroundRGB is Color fc) {
+				topPrevColors.Add(fc);
+			}
+			else {
+				break;
+			}
+		}
+		
+		// Bottom blending
+		foreach (var col in colors) {
+			if (col.Char is '█' or '▄' && col.Color?.ForegroundRGB is Color fc) {
+				bottomPrevColors.Add(fc);
+			}
+			else if (col.Char is ' ' or '▀' && col.Color?.BackgroundRGB is Color bc) {
+				bottomPrevColors.Add(bc);
+			}
+			else {
+				break;
+			}
+		}
+		
+		var topBlended    =    topPrevColors[0].Filter(   topPrevColors[1..], blendFilter, Jimbl.Graphics.Color.Space.RGB);
+		var bottomBlended = bottomPrevColors[0].Filter(bottomPrevColors[1..], blendFilter, Jimbl.Graphics.Color.Space.RGB);
+		
+		return new(topBlended, bottomBlended); // Convention: Top is FG, bottom is BG. Caller will force char to '▀'
 	}
 }
