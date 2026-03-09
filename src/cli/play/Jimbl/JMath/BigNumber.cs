@@ -16,32 +16,51 @@ public readonly struct BigNumber:
 	IFloatingPoint<BigNumber>,
 	IMinMaxValue<BigNumber>
 {
-	// This is the highest signed 128-bit value which is divisible by all integers from 2 to 22
-	// It is also a multiple of 2^103 (and therefore, also a multiple of 2^64, 2^32... etc)
-	public static readonly Int128 UnitPrecision = Int128.Parse("147549814206333053320842685369842401280");
+	// This unit value is carefully picked to represent the base-10 precision of decimal values (10^28)
+	// as well as the base-2 precision of double values (2^53). It is also a multiple of common small integers for better fractional accuracy (2-24)
+	public static readonly BigInteger UnitPrecision = BigInteger.Parse("16533182789382915930193920000000000000000000000000000");
 	
-	public static BigNumber One         { get; }
-	public static BigNumber NegativeOne { get; }
-	public static int       Radix       { get; }
-	public static BigNumber Zero        { get; }
-	public static BigNumber E           { get; }
-	public static BigNumber Pi          { get; }
-	public static BigNumber Tau         { get; }
+	static BigNumber one              = new( UnitPrecision);
+	static BigNumber negativeOne      = new(-UnitPrecision);
+	static BigNumber zero             = new((BigInteger) 0);
+	static BigNumber e                = new(BigInteger.Parse( "44941850342971410491504784020845001571447288814329989"));
+	static BigNumber pi               = new(BigInteger.Parse( "51940525591582574509458869567679175027653994297991570"));
+	static BigNumber tau              = new(BigInteger.Parse("103881051183165149018917739135358350055307988595983140"));
+	static BigNumber nan              = new(double.NaN);
+	static BigNumber positiveInfinity = new(double.PositiveInfinity);
+	static BigNumber negativeInfinity = new(double.NegativeInfinity);
 	
-	public static BigNumber AdditiveIdentity       { get; }
-	public static BigNumber MultiplicativeIdentity { get; }
+	static BigInteger float64ThresholdBigInt = BigInteger.Parse("7002075272792542790512015926651");
+	static BigNumber  float64ThresholdBigNum = new(float64ThresholdBigInt);
+	static double     float64Threshold       = 4.235164736271502e-22;
+	static double     nonFloatIndicator      = BitConverter.Int64BitsToDouble(0);
+	static long       doubleUnit             = 9007199254740992;
+	static BigInteger doubleToBigIntUnit     = BigInteger.Parse("1835552020310928337275981903076171875");
 	
-	public static BigNumber MaxValue { get; }
-	public static BigNumber MinValue { get; }
+	public static BigNumber One         => one;
+	public static BigNumber NegativeOne => negativeOne;
+	public static int       Radix       => 2;
+	public static BigNumber Zero        => zero;
+	public static BigNumber E           => e;
+	public static BigNumber Pi          => pi;
+	public static BigNumber Tau         => tau;
+	
+	public static BigNumber AdditiveIdentity       => zero;
+	public static BigNumber MultiplicativeIdentity => one;
+	
+	public static BigNumber MaxValue => positiveInfinity;
+	public static BigNumber MinValue => negativeInfinity;
+	
+	public static BigNumber NaN              => nan;
+	public static BigNumber PositiveInfinity => positiveInfinity;
+	public static BigNumber NegativeInfinity => negativeInfinity;
 	
 	// Fields
 	readonly BigInteger value;
-	readonly double     specialValue = 0;
+	readonly double     doubleValue = nonFloatIndicator;
 	
 	// Properties
-	internal bool IsSpecial => double.IsSubnormal(specialValue)
-	                        || double.IsInfinity(specialValue)
-	                        || double.IsNaN(specialValue);
+	internal bool IsDouble => BitConverter.DoubleToInt64Bits(doubleValue) != 0;
 	
 	// Constructors
 	public BigNumber() { }
@@ -50,8 +69,8 @@ public readonly struct BigNumber:
 		this.value = value;
 	}
 	
-	internal BigNumber(double specialValue) {
-		this.specialValue = specialValue;
+	internal BigNumber(double doubleValue) {
+		this.doubleValue = doubleValue;
 	}
 	
 	// Compare
@@ -59,13 +78,88 @@ public readonly struct BigNumber:
 		throw new NotImplementedException();
 	}
 	
+	public int CompareTo(double other) {
+		if (IsDouble) {
+			return doubleValue.CompareTo(other);
+		}
+		else if (double.IsNaN(other)) {
+			return 1;
+		}
+		else if (value >= 0 && double.IsNegative(other)) {
+			if (value == 0 && other == 0) { // Account for negative zero
+				return 0;
+			}
+			else {
+				return 1;
+			}
+		}
+		else if (value < 0 && double.IsPositive(other)) {
+			return -1;
+		}
+		else if (double.IsInfinity(other)) {
+			return value >= 0 ? -1 : 1;
+		}
+		else if (value >= 0) { // Both positive
+			return 0; // TODO
+		}
+		else { // Both negative
+			return 0; // TODO
+		}
+	}
+	
 	public int CompareTo(BigNumber other) {
-		throw new NotImplementedException();
+		if (IsDouble && other.IsDouble) {
+			return doubleValue.CompareTo(other.doubleValue);
+		}
+		else if (IsNaN(this)) {
+			return -1;
+		}
+		else if (IsNaN(other)) {
+			return 1;
+		}
+		else if (IsPositiveInfinity(this)) {
+			return 1;
+		}
+		else if (IsPositiveInfinity(other)) {
+			return -1;
+		}
+		else if (IsNegativeInfinity(this)) {
+			return -1;
+		}
+		else if (IsNegativeInfinity(other)) {
+			return 1;
+		}
+		else if (IsPositive(this) && IsNegative(other)) {
+			return 1;
+		}
+		if (IsNegative(this) && IsPositive(other)) {
+			return -1;
+		}
+		else if (IsDouble && !other.IsDouble) {
+			if (IsPositive(this) && IsPositive(other)) {
+				return IsZero(other) ? 1 : -1;
+			}
+			else {
+				return IsZero(other) ? -1 : 1;
+			}
+		}
+		else if (!IsDouble && other.IsDouble) {
+			// Special double value assumed to be subnormal here
+			if (IsPositive(this) && IsPositive(other)) {
+				return IsZero(this) ? -1 : 1;
+			}
+			else {
+				return IsZero(this) ? 1 : -1;
+			}
+		}
+		else {
+			return value.CompareTo(other.value);
+		}
 	}
 	
 	// ???
 	public TypeCode GetTypeCode() {
-		throw new NotImplementedException();
+		return Type.GetTypeCode(typeof(BigNumber));
 	}
 	
 	// Conversions (to)
@@ -73,35 +167,11 @@ public readonly struct BigNumber:
 		throw new NotImplementedException();
 	}
 	
-	public byte ToByte(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
 	public char ToChar(IFormatProvider? provider) {
 		throw new NotImplementedException();
 	}
 	
-	public DateTime ToDateTime(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
-	public decimal ToDecimal(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
-	public double ToDouble(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
-	public short ToInt16(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
-	public int ToInt32(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
-	public long ToInt64(IFormatProvider? provider) {
+	public byte ToByte(IFormatProvider? provider) {
 		throw new NotImplementedException();
 	}
 	
@@ -109,19 +179,11 @@ public readonly struct BigNumber:
 		throw new NotImplementedException();
 	}
 	
-	public float ToSingle(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
-	public string ToString(IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
-	public object ToType(Type conversionType, IFormatProvider? provider) {
-		throw new NotImplementedException();
-	}
-	
 	public ushort ToUInt16(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
+	public short ToInt16(IFormatProvider? provider) {
 		throw new NotImplementedException();
 	}
 	
@@ -129,7 +191,44 @@ public readonly struct BigNumber:
 		throw new NotImplementedException();
 	}
 	
+	public int ToInt32(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
 	public ulong ToUInt64(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
+	public long ToInt64(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
+	public float ToSingle(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
+	public double ToDouble(IFormatProvider? provider) {
+		if (IsDouble) {
+			return doubleValue;
+		}
+		else {
+			return fixedToDouble(value);
+		}
+	}
+	
+	public decimal ToDecimal(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
+	public string ToString(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
+	public DateTime ToDateTime(IFormatProvider? provider) {
+		throw new NotImplementedException();
+	}
+	
+	public object ToType(Type conversionType, IFormatProvider? provider) {
 		throw new NotImplementedException();
 	}
 	
@@ -159,7 +258,15 @@ public readonly struct BigNumber:
 	
 	// Equals
 	public bool Equals(BigNumber other) {
-		throw new NotImplementedException();
+		if (IsDouble && other.IsDouble) {
+			return doubleValue.Equals(other.doubleValue);
+		}
+		else if (IsNaN(this) || IsNaN(other)) {
+			return false;
+		}
+		else {
+			return CompareTo(other) != 0;
+		}
 	}
 	
 	// Formatting
@@ -205,7 +312,7 @@ public readonly struct BigNumber:
 	
 	// Operators
 	public static BigNumber operator + (BigNumber value) {
-		throw new NotImplementedException();
+		return value;
 	}
 	
 	public static BigNumber operator - (BigNumber value) {
@@ -266,8 +373,8 @@ public readonly struct BigNumber:
 	
 	// Statics
 	public static BigNumber Abs(BigNumber value) {
-		if (value.IsSpecial) {
-			return new(double.Abs(value.specialValue));
+		if (value.IsDouble) {
+			return new(double.Abs(value.doubleValue));
 		}
 		else {
 			return new(BigInteger.Abs(value.value));
@@ -275,15 +382,15 @@ public readonly struct BigNumber:
 	}
 	
 	public static bool IsCanonical(BigNumber value) {
-		return !value.IsSpecial || isCanonical(value.specialValue);
+		return !value.IsDouble || isCanonical(value.doubleValue);
 	}
 	
 	public static bool IsFinite(BigNumber value) {
-		return !value.IsSpecial || double.IsFinite(value.specialValue);
+		return !value.IsDouble || double.IsFinite(value.doubleValue);
 	}
 	
 	public static bool IsInteger(BigNumber value) {
-		return !value.IsSpecial && value == value.truncate();
+		return !value.IsDouble && value == value.truncate();
 	}
 	
 	public static bool IsEvenInteger(BigNumber value) {
@@ -295,39 +402,39 @@ public readonly struct BigNumber:
 	}
 	
 	public static bool IsPositive(BigNumber value) {
-		return !value.IsSpecial && value.value >= 0 || value.IsSpecial && double.IsPositive(value.specialValue);
+		return !value.IsDouble && value.value >= 0 || value.IsDouble && double.IsPositive(value.doubleValue);
 	}
 	
 	public static bool IsNegative(BigNumber value) {
-		return !value.IsSpecial && value.value < 0 || value.IsSpecial && double.IsNegative(value.specialValue);
+		return !value.IsDouble && value.value < 0 || value.IsDouble && double.IsNegative(value.doubleValue);
 	}
 	
 	public static bool IsNormal(BigNumber value) {
-		return !value.IsSpecial || double.IsNormal(value.specialValue);
+		return !value.IsDouble || double.IsNormal(value.doubleValue);
 	}
 	
 	public static bool IsSubnormal(BigNumber value) {
-		return value.IsSpecial && double.IsSubnormal(value.specialValue);
+		return value.IsDouble && double.IsSubnormal(value.doubleValue);
 	}
 	
 	public static bool IsInfinity(BigNumber value) {
-		return value.IsSpecial && double.IsInfinity(value.specialValue);
+		return value.IsDouble && double.IsInfinity(value.doubleValue);
 	}
 	
 	public static bool IsPositiveInfinity(BigNumber value) {
-		return value.IsSpecial && double.IsPositiveInfinity(value.specialValue);
+		return value.IsDouble && double.IsPositiveInfinity(value.doubleValue);
 	}
 	
 	public static bool IsNegativeInfinity(BigNumber value) {
-		return value.IsSpecial && double.IsNegativeInfinity(value.specialValue);
+		return value.IsDouble && double.IsNegativeInfinity(value.doubleValue);
 	}
 	
 	public static bool IsNaN(BigNumber value) {
-		return value.IsSpecial && double.IsNaN(value.specialValue);
+		return value.IsDouble && double.IsNaN(value.doubleValue);
 	}
 	
 	public static bool IsRealNumber(BigNumber value) {
-		return !value.IsSpecial || double.IsRealNumber(value.specialValue);
+		return !value.IsDouble || double.IsRealNumber(value.doubleValue);
 	}
 	
 	public static bool IsImaginaryNumber(BigNumber value) {
@@ -339,23 +446,115 @@ public readonly struct BigNumber:
 	}
 	
 	public static bool IsZero(BigNumber value) {
-		return value.value == 0;
+		return !value.IsDouble && value.value == 0;
 	}
 	
 	public static BigNumber MaxMagnitude(BigNumber x, BigNumber y) {
-		throw new NotImplementedException();
+		if (x.IsDouble && y.IsDouble) {
+			return new(double.MaxMagnitude(x.doubleValue, y.doubleValue));
+		}
+		else if (IsNaN(x)) {
+			return x;
+		}
+		else if (IsNaN(y)) {
+			return y;
+		}
+		else if (IsInfinity(y)) {
+			return y;
+		}
+		else if (IsInfinity(x)) {
+			return x;
+		}
+		else if (x.IsDouble && !y.IsDouble) {
+			return IsZero(y) ? x : y;
+		}
+		else if (!x.IsDouble && y.IsDouble) {
+			return IsZero(x) ? y : x;
+		}
+		else {
+			return new(BigInteger.MaxMagnitude(x.value, y.value));
+		}
 	}
 	
 	public static BigNumber MaxMagnitudeNumber(BigNumber x, BigNumber y) {
-		throw new NotImplementedException();
+		if (x.IsDouble && y.IsDouble) {
+			return new(double.MaxMagnitudeNumber(x.doubleValue, y.doubleValue));
+		}
+		else if (IsNaN(x)) {
+			return y;
+		}
+		else if (IsNaN(y)) {
+			return x;
+		}
+		else if (IsInfinity(y)) {
+			return y;
+		}
+		else if (IsInfinity(x)) {
+			return x;
+		}
+		else if (x.IsDouble && !y.IsDouble) {
+			return IsZero(y) ? x : y;
+		}
+		else if (!x.IsDouble && y.IsDouble) {
+			return IsZero(x) ? y : x;
+		}
+		else {
+			return new(BigInteger.MaxMagnitude(x.value, y.value));
+		}
 	}
 	
 	public static BigNumber MinMagnitude(BigNumber x, BigNumber y) {
-		throw new NotImplementedException();
+		if (x.IsDouble && y.IsDouble) {
+			return new(double.MinMagnitude(x.doubleValue, y.doubleValue));
+		}
+		else if (IsNaN(x)) {
+			return x;
+		}
+		else if (IsNaN(y)) {
+			return y;
+		}
+		else if (IsInfinity(y)) {
+			return x;
+		}
+		else if (IsInfinity(x)) {
+			return y;
+		}
+		else if (x.IsDouble && !y.IsDouble) {
+			return IsZero(y) ? y : x;
+		}
+		else if (!x.IsDouble && y.IsDouble) {
+			return IsZero(x) ? x : y;
+		}
+		else {
+			return new(BigInteger.MinMagnitude(x.value, y.value));
+		}
 	}
 	
 	public static BigNumber MinMagnitudeNumber(BigNumber x, BigNumber y) {
-		throw new NotImplementedException();
+		if (x.IsDouble && y.IsDouble) {
+			return new(double.MinMagnitudeNumber(x.doubleValue, y.doubleValue));
+		}
+		else if (IsNaN(x)) {
+			return y;
+		}
+		else if (IsNaN(y)) {
+			return x;
+		}
+		else if (IsInfinity(y)) {
+			return x;
+		}
+		else if (IsInfinity(x)) {
+			return y;
+		}
+		else if (x.IsDouble && !y.IsDouble) {
+			return IsZero(y) ? y : x;
+		}
+		else if (!x.IsDouble && y.IsDouble) {
+			return IsZero(x) ? x : y;
+		}
+		else {
+			return new(BigInteger.MinMagnitude(x.value, y.value));
+		}
 	}
 	
 	public static BigNumber Round(BigNumber x, int digits, MidpointRounding mode) {
@@ -397,15 +596,125 @@ public readonly struct BigNumber:
 	
 	// Helpers
 	BigNumber truncate() {
-		if (IsSpecial) {
-			return new((BigInteger) (long) specialValue * UnitPrecision);
+		if (IsDouble) {
+			return new((BigInteger) (long) doubleValue * UnitPrecision);
 		}
 		else {
 			return new(value / UnitPrecision * UnitPrecision);
 		}
 	}
 	
+	BigNumber roundAwayFromZero() {
+		if (IsDouble) {
+			var truncated = (long) doubleValue;
+			
+			if (truncated == doubleValue) {
+				return new((BigInteger) truncated * UnitPrecision);
+			}
+			else if (double.IsPositive(doubleValue)) {
+				return new(((BigInteger) truncated + 1) * UnitPrecision);
+			}
+			else {
+				return new(((BigInteger) truncated - 1) * UnitPrecision);
+			}
+		}
+		else {
+			var truncated = value / UnitPrecision * UnitPrecision;
+			
+			if (value == truncated) {
+				return this;
+			}
+			else if (value >= 0) {
+				return new(truncated + UnitPrecision);
+			}
+			else {
+				return new(truncated - UnitPrecision);
+			}
+		}
+	}
+	
 	static bool isCanonical<T>(T value) where T: INumber<T> {
 		return T.IsCanonical(value);
+	}
+	
+	static void normalize(ref BigNumber n) {
+		if (n.IsDouble && !IsNaN(n) && !IsInfinity(n)) {
+			if (!IsSubnormal(n) && n.doubleValue is >= 6.048442170748684e-53 or <= -6.048442170748684e-53) {
+				
+			}
+		}
+	}
+	
+	static (object, object) upcastPair(BigInteger b, double d) {
+		if (tryDoubleToFixed(d, out var result)) {
+			return (b, result);
+		}
+		else {
+			return (fixedToDouble(b), d);
+		}
+	}
+	
+	static bool tryDoubleToFixed(double d, out BigInteger result) {
+		result = 0;
+		
+		if (double.IsNaN(d) || double.IsInfinity(d) || double.IsSubnormal(d) || Math.Abs(d) < float64Threshold) {
+			return false;
+		}
+		else {
+			result = doubleToFixed(d);
+			return true;
+		}
+	}
+	
+	static BigInteger doubleToFixed(double d) {
+		// Assumes non-NaN, non-Infinity, and non-Zero
+		var sign     = d.GetSignBit();
+		var exponent = d.GetExponentBits();
+		var fraction = d.GetFractionBits();
+		
+		BigInteger fixedPoint = fraction;
+		
+		if (exponent == 0) { // Handle subnormals
+			fixedPoint *=  UnitPrecision; // Multiply by fixed point "one"
+			fixedPoint >>= 1022;
+		}
+		else { // Handle normals
+			var trueExponent = exponent - 1023;
+			
+			fixedPoint |= 0x10_0000_0000_0000; // Include mantissa
+			fixedPoint *= UnitPrecision;       // Multiply by fixed point "one"
+			
+			if (trueExponent > 0) {
+				fixedPoint <<= trueExponent;
+			}
+			else if (trueExponent < 0) {
+				fixedPoint >>= trueExponent;
+			}
+		}
+			
+		fixedPoint >>= 52; // Adjust for fraction bits
+		if (sign) {
+			fixedPoint *= -1;
+		}
+		
+		return fixedPoint;
+	}
+	
+	static double fixedToDouble(BigInteger b) {
+		// In this case, I think it'd be easier to leverage the built-in int->double conversion with the integer and fractional parts separately
+		var sign = false;
+		
+		if (b < 0) {
+			b *= -1;
+			sign = true;
+		}
+		
+		var trueIntTrunc = b / UnitPrecision; // Integer portion
+		var fractional   = b % UnitPrecision;
+		
+		fractional /= doubleToBigIntUnit;
+		
+		var trueFractional = (double) trueIntTrunc + (double) fractional / doubleUnit;
+		return trueFractional;
 	}
 }

@@ -166,6 +166,21 @@ public static class Exts {
 	public static char ToLower(this char c) => char.ToLower(c);
 	public static char ToUpper(this char c) => char.ToUpper(c);
 	
+	public static UInt64 GetFractionBits(this double d) {
+		var allBits = BitConverter.DoubleToUInt64Bits(d);
+		return allBits & 0xF_FFFF_FFFF_FFFF; // Lower 52 bits
+	}
+	
+	public static UInt16 GetExponentBits(this double d) {
+		var allBits = BitConverter.DoubleToUInt64Bits(d);
+		return (UInt16) (allBits >> 52 & 0x7_FF);
+	}
+	
+	public static bool GetSignBit(this double d) {
+		var allBits = BitConverter.DoubleToUInt64Bits(d);
+		return allBits >> 63 != 0;
+	}
+	
 	public static bool IsNumeric(this Type type) {
 		return type.FitsInt32()   || type.FitsUInt32()
 		    || type.FitsInt64()   || type.FitsUInt64()
