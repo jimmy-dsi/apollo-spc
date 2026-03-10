@@ -124,6 +124,8 @@ public static partial class CliMain {
 	}
 	
 	static void handleUI(EmuDataBuffer? buffer) {
+		PrevStartAddr = StartAddr;
+		
 		KeyBindings.Action? action = null;
 		var state = UI_State;
 		
@@ -225,13 +227,6 @@ public static partial class CliMain {
 			action = KeyBindings.GetAction();
 		
 			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
-		
-			for (var _ = 0; _ < framesSinceLastDisplay; _++) {
-				PrevStartAddr4 = PrevStartAddr3;
-				PrevStartAddr3 = PrevStartAddr2;
-				PrevStartAddr2 = PrevStartAddr1;
-				PrevStartAddr1 = StartAddr;
-			}
 		
 			if (action is not null) {
 				doAction(action!.Value);

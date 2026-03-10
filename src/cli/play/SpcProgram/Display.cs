@@ -11,6 +11,10 @@ public static class Display {
 	static List<      char[]>  charBuffer = new();
 	static List<AnsiColor?[]> colorBuffer = new();
 	
+	// Previous scrollable display color buffers
+	static List<      char[]>[]  prevCharBuffers;
+	static List<AnsiColor?[]>[] prevColorBuffers;
+	
 	static bool windowEnabled = false;
 	
 	static int windowLeft   = 0;
@@ -74,13 +78,22 @@ public static class Display {
 		List<AnsiColor?[][]>  pcg = new();
 		List<      char[][]> pchg = new();
 		
+		List<List<AnsiColor?[]>>  pcb = new();
+		List<List<      char[]>> pchb = new();
+		
 		for (var i = 0; i < 4; i++) {
 			pcg .Add(new AnsiColor?[][]{ });
 			pchg.Add(new       char[][]{ });
+			
+			pcb .Add(new List<AnsiColor?[]>());
+			pchb.Add(new List<      char[]>());
 		}
 		
 		prevColorGrids = pcg .ToArray();
 		prevCharGrids  = pchg.ToArray();
+		
+		prevColorBuffers = pcb .ToArray();
+		prevCharBuffers  = pchb.ToArray();
 			
 		for (var i = 0; i < 4; i++) {
 			prevColorGrids[i] = new AnsiColor?[height][];
@@ -103,6 +116,21 @@ public static class Display {
 	public static void ResetWindowBuffer(int bufWidth, int bufHeight, int portX, int portY, int portWidth, int portHeight) {
 		charBuffer .Clear();
 		colorBuffer.Clear();
+		
+		for (var i = 0; i < prevCharBuffers.Length; i++) {
+			prevCharBuffers [i].Clear();
+			prevColorBuffers[i].Clear();
+		
+			for (var _ = 0; _ < bufHeight; _++) {
+				prevCharBuffers [i].Add(new       char[bufWidth]);
+				prevColorBuffers[i].Add(new AnsiColor?[bufWidth]);
+			
+				for (var x = 0; x < bufWidth; x++) {
+					prevCharBuffers [i][^1][x] = ' ';
+					prevColorBuffers[i][^1][x] = null;
+				}
+			}
+		}
 		
 		for (var _ = 0; _ < bufHeight; _++) {
 			charBuffer .Add(new       char[bufWidth]);
@@ -323,17 +351,11 @@ public static class Display {
 		StringBuilder sb = new("\x1B[H");
 		
 		sb.Append("\x1B[0m");
-		if (colorGrid[0][0] != null) {
-			sb.Append(colorGrid[0][0]!.AnsiString);
+		if (ColorAt(0, 0) != null) {
+			sb.Append(ColorAt(0, 0)!.AnsiString);
 		}
 		
 		AnsiColor? prevColor = null;
-				
-		// Update positions
-		var offset0 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr1 / 0x10;
-		var offset1 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr2 / 0x10;
-		var offset2 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr3 / 0x10;
-		var offset3 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr4 / 0x10;
 		
 		// Update color and char grids
 		for (var i = 0; i < framesSinceLastDisplay; i++) {
@@ -341,18 +363,35 @@ public static class Display {
 				for (var x = 0; x < Width; x++) {
 					var ch =  CharAt(x, y);
 					var cl = ColorAt(x, y);
+					
+					if (windowEnabled && IsInWindow(x, y)) {
+						var (wx, wy) = WindowCoords(x, y).AsTuple;
+						
+						// Update color buffers
+						prevColorBuffers[3][wy][wx] = prevColorBuffers[2][wy][wx];
+						prevColorBuffers[2][wy][wx] = prevColorBuffers[1][wy][wx];
+						prevColorBuffers[1][wy][wx] = prevColorBuffers[0][wy][wx];
+						prevColorBuffers[0][wy][wx] = cl;
 				
-					// Update color grids
-					prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
-					prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
-					prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
-					prevColorGrids[0][y][x] = cl;
+						// Update char buffers
+						prevCharBuffers[3][wy][wx] = prevCharBuffers[2][wy][wx];
+						prevCharBuffers[2][wy][wx] = prevCharBuffers[1][wy][wx];
+						prevCharBuffers[1][wy][wx] = prevCharBuffers[0][wy][wx];
+						prevCharBuffers[0][wy][wx] = ch;
+					}
+					else {
+						// Update color grids
+						prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
+						prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
+						prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
+						prevColorGrids[0][y][x] = cl;
 				
-					// Update char grids
-					prevCharGrids[3][y][x] = prevCharGrids[2][y][x];
-					prevCharGrids[2][y][x] = prevCharGrids[1][y][x];
-					prevCharGrids[1][y][x] = prevCharGrids[0][y][x];
-					prevCharGrids[0][y][x] = ch;
+						// Update char grids
+						prevCharGrids[3][y][x] = prevCharGrids[2][y][x];
+						prevCharGrids[2][y][x] = prevCharGrids[1][y][x];
+						prevCharGrids[1][y][x] = prevCharGrids[0][y][x];
+						prevCharGrids[0][y][x] = ch;
+					}
 				}
 			}
 		}
@@ -368,28 +407,37 @@ public static class Display {
 				
 				var isMultiBlended = false;
 				
-				if ((!windowEnabled || !IsInWindow(x, y)) && (cl is not null && cl.IsBG || isMulti)) {
-					var (y0, y1, y2, y3) = (y + offset0, y + offset1, y + offset2, y + offset3);
-					
-					if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
+				if (cl is not null && cl.IsBG || isMulti) {
+					if (windowEnabled && IsInWindow(x, y)) {
+						var (wx, wy) = WindowCoords(x, y).AsTuple;
+						
+						cl = blendColors(
+							cl,
+							prevColorBuffers[0][wy][wx],
+							prevColorBuffers[1][wy][wx],
+							prevColorBuffers[2][wy][wx],
+							prevColorBuffers[3][wy][wx]
+						);
+					}
+					else if (x < Width - 32 && y >= 0 && y < Height) {
 						if (isMulti) {
 							isMultiBlended = true;
 							
 							cl = blendDualColors(
 								(cl!, ch),
-								(prevColorGrids[0][y0][x], prevCharGrids[0][y0][x]),
-								(prevColorGrids[1][y1][x], prevCharGrids[1][y1][x]),
-								(prevColorGrids[2][y2][x], prevCharGrids[2][y2][x]),
-								(prevColorGrids[3][y3][x], prevCharGrids[3][y3][x])
+								(prevColorGrids[0][y][x], prevCharGrids[0][y][x]),
+								(prevColorGrids[1][y][x], prevCharGrids[1][y][x]),
+								(prevColorGrids[2][y][x], prevCharGrids[2][y][x]),
+								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
 							);
 						}
 						else {
 							cl = blendColors(
 								cl,
-								prevColorGrids[0][y0][x],
-								prevColorGrids[1][y1][x],
-								prevColorGrids[2][y2][x],
-								prevColorGrids[3][y3][x]
+								prevColorGrids[0][y][x],
+								prevColorGrids[1][y][x],
+								prevColorGrids[2][y][x],
+								prevColorGrids[3][y][x]
 							);
 						}
 					}
