@@ -5,6 +5,11 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
 
+        <DebugType>none</DebugType>
+        <DebugSymbols>false</DebugSymbols>
+        <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+
+        <IlcGenerateDebugInfo>false</IlcGenerateDebugInfo>
         <StripSymbols>false</StripSymbols>
     </PropertyGroup>
 
