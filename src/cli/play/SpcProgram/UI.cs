@@ -796,31 +796,37 @@ public static partial class CliMain {
 		switch (nextView) {
 			case View.MemoryViewer: {
 				requestEmuData(Transfer.Requests.SMP_Bus);
+				Display.EnableWindow();
 				break;
 			}
 			
 			case View.DSPViewer1: {
 				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1);
+				Display.HideWindow();
 				break;
 			}
 			
 			case View.DSPViewer2: {
 				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2);
+				Display.HideWindow();
 				break;
 			}
 			
 			case View.DSPViewer3: {
 				requestEmuData(Transfer.Requests.DSP_3);
+				Display.HideWindow();
 				break;
 			}
 			
 			case View.Script700Viewer: {
 				requestEmuData(Transfer.Requests.Script700 | Transfer.Requests.SMP_State);
+				Display.HideWindow();
 				break;
 			}
 			
 			default: {
 				requestEmuData(Transfer.Requests.CycleCountOnly);
+				Display.HideWindow();
 				break;
 			}
 		}
@@ -909,56 +915,69 @@ public static partial class CliMain {
 	                           int endRow,
 	                           byte[] data,
 	                           AnsiColor?[]? colorData = null,
-	                           bool useHeatMap = false)
+	                           bool useHeatMap = false,
+	                           int yOffset = 0,
+	                           bool writeToScrollBuf = false)
 	{
+		Display.UpdateState(writeToScrollBuf);
+		
 		Display.X = 0;
-		Display.Y = 0;
+		Display.Y = yOffset;
 		
 		for (var i = startRow; i <= endRow; i++) {
 			var startAddr = (uint) i * 16;
 			switch (addrBusSize) {
 				case BusSize.Bit8: {
-					Display.Write($"{startAddr:X2} | ");
+					Display.Write($"{startAddr:X2} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit16: {
-					Display.Write($"{startAddr:X4} | ");
+					Display.Write($"{startAddr:X4} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit24: {
-					Display.Write($"{startAddr:X6} | ");
+					Display.Write($"{startAddr:X6} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit32: {
-					Display.Write($"{startAddr:X8} | ");
+					Display.Write($"{startAddr:X8} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 			}
 			
 			for (var c = 0; c < 16; c++) {
 				var idx = (i - startRow) * 16 + c;
-				Display.Write($"{data[idx]:X2} ", col: colorData?[idx]);
+				
+				if (idx >= 0 && idx < data.Length) {
+					Display.Write($"{data[idx]:X2} ", col: colorData?[idx], writeToScrollBuf: writeToScrollBuf);
+				}
 			}
-			Display.Write("| ");
+			Display.Write("| ", writeToScrollBuf: writeToScrollBuf);
 			
 			if (useHeatMap) {
 				for (var c = 0; c < 16; c++) {
 					var idx = (i - startRow) * 16 + c;
-					var val = data[idx];
-					var col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
-					Display.Write("  ", col: col);
+					
+					if (idx >= 0 && idx < data.Length) {
+						var val = data[idx];
+						var col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
+						Display.Write("  ", col: col, writeToScrollBuf: writeToScrollBuf);
+					}
 				}
 			}
 			else {
 				for (var c = 0; c < 16; c++) {
 					var idx = (i - startRow) * 16 + c;
-					var val = data[idx];
-					Display.Write($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}", col: colorData?[idx]);
+					
+					if (idx >= 0 && idx < data.Length) {
+						var val = data[idx];
+						Display.Write($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}", col: colorData?[idx], writeToScrollBuf: writeToScrollBuf);
+					}
 				}
-				Display.Write(new string(' ', 16));
+				Display.Write(new string(' ', 16), writeToScrollBuf: writeToScrollBuf);
 			}
 			
-			Display.Write("\n");
+			Display.Write("\n", writeToScrollBuf: writeToScrollBuf);
 		}
 	}
 	

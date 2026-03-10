@@ -122,6 +122,10 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('('), KeyBindings.Action.SeekPos_9, ctrl: false);
 			KeyBindings.Register(KeyBindings.Key.Char(' '),  KeyBindings.Action.TogglePause);
 			
+			// Create RAM memory viewer buffer
+			Display.ResetWindowBuffer(91, 0x1000, 0, 0, 91, ScrollAreaRows);
+			Display.HideWindow();
+			
 			Console.Clear();
 			Console.CursorVisible = false;
 			

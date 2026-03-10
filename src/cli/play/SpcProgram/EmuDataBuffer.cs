@@ -244,7 +244,7 @@ public class EmuDataBuffer: ICloneable {
 		nextStep++;
 	}
 	
-	public void RequestPopulate(Emulator emu, Transfer.Requests requests, UInt16 startAddr = 0, UInt16 length = 0x100) {
+	public void RequestPopulate(Emulator emu, Transfer.Requests requests, Int32 startAddr = 0, UInt32 length = 0x100) {
 		resetToNull();
 		
 		if ((requests & Transfer.Requests.ARAM) != 0) {

@@ -30,8 +30,8 @@ public static class Transfer {
 	static object requestLock = new();
 	
 	static Requests requests         = Requests.CycleCountOnly;
-	static UInt16   memRequestStart  = 0;
-	static UInt16   memRequestLength = 0x100;
+	static  Int32   memRequestStart  = 0;
+	static UInt32   memRequestLength = 0x100;
 	
 	static Emulator emu => CliMain.PrimaryEmu;
 	
@@ -152,7 +152,7 @@ public static class Transfer {
 		Signal.Set();
 	}
 	
-	public static void RequestEmuData(Requests reqs, UInt16 startAddress, UInt16 length) {
+	public static void RequestEmuData(Requests reqs, Int32 startAddress, UInt32 length) {
 		lock (requestLock) {
 			requests = reqs;
 			memRequestStart  = startAddress;
