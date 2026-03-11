@@ -396,6 +396,16 @@ public static class Display {
 			}
 		}
 		
+		var screenToAreaRatio = 1.0;
+		var scrollbarSize     = 0;
+		var scrollbarTop      = 0;
+		
+		if (windowEnabled) {
+			screenToAreaRatio = (double) windowHeight / charBuffer.Count;
+			scrollbarSize     = (int) Math.Ceiling(screenToAreaRatio * windowHeight);
+			scrollbarTop      = windowTop + windowHeight * ScrollTop / charBuffer.Count;
+		}
+		
 		for (var y = 0; y < Height; y++) {
 			for (var x = 0; x < Width; x++) {
 				var ch =  CharAt(x, y);
@@ -407,7 +417,17 @@ public static class Display {
 				
 				var isMultiBlended = false;
 				
-				if (cl is not null && cl.IsBG || isMulti) {
+				if (windowEnabled && charBuffer.Count > windowHeight && IsInWindow(x, y) && x == WindowBottomRight.X - 1) {
+					if (y >= scrollbarTop && y < scrollbarTop + scrollbarSize) {
+						ch = '█';
+						cl = AnsiColor.Grey;
+					}
+					else {
+						ch = '▒';
+						cl = AnsiColor.DarkGrey;
+					}
+				}
+				else if (cl is not null && cl.IsBG || isMulti) {
 					if (windowEnabled && IsInWindow(x, y)) {
 						var (wx, wy) = WindowCoords(x, y).AsTuple;
 						
