@@ -816,7 +816,9 @@ public static partial class CliMain {
 	}
 	
 	static void loadSnapshot(int targetSnapshotIndex) {
-		resetTraceLog();
+		if (currentView == View.ASMViewer) {
+			resetTraceLog();
+		}
 		Emulator? snapshot = null;
 		
 		lock (seekBarLock) {
