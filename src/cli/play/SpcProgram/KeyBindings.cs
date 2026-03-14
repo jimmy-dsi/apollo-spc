@@ -171,6 +171,7 @@ public static class KeyBindings {
 		SeekPos_8,
 		SeekPos_9,
 		TogglePause,
+		StepInstruction,
 	}
 		
 	static Key?      lastCtrlKey    = null;

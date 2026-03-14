@@ -70,6 +70,8 @@ public static class Driver {
 	static Random rng = new();
 	static int cycleSpillOver = 0;
 	
+	static bool paused = false;
+	
 	const int MaxConsecutiveTimeouts = 90;
 	const int BusyloopReliefMS       = 20;
 	
@@ -81,8 +83,23 @@ public static class Driver {
 		lock (CliMain.EmuRestoreLock) {
 			try {
 				if (CliMain.UI_State is not CliMain.State.Normal) {
+					//if (!paused) {
+					//	emu.StepInstruction(); // Ensure we end up on instruction boundary when paused (So trace log shows instruction correctly on break)
+					//	paused = true;
+					//	return;
+					//}
+					
+					if (!Transfer.StepSignal.WaitOne(0)) {
+						return;
+					}
+					
+					emu.StepInstruction();
+					Transfer.StepSignal.Reset();
+					
 					return;
 				}
+				
+				paused = false;
 				
 				var samples = numShorts / 2;
 		

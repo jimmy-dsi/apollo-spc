@@ -58,7 +58,7 @@ public static partial class CliMain {
 	static int seekPosition    = 1;
 	
 	static int viewIndex = 0;
-	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer];
+	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
 	
 	static bool heatMapEnabled    = false;
 	static bool cyclesInSpcClocks = false;
@@ -247,6 +247,11 @@ public static partial class CliMain {
 			
 			case View.Help: {
 				showHelpMenu();
+				break;
+			}
+			
+			case View.ASMViewer: {
+				showTraceLogger(buffer!);
 				break;
 			}
 			
@@ -542,6 +547,12 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset < Math.Max(0, InstructionsSinceTrace - ScrollAreaRows)) {
+						ScrollOffset++;
+					}
+				}
+				
 				break;
 			}
 			
@@ -552,6 +563,13 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					//scrollSignal = true;
+					if (ScrollOffset > 0) {
+						ScrollOffset--;
+					}
+				}
+				
 				break;
 			}
 			
@@ -562,10 +580,20 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 					else if (StartAddr > 0) {
-						StartAddr = 0;
+						//scrollSignal = true;
+						StartAddr    = 0;
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset + 16 <= Math.Max(0, InstructionsSinceTrace - ScrollAreaRows)) {
+						ScrollOffset += 16;
+					}
+					else {
+						ScrollOffset = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows);
+					}
+				}
+				
 				break;
 			}
 			
@@ -579,6 +607,15 @@ public static partial class CliMain {
 					}
 					requestEmuData(requests);
 				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset - 16 >= 0) {
+						ScrollOffset -= 16;
+					}
+					else {
+						ScrollOffset = 0;
+					}
+				}
+				
 				break;
 			}
 			
@@ -589,6 +626,10 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					ScrollOffset = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows);
+				}
+				
 				break;
 			}
 			
@@ -599,6 +640,10 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					ScrollOffset = 0;
+				}
+				
 				break;
 			}
 			
@@ -710,6 +755,16 @@ public static partial class CliMain {
 				TogglePause();
 				break;
 			}
+			
+			case KeyBindings.Action.StepInstruction: {
+				if (UI_State == State.Paused) {
+					ScrollOffset = 0;
+					InstructionsSinceTrace = NextInstructionsSinceTrace;
+					refreshSignal++;
+					Transfer.StepSignal.Set(); // Signal emulating thread to step one single instruction
+				}
+				break;
+			}
 		}
 	}
 	
@@ -761,6 +816,7 @@ public static partial class CliMain {
 	}
 	
 	static void loadSnapshot(int targetSnapshotIndex) {
+		resetTraceLog();
 		Emulator? snapshot = null;
 		
 		lock (seekBarLock) {
@@ -789,8 +845,19 @@ public static partial class CliMain {
 		
 		// Make requests
 		switch (nextView) {
+			case View.ASMViewer: {
+				Display.ScrollTop = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows - ScrollOffset);
+				requestEmuData(Transfer.Requests.SPC_Regs);
+				Display.CurrentBufferId = "trace";
+				Display.SetWindowProps(0, 0, Display.Width, ScrollAreaRows);
+				Display.EnableWindow();
+				break;
+			}
+			
 			case View.MemoryViewer: {
 				requestEmuData(Transfer.Requests.SMP_Bus);
+				Display.CurrentBufferId = "aram";
+				Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
 				Display.EnableWindow();
 				break;
 			}
@@ -1264,7 +1331,11 @@ public static partial class CliMain {
 	}
 	
 	static void requestEmuData(Transfer.Requests reqs) {
+		requestEmuData(reqs, StartAddr, ScrollAreaRows * 0x10);
+	}
+	
+	static void requestEmuData(Transfer.Requests reqs, int startAddress, uint length) {
 		requests = reqs;
-		Transfer.RequestEmuData(reqs, StartAddr, ScrollAreaRows * 0x10);
+		Transfer.RequestEmuData(reqs, startAddress, length);
 	}
 }

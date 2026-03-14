@@ -200,6 +200,7 @@ pub const SSMP = struct {
     pub fn step(self: *SSMP) void {
         if (self.co.null_transition(.{})) {
             if (self.instr_boundary) {
+                //self.spc.state.instruction_start_pc = self.spc.pc();
                 self.prev_spc_state = self.spc.state;
 
                 if (self.emu.singleton != null and self.emu.script700.state.has_breakpoint(self.spc.pc())) {
@@ -223,7 +224,9 @@ pub const SSMP = struct {
 
         if (self.co.null_transition(.{.no_reset = true})) {
             const substate = self.co.substate();
+
             if (substate == 0) {
+                //self.spc.state.instruction_start_pc = self.spc.pc();
                 self.instr_boundary = true;
                 self.prev_exec_cycle = self.cur_exec_cycle;
                 self.cur_exec_cycle  = self.s_dsp().cur_cycle();

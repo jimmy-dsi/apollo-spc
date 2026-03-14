@@ -25,7 +25,8 @@ public static class Transfer {
 		Script700_Data  = 1 << 11,
 	}
 	
-	public static AutoResetEvent Signal = new(false);
+	public static AutoResetEvent Signal     = new(false);
+	public static AutoResetEvent StepSignal = new(false);
 	
 	static object requestLock = new();
 	

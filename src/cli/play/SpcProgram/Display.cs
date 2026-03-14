@@ -7,13 +7,25 @@ using Jimbl.JMath;
 using Jimbl.Graphics;
 
 public static class Display {
+	// Swappable display region buffers
+	static Dictionary<string, (List<char[]>, List<AnsiColor?[]>)> namedBuffers = new() {
+		["default"] = (new(), new())
+	};
+	
 	// For scrollable display region
-	static List<      char[]>  charBuffer = new();
-	static List<AnsiColor?[]> colorBuffer = new();
+	static string currentBufferId = "default";
+	
+	static List<      char[]>  charBuffer = namedBuffers[currentBufferId].Item1;
+	static List<AnsiColor?[]> colorBuffer = namedBuffers[currentBufferId].Item2;
+	
+	public static List<      char[]>  CharBuffer =>  charBuffer;
+	public static List<AnsiColor?[]> ColorBuffer => colorBuffer;
+	
+	public static bool UseBufferBlending { get; set; } = true;
 	
 	// Previous scrollable display color buffers
-	static List<      char[]>[]  prevCharBuffers;
-	static List<AnsiColor?[]>[] prevColorBuffers;
+	static List<      char[]>[]  prevCharBuffers = new List<      char[]>[]{};
+	static List<AnsiColor?[]>[] prevColorBuffers = new List<AnsiColor?[]>[]{};
 	
 	static bool windowEnabled = false;
 	
@@ -67,7 +79,29 @@ public static class Display {
 		get => y;
 		set => y = value;
 	}
-	
+
+	public static string CurrentBufferId {
+		get => currentBufferId;
+		set {
+			var prevBufferId = currentBufferId;
+			currentBufferId = value;
+			
+			if (prevBufferId == currentBufferId) {
+				return;
+			}
+			
+			if (!namedBuffers.ContainsKey(currentBufferId)) {
+				namedBuffers[currentBufferId] = (new(), new());
+			}
+			
+			charBuffer  = namedBuffers[currentBufferId].Item1;
+			colorBuffer = namedBuffers[currentBufferId].Item2;
+			
+			initBuffers();
+			ResetPrevBuffers();
+		}
+	}
+
 	public static void Init(int width, int height) {
 		Width  = width;
 		Height = height;
@@ -78,22 +112,13 @@ public static class Display {
 		List<AnsiColor?[][]>  pcg = new();
 		List<      char[][]> pchg = new();
 		
-		List<List<AnsiColor?[]>>  pcb = new();
-		List<List<      char[]>> pchb = new();
-		
 		for (var i = 0; i < 4; i++) {
 			pcg .Add(new AnsiColor?[][]{ });
 			pchg.Add(new       char[][]{ });
-			
-			pcb .Add(new List<AnsiColor?[]>());
-			pchb.Add(new List<      char[]>());
 		}
 		
 		prevColorGrids = pcg .ToArray();
 		prevCharGrids  = pchg.ToArray();
-		
-		prevColorBuffers = pcb .ToArray();
-		prevCharBuffers  = pchb.ToArray();
 			
 		for (var i = 0; i < 4; i++) {
 			prevColorGrids[i] = new AnsiColor?[height][];
@@ -110,7 +135,65 @@ public static class Display {
 			}
 		}
 		
+		initBuffers();
 		Clear();
+	}
+	
+	static void initBuffers() {
+		if (prevCharBuffers.Length > 0) {
+			return;
+		}
+		
+		List<List<AnsiColor?[]>>  pcb = new();
+		List<List<      char[]>> pchb = new();
+		
+		for (var i = 0; i < 4; i++) {
+			pcb .Add(new List<AnsiColor?[]>());
+			pchb.Add(new List<      char[]>());
+		}
+		
+		prevColorBuffers = pcb .ToArray();
+		prevCharBuffers  = pchb.ToArray();
+	}
+	
+	public static void SetWindowProps(int portX, int portY, int portWidth, int portHeight) {
+		windowLeft = portX;
+		windowTop  = portY;
+		
+		windowWidth  = portWidth;
+		windowHeight = portHeight;
+	}
+	
+	public static void ResetPrevBuffers() {
+		var bufHeight = charBuffer.Count;
+		var bufWidth  = charBuffer.Count > 0 ? charBuffer[^1].Length : 0;
+		
+		for (var i = 0; i < prevCharBuffers.Length; i++) {
+			prevCharBuffers [i].Clear();
+			prevColorBuffers[i].Clear();
+		
+			for (var _ = 0; _ < bufHeight; _++) {
+				prevCharBuffers [i].Add(new       char[bufWidth]);
+				prevColorBuffers[i].Add(new AnsiColor?[bufWidth]);
+			
+				for (var x = 0; x < bufWidth; x++) {
+					prevCharBuffers [i][^1][x] = ' ';
+					prevColorBuffers[i][^1][x] = null;
+				}
+			}
+		}
+		
+		windowEnabled = true;
+	}
+	
+	public static void AddBufferRow() {
+		CharBuffer .Add(new       char[windowWidth]);
+		ColorBuffer.Add(new AnsiColor?[windowWidth]);
+		
+		for (var i = 0; i < windowWidth; i++) {
+			CharBuffer [^1][i] = ' ';
+			ColorBuffer[^1][i] = null;
+		}
 	}
 	
 	public static void ResetWindowBuffer(int bufWidth, int bufHeight, int portX, int portY, int portWidth, int portHeight) {
@@ -365,19 +448,21 @@ public static class Display {
 					var cl = ColorAt(x, y);
 					
 					if (windowEnabled && IsInWindow(x, y)) {
-						var (wx, wy) = WindowCoords(x, y).AsTuple;
-						
-						// Update color buffers
-						prevColorBuffers[3][wy][wx] = prevColorBuffers[2][wy][wx];
-						prevColorBuffers[2][wy][wx] = prevColorBuffers[1][wy][wx];
-						prevColorBuffers[1][wy][wx] = prevColorBuffers[0][wy][wx];
-						prevColorBuffers[0][wy][wx] = cl;
-				
-						// Update char buffers
-						prevCharBuffers[3][wy][wx] = prevCharBuffers[2][wy][wx];
-						prevCharBuffers[2][wy][wx] = prevCharBuffers[1][wy][wx];
-						prevCharBuffers[1][wy][wx] = prevCharBuffers[0][wy][wx];
-						prevCharBuffers[0][wy][wx] = ch;
+						if (UseBufferBlending) {
+							var (wx, wy) = WindowCoords(x, y).AsTuple;
+							
+							// Update color buffers
+							prevColorBuffers[3][wy][wx] = prevColorBuffers[2][wy][wx];
+							prevColorBuffers[2][wy][wx] = prevColorBuffers[1][wy][wx];
+							prevColorBuffers[1][wy][wx] = prevColorBuffers[0][wy][wx];
+							prevColorBuffers[0][wy][wx] = cl;
+					
+							// Update char buffers
+							prevCharBuffers[3][wy][wx] = prevCharBuffers[2][wy][wx];
+							prevCharBuffers[2][wy][wx] = prevCharBuffers[1][wy][wx];
+							prevCharBuffers[1][wy][wx] = prevCharBuffers[0][wy][wx];
+							prevCharBuffers[0][wy][wx] = ch;
+						}
 					}
 					else {
 						// Update color grids
@@ -429,15 +514,17 @@ public static class Display {
 				}
 				else if (cl is not null && cl.IsBG || isMulti) {
 					if (windowEnabled && IsInWindow(x, y)) {
-						var (wx, wy) = WindowCoords(x, y).AsTuple;
+						if (UseBufferBlending) {
+							var (wx, wy) = WindowCoords(x, y).AsTuple;
 						
-						cl = blendColors(
-							cl,
-							prevColorBuffers[0][wy][wx],
-							prevColorBuffers[1][wy][wx],
-							prevColorBuffers[2][wy][wx],
-							prevColorBuffers[3][wy][wx]
-						);
+							cl = blendColors(
+								cl,
+								prevColorBuffers[0][wy][wx],
+								prevColorBuffers[1][wy][wx],
+								prevColorBuffers[2][wy][wx],
+								prevColorBuffers[3][wy][wx]
+							);
+						}
 					}
 					else if (x < Width - 32 && y >= 0 && y < Height) {
 						if (isMulti) {

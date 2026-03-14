@@ -8,7 +8,8 @@ public static partial class CliMain {
 	public static UInt16 PrevStartAddr = 0x0000;
 	
 	static void showMemoryViewer(EmuDataBuffer buffer) {
-		Display.ScrollTop = PrevStartAddr >> 4;
+		Display.UseBufferBlending = true;
+		Display.ScrollTop         = PrevStartAddr >> 4;
 		
 		var startRow = Display.ScrollTop;
 		var endRow   = startRow + 0x2F;

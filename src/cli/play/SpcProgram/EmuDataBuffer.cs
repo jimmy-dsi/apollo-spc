@@ -125,6 +125,29 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
+	public class SPCState: ICloneable {
+		public byte   A            { get; internal set; }
+		public byte   X            { get; internal set; }
+		public byte   Y            { get; internal set; }
+		
+		public byte   SP           { get; internal set; }
+		public UInt16 PC           { get; internal set; }
+		
+		public byte   PSW          { get; internal set; }
+		
+		public UInt16 InstrStartPC { get; internal set; }
+		
+		public byte[] ExecData     { get; internal set; } = new byte[3];
+		
+		public SPCState Clone() {
+			var clone = (SPCState) MemberwiseClone();
+			clone.ExecData = ExecData.ToArray();
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
 	public class SMPState: ICloneable {
 		public struct TimerState {
 			bool Enabled;
@@ -233,6 +256,7 @@ public class EmuDataBuffer: ICloneable {
 	public DSPVoice1[]?    DSP_Voice             { get; private set; }
 	public DSP2State?      DSP_State             { get; private set; }
 	public DSP3State?      DSP_DebugState        { get; private set; }
+	public SPCState?       SPC_State             { get; private set; }
 	public SMPState?       SMP_State             { get; private set; }
 	public Script700State? Script700_State       { get; private set; }
 	
@@ -363,6 +387,27 @@ public class EmuDataBuffer: ICloneable {
 			}
 		}
 		
+		if ((requests & Transfer.Requests.SPC_Regs) != 0) {
+			SPC_State = new() {
+				A            = emu.SPC.State.A,
+				X            = emu.SPC.State.X,
+				Y            = emu.SPC.State.Y,
+				
+				SP           = emu.SPC.State.SP,
+				PC           = emu.SPC.State.PC,
+				
+				PSW          = emu.SPC.State.PSW,
+				
+				InstrStartPC = emu.SPC.State.InstructionStartPC,
+			};
+			
+			var pc = SPC_State.InstrStartPC;
+			
+			for (var i = 0; i < 3; i++) {
+				SPC_State.ExecData[i] = emu.SMP.DebugReadByte((UInt16) (pc + i));
+			}
+		}
+		
 		if ((requests & Transfer.Requests.SMP_State) != 0) {
 			SMP_State = new() {
 				Timer = [
@@ -441,6 +486,7 @@ public class EmuDataBuffer: ICloneable {
 		if ((requests & Transfer.Requests.DSP_1)           != 0) result = result && DSP_Voice             is not null;
 		if ((requests & Transfer.Requests.DSP_2)           != 0) result = result && DSP_State             is not null;
 		if ((requests & Transfer.Requests.DSP_3)           != 0) result = result && DSP_DebugState        is not null;
+		if ((requests & Transfer.Requests.SPC_Regs)        != 0) result = result && SPC_State             is not null;
 		if ((requests & Transfer.Requests.SMP_State)       != 0) result = result && SMP_State             is not null;
 		if ((requests & Transfer.Requests.Script700)       != 0) result = result && Script700_State       is not null;
 		if ((requests & Transfer.Requests.Script700_Break) != 0) result = result && Script700_Breakpoints is not null;
@@ -482,6 +528,10 @@ public class EmuDataBuffer: ICloneable {
 			clone.DSP_DebugState = DSP_DebugState.Clone();
 		}
 		
+		if (SPC_State is not null) {
+			clone.SPC_State = SPC_State.Clone();
+		}
+		
 		if (SMP_State is not null) {
 			clone.SMP_State = SMP_State.Clone();
 		}
@@ -503,6 +553,7 @@ public class EmuDataBuffer: ICloneable {
 		DSP_Voice             = null;
 		DSP_State             = null;
 		DSP_DebugState        = null;
+		SPC_State             = null;
 		SMP_State             = null;
 		Script700_State       = null;
 	}

@@ -121,9 +121,15 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('*'), KeyBindings.Action.SeekPos_8, ctrl: false);
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('('), KeyBindings.Action.SeekPos_9, ctrl: false);
 			KeyBindings.Register(KeyBindings.Key.Char(' '),  KeyBindings.Action.TogglePause);
+			KeyBindings.Register(KeyBindings.Key.F6,         KeyBindings.Action.StepInstruction);
 			
-			// Create RAM memory viewer buffer
+			// Create RAM memory view buffer and Trace logger view buffer
+			Display.CurrentBufferId = "aram";
 			Display.ResetWindowBuffer(91, 0x1000, 0, 0, 91, ScrollAreaRows);
+			Display.CurrentBufferId = "trace";
+			Display.ResetWindowBuffer(Display.Width, ScrollAreaRows, 0, 0, Display.Width, ScrollAreaRows);
+			Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
+			
 			Display.HideWindow();
 			
 			Console.Clear();
