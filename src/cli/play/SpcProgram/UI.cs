@@ -38,6 +38,7 @@ public static partial class CliMain {
 		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
 		
 		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos,
+		SteppedCycles, Paused,
 		
 		Script700_Error, Continue
 	}
@@ -45,6 +46,8 @@ public static partial class CliMain {
 	static State  uiState          = State.Init;
 	static bool   disableScript700 = false;
 	static object uiStateLock      = new();
+	
+	static bool ignoreStepDisplay = false;
 	
 	static View       realView       = View.Metadata;
 	static View       currentView    = View.Metadata;
@@ -54,8 +57,9 @@ public static partial class CliMain {
 	static bool       menuBarError   = false;
 	static Stopwatch? tempMsgTime    = null;
 	
-	static int channelToToggle = 0;
-	static int seekPosition    = 1;
+	static int  channelToToggle = 0;
+	static int  seekPosition    = 1;
+	static long stepCycles      = 0;
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
@@ -230,6 +234,21 @@ public static partial class CliMain {
 		
 			if (action is not null) {
 				doAction(action!.Value);
+			}
+			
+			if (buffer is not null) {
+				if (!ignoreStepDisplay) {
+					if (state == State.Paused && lastInstructionCycle >= 0) {
+						stepCycles = buffer.DSPCycle - lastInstructionCycle;
+						if (stepCycles > 0) {
+							setTempStatusMsg(StatusMSG.SteppedCycles);
+						}
+					}
+			
+					lastInstructionCycle = buffer.DSPCycle;
+				}
+				
+				ignoreStepDisplay = false;
 			}
 		
 			if (nextView != currentView) {
@@ -753,6 +772,14 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.TogglePause: {
 				TogglePause();
+				
+				if (UI_State == State.Paused) {
+					setTempStatusMsg(StatusMSG.Paused);
+				}
+				else {
+					setTempStatusMsg(StatusMSG.Continue);
+				}
+				
 				break;
 			}
 			
@@ -761,8 +788,14 @@ public static partial class CliMain {
 					ScrollOffset = 0;
 					InstructionsSinceTrace = NextInstructionsSinceTrace;
 					refreshSignal++;
+					
+					if (currentView != View.ASMViewer) {
+						resetTraceLog();
+					}
+					
 					Transfer.StepSignal.Set(); // Signal emulating thread to step one single instruction
 				}
+				
 				break;
 			}
 		}
@@ -816,9 +849,11 @@ public static partial class CliMain {
 	}
 	
 	static void loadSnapshot(int targetSnapshotIndex) {
+		ignoreStepDisplay = true;
 		if (currentView == View.ASMViewer) {
 			resetTraceLog();
 		}
+		
 		Emulator? snapshot = null;
 		
 		lock (seekBarLock) {
@@ -838,6 +873,7 @@ public static partial class CliMain {
 		
 		lock (EmuRestoreLock) {
 			PrimaryEmu.LoadStateFrom(snapshot);
+			lastInstructionCycle = PrimaryEmu.DSP.CurrentCycle;
 		}
 	}
 	
@@ -939,9 +975,11 @@ public static partial class CliMain {
 			StatusMSG.SeekFwdFar            => $"Seek +30 seconds",
 			StatusMSG.SeekBackFar           => $"Seek -30 seconds",
 			StatusMSG.SeekPos               => $"Seek to position {seekPosition}",
+			StatusMSG.SteppedCycles         => cyclesInSpcClocks ? $"Stepped {stepCycles / 2} SPC cycles" : $"Stepped {stepCycles} DSP cycles",
+			StatusMSG.Paused                => $"Paused",
 			StatusMSG.Script700_Error       => $"Script700 error occurred",
-			StatusMSG.Continue              => $"Resuming...",
-			_ => throw new NotImplementedException()
+			StatusMSG.Continue              => $"Resuming playback",
+			_                               => throw new NotImplementedException()
 		};
 	}
 	

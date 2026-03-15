@@ -29,6 +29,8 @@ public static partial class CliMain {
 		}
 		
 		if (InstructionsSinceTrace == 0) {
+			lastInstructionCycle = buffer.DSPCycle;
+			
 			Display.ClearBox(Display.Width, ScrollAreaRows, 0, 0, writeToScrollBuf: true);
 			Display.ScrollTop = 0;
 			
@@ -58,7 +60,6 @@ public static partial class CliMain {
 			}
 			
 			refreshSignal = 0;
-			lastInstructionCycle = buffer.DSPCycle;
 			
 			var spc = buffer.SPC_State!;
 			
@@ -117,6 +118,9 @@ public static partial class CliMain {
 	}
 	
 	static void resetTraceLog() {
+		var bufId = Display.CurrentBufferId;
+		Display.CurrentBufferId = "trace";
+		
 		Display.ClearBox(Display.Width, ScrollAreaRows, 0, 0, writeToScrollBuf: true);
 		Display.ScrollTop = 0;
 			
@@ -127,5 +131,7 @@ public static partial class CliMain {
 		
 		InstructionsSinceTrace = 1;
 		lastInstructionCycle   = -1;
+		
+		Display.CurrentBufferId = bufId;
 	}
 }

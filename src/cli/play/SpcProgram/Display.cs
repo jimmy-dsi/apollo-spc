@@ -79,6 +79,8 @@ public static class Display {
 		get => y;
 		set => y = value;
 	}
+	
+	public static bool NoResetBuffer { get; set; } = false;
 
 	public static string CurrentBufferId {
 		get => currentBufferId;
@@ -97,10 +99,16 @@ public static class Display {
 			charBuffer  = namedBuffers[currentBufferId].Item1;
 			colorBuffer = namedBuffers[currentBufferId].Item2;
 			
-			initBuffers();
-			ResetPrevBuffers();
+			if (!NoResetBuffer) {
+				initBuffers();
+				ResetPrevBuffers();
+			}
 		}
 	}
+	
+	public static ItemGetter<string, (List<char[]> CharBuffer, List<AnsiColor?[]> ColorBuffer)> Buffer = new() {
+		Get = k => namedBuffers[k]
+	};
 
 	public static void Init(int width, int height) {
 		Width  = width;
