@@ -41,7 +41,9 @@ public static partial class CliMain {
 		Display.Write($"Display cycle count in {(cyclesInSpcClocks ? "DSP" : "SPC")} clocks", 1, y); Display.Write("Ctrl+D", x, y); y++;
 		y++;
 		
-		Display.Write("Pause/Resume",                   1, y); Display.Write("Space",               x, y); y++;
+		Display.Write("Pause / Resume",                 1, y); Display.Write("Space",               x, y); y++;
+		Display.Write("Break execution / Resume",       1, y); Display.Write("F5",                  x, y); y++;
+		Display.Write("Step SPC700 instruction",        1, y); Display.Write("F6",                  x, y); y++;
 		
 		Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
 	}

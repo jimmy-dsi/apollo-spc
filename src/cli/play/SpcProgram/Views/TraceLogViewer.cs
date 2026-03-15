@@ -15,6 +15,9 @@ public static partial class CliMain {
 	static int  refreshSignal = 0;
 	static bool initScrollAdjust = false;
 	
+	static View? tracePrevView      = null;
+	static int   tracePrevViewIndex = 0;
+	
 	static void showTraceLogger(EmuDataBuffer buffer) {
 		Display.UseBufferBlending = false;
 		
@@ -118,6 +121,9 @@ public static partial class CliMain {
 	}
 	
 	static void resetTraceLog() {
+		var noReset = Display.NoResetBuffer;
+		Display.NoResetBuffer = true;
+		
 		var bufId = Display.CurrentBufferId;
 		Display.CurrentBufferId = "trace";
 		
@@ -133,5 +139,6 @@ public static partial class CliMain {
 		lastInstructionCycle   = -1;
 		
 		Display.CurrentBufferId = bufId;
+		Display.NoResetBuffer   = noReset;
 	}
 }

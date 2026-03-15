@@ -98,6 +98,10 @@ public static class Exts {
 		}
 	}
 	
+	public static int IndexOf(this Array arr, object? value) {
+		return Array.IndexOf(arr, value);
+	}
+	
 	// Integer Extension Methods
 	public static byte   SafeUnsigned(this sbyte value) => (byte)   sbyte.Clamp(value, 0, sbyte.MaxValue);
 	public static UInt16 SafeUnsigned(this Int16 value) => (UInt16) Int16.Clamp(value, 0, Int16.MaxValue);

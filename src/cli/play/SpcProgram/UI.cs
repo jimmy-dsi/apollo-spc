@@ -38,7 +38,7 @@ public static partial class CliMain {
 		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
 		
 		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos,
-		SteppedCycles, Paused,
+		SteppedCycles, Paused, BreakExec, CycleDisplayChanged,
 		
 		Script700_Error, Continue
 	}
@@ -63,6 +63,7 @@ public static partial class CliMain {
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
+	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
 	static bool heatMapEnabled    = false;
 	static bool cyclesInSpcClocks = false;
@@ -114,6 +115,10 @@ public static partial class CliMain {
 				disableScript700 = value;
 			}
 		}
+	}
+	
+	public static void ToggleBreak() {
+		TogglePause();
 	}
 	
 	public static void TogglePause() {
@@ -270,12 +275,17 @@ public static partial class CliMain {
 			}
 			
 			case View.ASMViewer: {
-				showTraceLogger(buffer!);
+				if (Display.CurrentBufferId == "trace") {
+					showTraceLogger(buffer!);
+				}
 				break;
 			}
 			
 			case View.MemoryViewer: {
-				showMemoryViewer(buffer!);
+				if (Display.CurrentBufferId == "aram") {
+					showMemoryViewer(buffer!);
+				}
+				
 				break;
 			}
 			
@@ -399,7 +409,17 @@ public static partial class CliMain {
 	static void doAction(KeyBindings.Action action) {
 		switch (action) {
 			case KeyBindings.Action.ExitCurrentMenu: {
-				changeCurrentView(realView, setAsRealView: false);
+				if (currentView != View.Help && tracePrevView is not null && currentView != tracePrevView && nextView != tracePrevView) {
+					viewIndex = tracePrevViewIndex;
+					changeCurrentView(tracePrevView!.Value, setAsRealView: false);
+						
+					tracePrevView      = null;
+					tracePrevViewIndex = 0;
+				}
+				else if (currentView == View.Help) {
+					changeCurrentView(realView, setAsRealView: false);
+				}
+				
 				break;
 			}
 			
@@ -416,6 +436,7 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.NavNextView: {
+				tracePrevView = null;
 				viewIndex++;
 				viewIndex %= views.Length;
 				changeCurrentView(views[viewIndex], setAsRealView: false);
@@ -423,6 +444,7 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.NavPrevView: {
+				tracePrevView = null;
 				viewIndex--;
 				viewIndex += views.Length;
 				viewIndex %= views.Length;
@@ -683,6 +705,7 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ToggleCycleUnit: {
 				cyclesInSpcClocks = !cyclesInSpcClocks;
+				setTempStatusMsg(StatusMSG.CycleDisplayChanged);
 				break;
 			}
 			
@@ -770,6 +793,36 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.ToggleBreak: {
+				ToggleBreak();
+				
+				if (UI_State == State.Paused) {
+					setTempStatusMsg(StatusMSG.BreakExec);
+					
+					if (currentView != View.ASMViewer && nextView != View.ASMViewer) {
+						tracePrevView      = nextView;
+						tracePrevViewIndex = viewIndex;
+						
+						viewIndex = asmViewerIndex;
+						changeCurrentView(View.ASMViewer, setAsRealView: false);
+					}
+				}
+				else {
+					setTempStatusMsg(StatusMSG.Continue);
+					resetTraceLog();
+					
+					if (tracePrevView is not null && currentView != tracePrevView && nextView != tracePrevView) {
+						viewIndex = tracePrevViewIndex;
+						changeCurrentView(tracePrevView!.Value, setAsRealView: false);
+						
+						tracePrevView      = null;
+						tracePrevViewIndex = 0;
+					}
+				}
+				
+				break;
+			}
+			
 			case KeyBindings.Action.TogglePause: {
 				TogglePause();
 				
@@ -778,6 +831,7 @@ public static partial class CliMain {
 				}
 				else {
 					setTempStatusMsg(StatusMSG.Continue);
+					resetTraceLog();
 				}
 				
 				break;
@@ -794,6 +848,10 @@ public static partial class CliMain {
 					}
 					
 					Transfer.StepSignal.Set(); // Signal emulating thread to step one single instruction
+				}
+				else {
+					TogglePause();
+					setTempStatusMsg(StatusMSG.Paused);
 				}
 				
 				break;
@@ -850,9 +908,7 @@ public static partial class CliMain {
 	
 	static void loadSnapshot(int targetSnapshotIndex) {
 		ignoreStepDisplay = true;
-		if (currentView == View.ASMViewer) {
-			resetTraceLog();
-		}
+		resetTraceLog();
 		
 		Emulator? snapshot = null;
 		
@@ -884,11 +940,16 @@ public static partial class CliMain {
 		// Make requests
 		switch (nextView) {
 			case View.ASMViewer: {
-				Display.ScrollTop = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows - ScrollOffset);
 				requestEmuData(Transfer.Requests.SPC_Regs);
 				Display.CurrentBufferId = "trace";
+				Display.ScrollTop = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows - ScrollOffset);
 				Display.SetWindowProps(0, 0, Display.Width, ScrollAreaRows);
 				Display.EnableWindow();
+				
+				if (UI_State != State.Paused) {
+					resetTraceLog();
+				}
+				
 				break;
 			}
 			
@@ -975,8 +1036,12 @@ public static partial class CliMain {
 			StatusMSG.SeekFwdFar            => $"Seek +30 seconds",
 			StatusMSG.SeekBackFar           => $"Seek -30 seconds",
 			StatusMSG.SeekPos               => $"Seek to position {seekPosition}",
-			StatusMSG.SteppedCycles         => cyclesInSpcClocks ? $"Stepped {stepCycles / 2} SPC cycles" : $"Stepped {stepCycles} DSP cycles",
+			StatusMSG.SteppedCycles         => cyclesInSpcClocks ? 
+			                                         $"Stepped {stepCycles / 2} SPC cycle{(stepCycles / 2 == 1 ? "" : "s")}"
+			                                       : $"Stepped {stepCycles} DSP cycles",
+			StatusMSG.CycleDisplayChanged   => $"Cycle display mode changed: {(cyclesInSpcClocks ? "SPC700" : "S-DSP")}",
 			StatusMSG.Paused                => $"Paused",
+			StatusMSG.BreakExec             => $"Execution break",
 			StatusMSG.Script700_Error       => $"Script700 error occurred",
 			StatusMSG.Continue              => $"Resuming playback",
 			_                               => throw new NotImplementedException()
