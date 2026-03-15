@@ -7,16 +7,31 @@ using Jimbl.JMath;
 using Jimbl.Graphics;
 
 public static class Display {
+	public class BufferTuple {
+		public required List<char[]>       CharBuffer  { get; set; }
+		public required List<AnsiColor?[]> ColorBuffer { get; set; }
+		public required int                VirtualSize { get; set; }
+		
+		public static implicit operator BufferTuple ((List<char[]>, List<AnsiColor?[]>, int) tup) =>
+			new() {
+				CharBuffer  = tup.Item1,
+				ColorBuffer = tup.Item2,
+				VirtualSize = tup.Item3
+			};
+	}
+	
+	public const int MaxBufferRows = 16384;
+	
 	// Swappable display region buffers
-	static Dictionary<string, (List<char[]>, List<AnsiColor?[]>)> namedBuffers = new() {
-		["default"] = (new(), new())
+	static Dictionary<string, BufferTuple> namedBuffers = new() {
+		["default"] = (new(), new(), 0)
 	};
 	
 	// For scrollable display region
 	static string currentBufferId = "default";
 	
-	static List<      char[]>  charBuffer = namedBuffers[currentBufferId].Item1;
-	static List<AnsiColor?[]> colorBuffer = namedBuffers[currentBufferId].Item2;
+	static List<      char[]>  charBuffer = namedBuffers[currentBufferId].CharBuffer;
+	static List<AnsiColor?[]> colorBuffer = namedBuffers[currentBufferId].ColorBuffer;
 	
 	public static List<      char[]>  CharBuffer =>  charBuffer;
 	public static List<AnsiColor?[]> ColorBuffer => colorBuffer;
@@ -80,6 +95,8 @@ public static class Display {
 		set => y = value;
 	}
 	
+	public static int VirtualSize { get; private set; } = 0;
+	
 	public static bool NoResetBuffer { get; set; } = false;
 
 	public static string CurrentBufferId {
@@ -93,11 +110,12 @@ public static class Display {
 			}
 			
 			if (!namedBuffers.ContainsKey(currentBufferId)) {
-				namedBuffers[currentBufferId] = (new(), new());
+				namedBuffers[currentBufferId] = (new(), new(), 0);
 			}
 			
-			charBuffer  = namedBuffers[currentBufferId].Item1;
-			colorBuffer = namedBuffers[currentBufferId].Item2;
+			charBuffer  = namedBuffers[currentBufferId].CharBuffer;
+			colorBuffer = namedBuffers[currentBufferId].ColorBuffer;
+			VirtualSize = namedBuffers[currentBufferId].VirtualSize;
 			
 			if (!NoResetBuffer) {
 				initBuffers();
@@ -106,7 +124,7 @@ public static class Display {
 		}
 	}
 	
-	public static ItemGetter<string, (List<char[]> CharBuffer, List<AnsiColor?[]> ColorBuffer)> Buffer = new() {
+	public static ItemGetter<string, BufferTuple> Buffer = new() {
 		Get = k => namedBuffers[k]
 	};
 
@@ -195,16 +213,30 @@ public static class Display {
 	}
 	
 	public static void AddBufferRow() {
-		CharBuffer .Add(new       char[windowWidth]);
-		ColorBuffer.Add(new AnsiColor?[windowWidth]);
+		VirtualSize++;
+		namedBuffers[currentBufferId].VirtualSize = VirtualSize;
 		
-		for (var i = 0; i < windowWidth; i++) {
-			CharBuffer [^1][i] = ' ';
-			ColorBuffer[^1][i] = null;
+		if (CharBuffer.Count < MaxBufferRows) {
+			CharBuffer .Add(new       char[windowWidth]);
+			ColorBuffer.Add(new AnsiColor?[windowWidth]);
+		
+			for (var i = 0; i < windowWidth; i++) {
+				CharBuffer [(CharBuffer .Count - 1) % MaxBufferRows][i] = ' ';
+				ColorBuffer[(ColorBuffer.Count - 1) % MaxBufferRows][i] = null;
+			}
 		}
 	}
 	
+	public static void SyncVirtualSize() {
+		VirtualSize = namedBuffers[currentBufferId].CharBuffer.Count;
+		namedBuffers[currentBufferId].VirtualSize = VirtualSize;
+	}
+	
 	public static void ResetWindowBuffer(int bufWidth, int bufHeight, int portX, int portY, int portWidth, int portHeight) {
+		bufHeight %= MaxBufferRows;
+		VirtualSize = bufHeight;
+		namedBuffers[currentBufferId].VirtualSize = VirtualSize;
+		
 		charBuffer .Clear();
 		colorBuffer.Clear();
 		
@@ -261,7 +293,9 @@ public static class Display {
 	}
 	
 	public static JVector2I WindowCoords(int x, int y) {
-		return (x - windowLeft, y - windowTop + scrollTop);
+		JVector2I coords = (x - windowLeft, y - windowTop + scrollTop);
+		coords.Y %= MaxBufferRows;
+		return coords;
 	}
 	
 	public static char CharAt(int x, int y) {
@@ -303,6 +337,8 @@ public static class Display {
 	}
 	
 	public static void SetBufferCharAt(int x, int y, char ch, AnsiColor? col) {
+		y %= MaxBufferRows;
+		
 		if (y < charBuffer.Count && x < charBuffer[y].Length) {
 			charBuffer [y][x] = ch;
 			colorBuffer[y][x] = col;
@@ -496,7 +532,7 @@ public static class Display {
 		if (windowEnabled) {
 			screenToAreaRatio = (double) windowHeight / charBuffer.Count;
 			scrollbarSize     = (int) Math.Ceiling(screenToAreaRatio * windowHeight);
-			scrollbarTop      = windowTop + windowHeight * ScrollTop / charBuffer.Count;
+			scrollbarTop      = windowTop + windowHeight * (ScrollTop - Math.Max(0, VirtualSize - charBuffer.Count)) / charBuffer.Count;
 		}
 		
 		for (var y = 0; y < Height; y++) {

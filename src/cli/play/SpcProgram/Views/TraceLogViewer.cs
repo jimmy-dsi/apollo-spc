@@ -38,8 +38,8 @@ public static partial class CliMain {
 			Display.ScrollTop = 0;
 			
 			if (Display.ColorBuffer.Count > ScrollAreaRows) {
-				Display. CharBuffer.RemoveRange(ScrollAreaRows, Display. CharBuffer.Count - ScrollAreaRows);
-				Display.ColorBuffer.RemoveRange(ScrollAreaRows, Display.ColorBuffer.Count - ScrollAreaRows);
+				Display. CharBuffer.RemoveRange(ScrollAreaRows, Math.Min(Display. CharBuffer.Count, Display.MaxBufferRows) - ScrollAreaRows);
+				Display.ColorBuffer.RemoveRange(ScrollAreaRows, Math.Min(Display.ColorBuffer.Count, Display.MaxBufferRows) - ScrollAreaRows);
 			}
 			
 			Display.Write("SPC700 trace log will appear here whenever execution is paused.", 0, 0, writeToScrollBuf: true);
@@ -110,6 +110,8 @@ public static partial class CliMain {
 	}
 	
 	static void unhighlight(int lineNumber) {
+		lineNumber %= Display.MaxBufferRows;
+		
 		if (lineNumber < 0 || lineNumber >= Display.ColorBuffer.Count) {
 			return;
 		}
@@ -133,6 +135,7 @@ public static partial class CliMain {
 		if (Display.ColorBuffer.Count > ScrollAreaRows) {
 			Display. CharBuffer.RemoveRange(ScrollAreaRows, Display. CharBuffer.Count - ScrollAreaRows);
 			Display.ColorBuffer.RemoveRange(ScrollAreaRows, Display.ColorBuffer.Count - ScrollAreaRows);
+			Display.SyncVirtualSize();
 		}
 		
 		InstructionsSinceTrace = 1;
@@ -140,5 +143,16 @@ public static partial class CliMain {
 		
 		Display.CurrentBufferId = bufId;
 		Display.NoResetBuffer   = noReset;
+	}
+	
+	static int getScrollTopOffset() {
+		var scrollOffset = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows);
+		var count = Display.Buffer["trace"].CharBuffer.Count;
+		
+		if (InstructionsSinceTrace > count) {
+			scrollOffset -= InstructionsSinceTrace - count;
+		}
+		
+		return scrollOffset;
 	}
 }

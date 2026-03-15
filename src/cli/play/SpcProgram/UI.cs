@@ -589,7 +589,7 @@ public static partial class CliMain {
 					}
 				}
 				else if (currentView == View.ASMViewer) {
-					if (ScrollOffset < Math.Max(0, InstructionsSinceTrace - ScrollAreaRows)) {
+					if (ScrollOffset < getScrollTopOffset()) {
 						ScrollOffset++;
 					}
 				}
@@ -627,11 +627,11 @@ public static partial class CliMain {
 					}
 				}
 				else if (currentView == View.ASMViewer) {
-					if (ScrollOffset + 16 <= Math.Max(0, InstructionsSinceTrace - ScrollAreaRows)) {
+					if (ScrollOffset + 16 <= getScrollTopOffset()) {
 						ScrollOffset += 16;
 					}
 					else {
-						ScrollOffset = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows);
+						ScrollOffset = getScrollTopOffset();
 					}
 				}
 				
@@ -668,7 +668,7 @@ public static partial class CliMain {
 					}
 				}
 				else if (currentView == View.ASMViewer) {
-					ScrollOffset = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows);
+					ScrollOffset = getScrollTopOffset();
 				}
 				
 				break;
