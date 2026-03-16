@@ -1,6 +1,6 @@
 pub const SPCState = struct {
-    pub const Mode = enum {
-        normal, asleep, stopped, interrupt
+    pub const Mode = enum(u8) {
+        normal = 0, asleep, stopped, interrupt
     };
 
     a: u8 = undefined,

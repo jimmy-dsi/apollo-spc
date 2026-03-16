@@ -321,7 +321,7 @@ public class SMP {
 		}
 	}
 	
-	public class MemAccessLog {
+	public class MemAccessLog: ICloneable {
 		public enum LogType {
 			None      = 0,
 			Read      = 1,
@@ -335,6 +335,8 @@ public class SMP {
 		public UInt64  DSPCycle  { get; }
 		public UInt16  Address   { get; }
 		
+		public byte?   ReadData  { get; }
+		
 		public byte?   PreData   { get; }
 		public byte?   WriteData { get; }
 		public byte?   PostData  { get; }
@@ -344,10 +346,19 @@ public class SMP {
 			DSPCycle  = log.DspCycle;
 			Address   = log.Address;
 			
+			ReadData  = Type == LogType.Read  ? log.PostData  : null;
+			
 			PreData   = Type == LogType.Write ? log.PreData   : null;
 			WriteData = Type == LogType.Write ? log.WriteData : null;
 			PostData  = Type == LogType.Write ? log.PostData  : null;
 		}
+		
+		public MemAccessLog Clone() {
+			var clone = (MemAccessLog) MemberwiseClone();
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
 	}
 	
 	bool loggingEnabled = false;

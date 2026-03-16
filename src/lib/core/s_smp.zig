@@ -16,7 +16,7 @@ pub const SSMP = struct {
     pub const cycles_per_sample: u32 = SDSP.cycles_per_sample / 2;
     pub const clock_rate:        u32 = SDSP.sample_rate * cycles_per_sample;
 
-    pub const LogBuffer = RingBuffer(AccessLog, 256);
+    pub const LogBuffer = RingBuffer(AccessLog, 1024);
 
     pub const Options = struct {
         a: ?u8 = null,

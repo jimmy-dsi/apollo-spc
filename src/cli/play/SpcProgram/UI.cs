@@ -940,7 +940,7 @@ public static partial class CliMain {
 		// Make requests
 		switch (nextView) {
 			case View.ASMViewer: {
-				requestEmuData(Transfer.Requests.SPC_Regs);
+				requestEmuData(Transfer.Requests.SPC_Regs | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.CurrentBufferId = "trace";
 				Display.ScrollTop = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows - ScrollOffset);
 				Display.SetWindowProps(0, 0, Display.Width, ScrollAreaRows);

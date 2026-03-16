@@ -62,6 +62,7 @@ internal partial class DLL {
 		public IntPtr PC;
 		
 		public IntPtr PSW;
+		public IntPtr Mode;
 		
 		public IntPtr InstructionStartPC;
 	}

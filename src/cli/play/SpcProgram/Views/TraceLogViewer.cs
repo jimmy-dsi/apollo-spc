@@ -1,5 +1,7 @@
 namespace SpcProgram;
 
+using System.Diagnostics;
+
 using Jimbl;
 using Jimbl.Graphics;
 
@@ -78,10 +80,95 @@ public static partial class CliMain {
 			}
 			
 			unhighlight(y - 1);
+			
+			if (y > 0) {
+				var logX = 38;
+			
+				UInt16? prevReadAddress = null;
+				byte?   prevReadData    = null;
+				
+				var smpState = buffer.SMP_State!;
+				
+				foreach (var log in logsSinceLastExec(buffer)) {
+					switch (log.Type) {
+						case SMP.MemAccessLog.LogType.Read: {
+							AnsiColor col;
+							
+							if (log.Address is >= 0x00F0 and <= 0x00FC) {
+								col = new(AnsiColor.Code.Yellow);
+							}
+							else if (log.Address is >= 0x00FD and <= 0x00FF) {
+								col = new(250, 125, 25);
+							}
+							else if (log.Address >= 0xFFC0 && smpState.UseBootROM) {
+								col = new(AnsiColor.Code.BrightGreen);
+							}
+							else if (smpState.RAMDisable) {
+								col = new(AnsiColor.Code.Red);
+							}
+							else {
+								col = new(AnsiColor.Code.Green);
+							}
+							
+							Display.Write($"[{log.Address:X4}]={log.ReadData:X2} ", logX, y - 1, col: col, writeToScrollBuf: true);
+						
+							prevReadAddress = log.Address;
+							prevReadData    = log.ReadData;
+						
+							logX += 10;
+							break;
+						}
+					
+						case SMP.MemAccessLog.LogType.Write: {
+							AnsiColor col;
+							
+							if (log.Address is >= 0x00F0 and <= 0x00FF) {
+								col = new(AnsiColor.Code.BrightMagenta);
+							}
+							else if (smpState.RAMDisable || !smpState.RAMWriteEnable) {
+								col = new(AnsiColor.Code.BrightRed);
+							}
+							else if (log.Address >= 0xFFC0 && smpState.UseBootROM) {
+								col = new(AnsiColor.Code.BrightBlue);
+							}
+							else {
+								col = new(AnsiColor.Code.Cyan);
+							}
+
+							var preData = log.PreData;
+							if (prevReadAddress == log.Address) {
+								preData =  prevReadData!.Value;
+								logX    -= 10;
+							}
+						
+							Display.Write($"[{log.Address:X4}]={preData:X2}->{log.PostData:X2} ", logX, y - 1, col: col, writeToScrollBuf: true);
+						
+							prevReadAddress = null;
+							prevReadData    = null;
+						
+							logX += 14;
+							break;
+						}
+					
+						default: {
+							throw new UnreachableException();
+						}
+					}
+				}
+			}
+			
 			Display.ClearLine(y, col: highlight, writeToScrollBuf: true);
 			
-			var instructionBytes = SPC.GetInstructionLength(spc.ExecData[0]);
 			var pc = spc.InstrStartPC;
+			
+			if (spc.Mode == SPC.ExecMode.Asleep) {
+				spc.ExecData[0] = 0xEF;
+			}
+			else if (spc.Mode == SPC.ExecMode.Stopped) {
+				spc.ExecData[0] = 0xFF;
+			}
+			
+			var instructionBytes = SPC.GetInstructionLength(spc.ExecData[0]);
 			
 			Display.Write(
 				$"{pc:X4} |  {SPC.DecodeInstruction(pc, spc.ExecData[0], spc.ExecData[1..])}",
@@ -96,7 +183,7 @@ public static partial class CliMain {
 			Display.Write($"{byteString}", x, y, col: highlight, writeToScrollBuf: true);
 			
 			var flagsString = "nvpbhizc".ToArray();
-			flagsString = Enumerable.Range(0, 8).Select(b => spc.PSW.GetBit(b) ? flagsString[b].ToUpper() : flagsString[b]).ToArray();
+			flagsString = Enumerable.Range(0, 8).Select(b => spc.PSW.GetBit(7 - b) ? flagsString[b].ToUpper() : flagsString[b]).ToArray();
 				
 			Display.Write(
 				$"A:{spc.A:X2} X:{spc.X:X2} Y:{spc.Y:X2} SP:{spc.SP:X2} {string.Join("", flagsString)}",
@@ -154,5 +241,24 @@ public static partial class CliMain {
 		}
 		
 		return scrollOffset;
+	}
+	
+	static SMP.MemAccessLog[] logsSinceLastExec(EmuDataBuffer buffer) {
+		var logs = buffer.SMP_AccessLogs;
+		
+		List<SMP.MemAccessLog> newLogs = new();
+		
+		for (var i = logs.Length - 1; i >= 0; i--) {
+			var log = logs[i];
+			if (log.Type == SMP.MemAccessLog.LogType.Exec) {
+				break;
+			}
+			
+			if (log.Type is SMP.MemAccessLog.LogType.Read or SMP.MemAccessLog.LogType.Write) {
+				newLogs.Add(log);
+			}
+		}
+		
+		return ((IEnumerable<SMP.MemAccessLog>) newLogs).Reverse().ToArray();
 	}
 }

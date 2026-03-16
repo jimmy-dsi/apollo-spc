@@ -6,6 +6,10 @@ using System.Text;
 using Jimbl;
 
 public class SPC {
+	public enum ExecMode {
+		Normal = 0, Asleep, Stopped, Interrupt
+	}
+	
 	public class Metadata {
 		// ID666 Main
 		public string Title    { get; set; }
@@ -276,6 +280,19 @@ public class SPC {
 			set {
 				emu.MaybeAcquireLock();
 				try     { (*(byte*) state.PSW).SetBit(0, value); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
+		public ExecMode Mode {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return (ExecMode) (*(byte*) state.Mode); }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(byte*) state.Mode = (byte) value; }
 				finally { emu.MaybeReleaseLock(); }
 			}
 		}

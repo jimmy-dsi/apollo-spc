@@ -126,18 +126,19 @@ public class EmuDataBuffer: ICloneable {
 	}
 	
 	public class SPCState: ICloneable {
-		public byte   A            { get; internal set; }
-		public byte   X            { get; internal set; }
-		public byte   Y            { get; internal set; }
+		public byte         A            { get; internal set; }
+		public byte         X            { get; internal set; }
+		public byte         Y            { get; internal set; }
 		
-		public byte   SP           { get; internal set; }
-		public UInt16 PC           { get; internal set; }
+		public byte         SP           { get; internal set; }
+		public UInt16       PC           { get; internal set; }
 		
-		public byte   PSW          { get; internal set; }
+		public byte         PSW          { get; internal set; }
+		public SPC.ExecMode Mode         { get; internal set; }
 		
-		public UInt16 InstrStartPC { get; internal set; }
+		public UInt16       InstrStartPC { get; internal set; }
 		
-		public byte[] ExecData     { get; internal set; } = new byte[3];
+		public byte[]       ExecData     { get; internal set; } = new byte[3];
 		
 		public SPCState Clone() {
 			var clone = (SPCState) MemberwiseClone();
@@ -249,16 +250,17 @@ public class EmuDataBuffer: ICloneable {
 	public long Step     { get; private set; }
 	public long DSPCycle { get; private set; }
 	
-	public byte[]?         ARAM_Data             { get; private set; }
-	public byte[]?         SMP_BusData           { get; private set; }
-	public byte[]?         DSP_RegisterMem       { get; private set; }
-	public bool[]?         Script700_Breakpoints { get; private set; }
-	public DSPVoice1[]?    DSP_Voice             { get; private set; }
-	public DSP2State?      DSP_State             { get; private set; }
-	public DSP3State?      DSP_DebugState        { get; private set; }
-	public SPCState?       SPC_State             { get; private set; }
-	public SMPState?       SMP_State             { get; private set; }
-	public Script700State? Script700_State       { get; private set; }
+	public byte[]?             ARAM_Data             { get; private set; }
+	public byte[]?             SMP_BusData           { get; private set; }
+	public byte[]?             DSP_RegisterMem       { get; private set; }
+	public bool[]?             Script700_Breakpoints { get; private set; }
+	public SMP.MemAccessLog[]? SMP_AccessLogs        { get; private set; }
+	public DSPVoice1[]?        DSP_Voice             { get; private set; }
+	public DSP2State?          DSP_State             { get; private set; }
+	public DSP3State?          DSP_DebugState        { get; private set; }
+	public SPCState?           SPC_State             { get; private set; }
+	public SMPState?           SMP_State             { get; private set; }
+	public Script700State?     Script700_State       { get; private set; }
 	
 	static long nextStep = 0;
 	
@@ -312,6 +314,10 @@ public class EmuDataBuffer: ICloneable {
 			for (var i = 0; i < 0x80; i++) {
 				DSP_RegisterMem[i] = emu.DSP.Register[i];
 			}
+		}
+		
+		if ((requests & Transfer.Requests.MemLogs) != 0) {
+			SMP_AccessLogs = emu.SMP.GetAccessLogsDeduped(Math.Max(0, DSPCycle - 240));
 		}
 		
 		if ((requests & Transfer.Requests.DSP_1) != 0) {
@@ -397,6 +403,7 @@ public class EmuDataBuffer: ICloneable {
 				PC           = emu.SPC.State.PC,
 				
 				PSW          = emu.SPC.State.PSW,
+				Mode         = emu.SPC.State.Mode,
 				
 				InstrStartPC = emu.SPC.State.InstructionStartPC,
 			};
@@ -483,6 +490,7 @@ public class EmuDataBuffer: ICloneable {
 		if ((requests & Transfer.Requests.ARAM)            != 0) result = result && ARAM_Data             is not null;
 		if ((requests & Transfer.Requests.SMP_Bus)         != 0) result = result && SMP_BusData           is not null;
 		if ((requests & Transfer.Requests.DSP_RegisterMem) != 0) result = result && DSP_RegisterMem       is not null;
+		if ((requests & Transfer.Requests.MemLogs)         != 0) result = result && SMP_AccessLogs        is not null;
 		if ((requests & Transfer.Requests.DSP_1)           != 0) result = result && DSP_Voice             is not null;
 		if ((requests & Transfer.Requests.DSP_2)           != 0) result = result && DSP_State             is not null;
 		if ((requests & Transfer.Requests.DSP_3)           != 0) result = result && DSP_DebugState        is not null;
@@ -507,6 +515,10 @@ public class EmuDataBuffer: ICloneable {
 		
 		if (DSP_RegisterMem is not null) {
 			clone.DSP_RegisterMem = DSP_RegisterMem.ToArray();
+		}
+		
+		if (SMP_AccessLogs is not null) {
+			clone.SMP_AccessLogs = SMP_AccessLogs.Select(x => x.Clone()).ToArray();
 		}
 		
 		if (Script700_Breakpoints is not null) {
@@ -549,6 +561,7 @@ public class EmuDataBuffer: ICloneable {
 		ARAM_Data             = null;
 		SMP_BusData           = null;
 		DSP_RegisterMem       = null;
+		SMP_AccessLogs        = null;
 		Script700_Breakpoints = null;
 		DSP_Voice             = null;
 		DSP_State             = null;

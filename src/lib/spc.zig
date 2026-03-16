@@ -15,7 +15,8 @@ pub const State = extern struct {
     sp: ?[*]u8  = null,
     pc: ?[*]u16 = null,
 
-    psw: ?[*]u8 = null,
+    psw:  ?[*]u8 = null,
+    mode: ?[*]u8 = null,
 
     instruction_start_pc: ?[*]u16 = null,
 };
@@ -32,7 +33,8 @@ pub inline fn get_cpu_state(emu_ptr: ?*Emu) !State {
         .sp = @ptrCast(&ep.?.s_smp.spc.state.sp),
         .pc = @ptrCast(&ep.?.s_smp.spc.state.pc),
 
-        .psw = @ptrCast(&ep.?.s_smp.spc.state.psw),
+        .psw  = @ptrCast(&ep.?.s_smp.spc.state.psw),
+        .mode = @ptrCast(&ep.?.s_smp.spc.state.mode),
 
         .instruction_start_pc = @ptrCast(&ep.?.s_smp.spc.state.instruction_start_pc),
     };
