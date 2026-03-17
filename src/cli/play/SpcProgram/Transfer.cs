@@ -142,10 +142,10 @@ public static class Transfer {
 		}
 	}
 	
-	public static void SendEmuData() {
+	public static void SendEmuData(long instrStep) {
 		// Transfer data from emu to main thread which the UI requests
 		Comm.UseBufferEmu(container => {
-			container.Buffer = new(emu.DSP.CurrentCycle);
+			container.Buffer = new(emu.DSP.CurrentCycle, instrStep);
 			container.Buffer.RequestPopulate(emu, GetRequests(), memRequestStart, memRequestLength);
 		});
 		

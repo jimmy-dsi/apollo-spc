@@ -247,8 +247,9 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
-	public long Step     { get; private set; }
-	public long DSPCycle { get; private set; }
+	public long Step      { get; private set; }
+	public long DSPCycle  { get; private set; }
+	public long InstrStep { get; private set; }
 	
 	public byte[]?             ARAM_Data             { get; private set; }
 	public byte[]?             SMP_BusData           { get; private set; }
@@ -264,13 +265,39 @@ public class EmuDataBuffer: ICloneable {
 	
 	static long nextStep = 0;
 	
-	public EmuDataBuffer(long dspCycle) {
+	public EmuDataBuffer(long dspCycle, long instrStep) {
 		DSPCycle = dspCycle;
 		Step = nextStep;
+		InstrStep = instrStep;
 		nextStep++;
 	}
 	
+	const int QueueLimit = 4;
+	
+	public static EmuDataBuffer[] GenBufferQueue {
+		get {
+			lock (genBufferLock) {
+				return genBufferQueue.ToArray();
+			}
+		}
+	}
+	
+	static Queue<EmuDataBuffer> genBufferQueue = new();
+	static object               genBufferLock  = new();
+	
 	public void RequestPopulate(Emulator emu, Transfer.Requests requests, Int32 startAddr = 0, UInt32 length = 0x100) {
+		// Shift Buffer queue
+		lock (genBufferLock) {
+			if (genBufferQueue.Count == 0 || InstrStep != genBufferQueue.Peek().InstrStep) {
+				
+				genBufferQueue.Enqueue(this);
+				
+				if (genBufferQueue.Count > QueueLimit) {
+					genBufferQueue.Dequeue();
+				}
+			}
+		}
+		
 		resetToNull();
 		
 		if ((requests & Transfer.Requests.ARAM) != 0) {
@@ -503,7 +530,7 @@ public class EmuDataBuffer: ICloneable {
 	}
 	
 	public EmuDataBuffer Clone() {
-		EmuDataBuffer clone = new(DSPCycle);
+		EmuDataBuffer clone = new(DSPCycle, InstrStep);
 		
 		if (ARAM_Data is not null) {
 			clone.ARAM_Data = ARAM_Data.ToArray();

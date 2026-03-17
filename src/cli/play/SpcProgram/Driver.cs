@@ -71,6 +71,7 @@ public static class Driver {
 	static int cycleSpillOver = 0;
 	
 	static bool paused = false;
+	static long instrStep = 0;
 	
 	const int MaxConsecutiveTimeouts = 90;
 	const int BusyloopReliefMS       = 20;
@@ -95,6 +96,8 @@ public static class Driver {
 					
 					emu.StepInstruction();
 					Transfer.StepSignal.Reset();
+					
+					instrStep++;
 					
 					return;
 				}
@@ -126,7 +129,7 @@ public static class Driver {
 				// Copy managed array into unmanaged buffer
 				Marshal.Copy(buffer, 0, stream, numShorts);
 				
-				Transfer.SendEmuData();
+				Transfer.SendEmuData(instrStep);
 				advanceFrame();
 			}
 		}

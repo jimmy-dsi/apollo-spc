@@ -20,7 +20,9 @@ public static partial class CliMain {
 	static View? tracePrevView      = null;
 	static int   tracePrevViewIndex = 0;
 	
-	static void showTraceLogger(EmuDataBuffer buffer) {
+	static long lastEmuInstrStep = 0;
+	
+	static void showTraceLogger(EmuDataBuffer buffer, EmuDataBuffer[]? prevBuffers = null, int recurseLevel = 1) {
 		Display.UseBufferBlending = false;
 		
 		if (UI_State == State.Paused) {
@@ -64,6 +66,34 @@ public static partial class CliMain {
 				return;
 			}
 			
+			if (InstructionsSinceTrace > 1 && lastEmuInstrStep == buffer.InstrStep) {
+				return;
+			}
+			
+			if (InstructionsSinceTrace == 1 && lastEmuInstrStep == buffer.InstrStep) {
+				lastEmuInstrStep = buffer.InstrStep - 1;
+			}
+			
+			// Recurse once if we have skipped one instruction
+			if (buffer.InstrStep - lastEmuInstrStep > 1 && recurseLevel > 0) {
+				EmuDataBuffer? backBuffer = null;
+				prevBuffers ??= EmuDataBuffer.GenBufferQueue;
+				
+				var earliestAfterThis = buffer.InstrStep;
+				
+				foreach (var buf in prevBuffers) {
+					if (buf.InstrStep < earliestAfterThis && buf.InstrStep > lastEmuInstrStep) {
+						earliestAfterThis = buf.InstrStep;
+						backBuffer = buf;
+					}
+				}
+				
+				if (backBuffer is not null) {
+					showTraceLogger(backBuffer, prevBuffers, recurseLevel: (int) (buffer.InstrStep - lastEmuInstrStep));
+					InstructionsSinceTrace++;
+				}
+			}
+			
 			refreshSignal = 0;
 			
 			var spc = buffer.SPC_State!;
@@ -75,7 +105,7 @@ public static partial class CliMain {
 			var x = 0;
 			var y = InstructionsSinceTrace - 1;
 			
-			if (y >= Display.ColorBuffer.Count) {
+			while (y >= Display.VirtualSize) {
 				Display.AddBufferRow();
 			}
 			
@@ -193,6 +223,7 @@ public static partial class CliMain {
 			);
 			
 			NextInstructionsSinceTrace = InstructionsSinceTrace + 1;
+			lastEmuInstrStep = buffer.InstrStep;
 		}
 	}
 	
