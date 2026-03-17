@@ -1,5 +1,8 @@
+using System.Xml;
+
 namespace SpcProgram;
 
+using System.Text;
 using System.Diagnostics;
 
 using Jimbl;
@@ -227,6 +230,20 @@ public static partial class CliMain {
 		}
 	}
 	
+	static HashSet<string> ctrlFlowInstrs = new() {
+		"bbc", "bbs", "bcc", "bcs", "beq", "bmi", "bne", "bpl", "bra", "brk", "bvc", "bvs",
+		"call", "cbne",
+		"dbnz",
+		"jmp",
+		"pcall",
+		"ret", "reti",
+		"sleep", "stop",
+		"tcall"
+	};
+	
+	static AnsiColor defaultInsColor  = new(AnsiColor.Code.BrightBlue);
+	static AnsiColor ctrlFlowInsColor = new(AnsiColor.Code.BrightMagenta);
+	
 	static void unhighlight(int lineNumber) {
 		lineNumber %= Display.MaxBufferRows;
 		
@@ -234,9 +251,51 @@ public static partial class CliMain {
 			return;
 		}
 		
-		var line = Display.ColorBuffer[lineNumber];
-		for (var i = 0; i < line.Length; i++) {
-			line[i] = null;
+		var chars  = Display .CharBuffer[lineNumber];
+		var colors = Display.ColorBuffer[lineNumber];
+		
+		for (var i = 0; i < colors.Length; i++) {
+			colors[i] = null;
+		}
+		
+		var insStart = 8;
+		StringBuilder sb = new();
+		
+		for (var i = insStart; i < chars.Length; i++) {
+			if (chars[i] != ' ') {
+				sb.Append(chars[i]);
+			}
+			else {
+				break;
+			}
+		}
+		
+		var insName = sb.ToString();
+		if (ctrlFlowInstrs.Contains(insName)) {
+			for (var i = 0; i < insName.Length; i++) {
+				colors[insStart + i] = ctrlFlowInsColor;
+			}
+		}
+		else {
+			for (var i = 0; i < insName.Length; i++) {
+				colors[insStart + i] = defaultInsColor;
+			}
+		}
+		
+		for (var i = insStart + insName.Length; i < insStart + 20; i++) {
+			var ch = chars[i];
+			if (ch is 'a' or 'x' or 'y') {
+				colors[i] = new(AnsiColor.Code.BrightCyan);
+			}
+			else if (ch is '$' or '#' or >= '0' and <= '9' or >= 'A' and <= 'F') {
+				colors[i] = new(AnsiColor.Code.BrightYellow);
+			}
+			else if (ch is '[' or ']' or '(' or ')') {
+				colors[i] = new(AnsiColor.Code.White);
+			}
+			else {
+				colors[i] = new(AnsiColor.Code.Grey);
+			}
 		}
 	}
 	
