@@ -954,7 +954,7 @@ public static partial class CliMain {
 			}
 			
 			case View.MemoryViewer: {
-				requestEmuData(Transfer.Requests.SMP_Bus);
+				requestEmuData(Transfer.Requests.SMP_Bus | Transfer.Requests.SPC_Regs | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.CurrentBufferId = "aram";
 				Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
 				Display.EnableWindow();
@@ -962,13 +962,13 @@ public static partial class CliMain {
 			}
 			
 			case View.DSPViewer1: {
-				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1);
+				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.HideWindow();
 				break;
 			}
 			
 			case View.DSPViewer2: {
-				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2);
+				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.HideWindow();
 				break;
 			}
@@ -1077,11 +1077,30 @@ public static partial class CliMain {
 		Bit8, Bit16, Bit24, Bit32, Bit64
 	}
 	
+	static AnsiColor writeRegColor = new(AnsiColor.Code.Black, AnsiColor.Code.White);
+	static AnsiColor writeErrColor = new(AnsiColor.Code.BrightRed);
+	static AnsiColor writeRomColor = new(AnsiColor.Code.BrightCyan);
+	static AnsiColor writeColor    = new(AnsiColor.Code.Cyan,    isBG: true);
+	static AnsiColor pcColor       = new(AnsiColor.Code.Magenta, isBG: true);
+	static AnsiColor execColor     = new(AnsiColor.Code.Blue,    isBG: true);
+	static AnsiColor fetchColor    = new(AnsiColor.Code.BrightBlue);
+	static AnsiColor readColor     = new(AnsiColor.Code.Green,   isBG: true);
+	static AnsiColor readRegColor1 = new(AnsiColor.Code.Yellow,  isBG: true);
+	static AnsiColor readRegColor2 = new(250, 125, 25,           isBG: true);
+	static AnsiColor readErrColor  = new(AnsiColor.Code.Red,     isBG: true);
+	static AnsiColor readRomColor  = new(AnsiColor.Code.Grey,    isBG: true);
+	
 	static void memDisplayRows(BusSize addrBusSize,
 	                           int startRow,
 	                           int endRow,
 	                           byte[] data,
 	                           AnsiColor?[]? colorData = null,
+	                           SMP.MemAccessLog[]? memLogs = null,
+	                           bool readDisabled   = false,
+	                           bool writeDisabled  = false,
+	                           bool bootRomEnabled = false,
+	                           UInt32? pc = null,
+	                           bool isDSP = false,
 	                           bool useHeatMap = false,
 	                           int yOffset = 0,
 	                           bool writeToScrollBuf = false)
@@ -1093,6 +1112,60 @@ public static partial class CliMain {
 		
 		for (var i = startRow; i <= endRow; i++) {
 			var startAddr = (uint) i * 16;
+			
+			AnsiColor? getColor(int c) {
+				var realAddr = startAddr + c;
+				var idx      = (i - startRow) * 16 + c;
+				
+				var color = colorData?[idx];
+				
+				if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Write) is not null) {
+					if (realAddr is >= 0x0F0 and <= 0x00FF) {
+						color = writeRegColor;
+					}
+					else if (writeDisabled) {
+						color = writeErrColor;
+					}
+					else if (realAddr >= 0xFFC0 && bootRomEnabled) {
+						color = writeRomColor;
+					}
+					else {
+						color = writeColor;
+					}
+				}
+				else if (realAddr == pc) {
+					color = pcColor;
+				}
+				else if (memLogs?.FirstOrDefault()?.Type == SMP.MemAccessLog.LogType.Exec && memLogs[0].Address == realAddr) {
+					color = execColor;
+				}
+				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Fetch) is not null) {
+					color = fetchColor;
+				}
+				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Fetch) is not null) {
+					color = fetchColor;
+				}
+				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Read) is not null) {
+					if (realAddr is >= 0x0F0 and <= 0x00FC) {
+						color = readRegColor1;
+					}
+					else if (realAddr is >= 0x0FD and <= 0x00FF) {
+						color = readRegColor2;
+					}
+					else if (realAddr >= 0xFFC0 && bootRomEnabled) {
+						color = readRomColor;
+					}
+					else if (readDisabled) {
+						color = readErrColor;
+					}
+					else {
+						color = readColor;
+					}
+				}
+				
+				return color;
+			}
+
 			switch (addrBusSize) {
 				case BusSize.Bit8: {
 					Display.Write($"{startAddr:X2} | ", writeToScrollBuf: writeToScrollBuf);
@@ -1116,7 +1189,10 @@ public static partial class CliMain {
 				var idx = (i - startRow) * 16 + c;
 				
 				if (idx >= 0 && idx < data.Length) {
-					Display.Write($"{data[idx]:X2} ", col: colorData?[idx], writeToScrollBuf: writeToScrollBuf);
+					var color = getColor(c);
+					
+					Display.Write($"{data[idx]:X2}", col: color, writeToScrollBuf: writeToScrollBuf);
+					Display.Write(" ", writeToScrollBuf: writeToScrollBuf);
 				}
 			}
 			Display.Write("| ", writeToScrollBuf: writeToScrollBuf);
@@ -1137,8 +1213,10 @@ public static partial class CliMain {
 					var idx = (i - startRow) * 16 + c;
 					
 					if (idx >= 0 && idx < data.Length) {
-						var val = data[idx];
-						Display.Write($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}", col: colorData?[idx], writeToScrollBuf: writeToScrollBuf);
+						var val   = data[idx];
+						var color = getColor(c);
+
+						Display.Write($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}", col: color, writeToScrollBuf: writeToScrollBuf);
 					}
 				}
 				Display.Write(new string(' ', 16), writeToScrollBuf: writeToScrollBuf);

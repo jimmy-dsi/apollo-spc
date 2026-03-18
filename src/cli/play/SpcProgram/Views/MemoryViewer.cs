@@ -19,6 +19,11 @@ public static partial class CliMain {
 			startRow,
 			endRow,
 			buffer.SMP_BusData!,
+			memLogs: logsSinceLastExec(buffer, filtered: false, inclExec: true),
+			bootRomEnabled: buffer.SMP_State!.UseBootROM,
+			readDisabled: buffer.SMP_State!.RAMDisable,
+			writeDisabled: buffer.SMP_State!.RAMDisable || !buffer.SMP_State!.RAMWriteEnable,
+			pc: buffer.SPC_State?.PC,
 			useHeatMap: heatMapEnabled,
 			yOffset: startRow,
 			writeToScrollBuf: true

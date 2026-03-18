@@ -1,5 +1,3 @@
-using System.Xml;
-
 namespace SpcProgram;
 
 using System.Text;
@@ -101,7 +99,10 @@ public static partial class CliMain {
 			
 			var spc = buffer.SPC_State!;
 			
-			AnsiColor? highlight = new(AnsiColor.Code.Magenta, isBG: true);
+			var highlightCode = AnsiColor.Code.Magenta;
+			
+			AnsiColor? highlight     = new(highlightCode, isBG: true);
+			AnsiColor? highlightName = new(highlightCode, isBG: true, isBold: true);
 			
 			Display.ScrollTop = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows - ScrollOffset);
 			
@@ -202,13 +203,14 @@ public static partial class CliMain {
 			}
 			
 			var instructionBytes = SPC.GetInstructionLength(spc.ExecData[0]);
+			var insParts         = SPC.DecodeInstruction(pc, spc.ExecData[0], spc.ExecData[1..]).Split(' ', 2);
 			
-			Display.Write(
-				$"{pc:X4} |  {SPC.DecodeInstruction(pc, spc.ExecData[0], spc.ExecData[1..])}",
-				x, y,
-				col: highlight,
-				writeToScrollBuf: true
-			);
+			var insName  = insParts[0];
+			var operands = string.Join(' ', insParts[1..]);
+			
+			Display.Write($"{pc:X4} |  ", x,                      y, col: highlight,     writeToScrollBuf: true);
+			Display.Write($"{insName} ",  x + 8,                  y, col: highlightName, writeToScrollBuf: true);
+			Display.Write($"{operands}",  x + 9 + insName.Length, y, col: highlight,     writeToScrollBuf: true);
 			
 			var byteString = string.Join(' ', spc.ExecData.Take(instructionBytes).Select(x => $"{x:X2}"));
 			
@@ -220,7 +222,7 @@ public static partial class CliMain {
 				
 			Display.Write(
 				$"A:{spc.A:X2} X:{spc.X:X2} Y:{spc.Y:X2} SP:{spc.SP:X2} {string.Join("", flagsString)}",
-				Display.Width - 31, y,
+				Display.Width - 30, y,
 				col: highlight,
 				writeToScrollBuf: true
 			);
@@ -241,8 +243,8 @@ public static partial class CliMain {
 		"tcall"
 	};
 	
-	static AnsiColor defaultInsColor  = new(AnsiColor.Code.BrightBlue);
-	static AnsiColor ctrlFlowInsColor = new(AnsiColor.Code.BrightMagenta);
+	static AnsiColor defaultInsColor  = new(AnsiColor.Code.BrightBlue,    isBold: true);
+	static AnsiColor ctrlFlowInsColor = new(AnsiColor.Code.BrightMagenta, isBold: true);
 	
 	static void unhighlight(int lineNumber) {
 		lineNumber %= Display.MaxBufferRows;
@@ -333,7 +335,7 @@ public static partial class CliMain {
 		return scrollOffset;
 	}
 	
-	static SMP.MemAccessLog[] logsSinceLastExec(EmuDataBuffer buffer) {
+	static SMP.MemAccessLog[] logsSinceLastExec(EmuDataBuffer buffer, bool filtered = true, bool inclExec = false) {
 		var logs = buffer.SMP_AccessLogs;
 		
 		List<SMP.MemAccessLog> newLogs = new();
@@ -341,10 +343,16 @@ public static partial class CliMain {
 		for (var i = logs.Length - 1; i >= 0; i--) {
 			var log = logs[i];
 			if (log.Type == SMP.MemAccessLog.LogType.Exec) {
+				if (inclExec) {
+					newLogs.Add(log);
+				}
 				break;
 			}
 			
 			if (log.Type is SMP.MemAccessLog.LogType.Read or SMP.MemAccessLog.LogType.Write) {
+				newLogs.Add(log);
+			}
+			else if (!filtered && log.Type is not SMP.MemAccessLog.LogType.DummyRead) {
 				newLogs.Add(log);
 			}
 		}

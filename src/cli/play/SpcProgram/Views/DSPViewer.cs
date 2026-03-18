@@ -409,7 +409,9 @@ public static partial class CliMain {
 			}
 		}
 		
-		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, coloring, useHeatMap: heatMapEnabled);
+		var dspLogs = getDspMemLogs(buffer);
+		
+		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, coloring, memLogs: dspLogs, useHeatMap: heatMapEnabled);
 	}
 	
 	static byte vFlagsToByte(bool[] flags) {
@@ -418,5 +420,50 @@ public static partial class CliMain {
 			result |= (byte) ((flags[v] ? 1 : 0) << v);
 		}
 		return result;
+	}
+	
+	static SMP.MemAccessLog[] getDspMemLogs(EmuDataBuffer buffer) {
+		var dspAddr = buffer.SMP_State!.DSPAddress;
+		
+		var logs = logsSinceLastExec(buffer, filtered: false, inclExec: true)
+		           .Where(x => x.Address is 0x00F2 or 0x00F3);
+		
+		List<SMP.MemAccessLog> dspLogs = new();
+		
+		foreach (var log in logs.Reverse()) {
+			if (log.Type == SMP.MemAccessLog.LogType.Write) {
+				if (log.Address == 0x00F2) {
+					dspAddr = log.PreData!.Value;
+				}
+				else if (log.Address == 0x00F3 && dspAddr < 0x80) {
+					SMP.MemAccessLog dspLog = new() {
+						Type      = log.Type,
+						DSPCycle  = log.DSPCycle,
+						Address   = dspAddr,
+						ReadData  = log.ReadData,
+						PreData   = log.PreData,
+						WriteData = log.WriteData,
+						PostData  = log.PostData
+					};
+					
+					dspLogs.Add(dspLog);
+				}
+			}
+			else if (log.Address == 0x00F3) {
+				SMP.MemAccessLog dspLog = new() {
+					Type      = log.Type,
+					DSPCycle  = log.DSPCycle,
+					Address   = (UInt16) (dspAddr & 0x7F),
+					ReadData  = log.ReadData,
+					PreData   = log.PreData,
+					WriteData = log.WriteData,
+					PostData  = log.PostData
+				};
+					
+				dspLogs.Add(dspLog);
+			}
+		}
+		
+		return ((IEnumerable<SMP.MemAccessLog>) dspLogs).Reverse().ToArray();
 	}
 }

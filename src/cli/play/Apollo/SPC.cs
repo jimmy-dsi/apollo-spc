@@ -717,6 +717,9 @@ public class SPC {
 			if (format.Length == 0) {
 				return 1;
 			}
+			else if (format.Length == 1 && format[0] == Format.TCall) {
+				return 1;
+			}
 			else if (format.Length == 1 && isRegister(format[0])) {
 				return 1;
 			}

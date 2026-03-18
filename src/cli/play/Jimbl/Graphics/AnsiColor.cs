@@ -17,6 +17,13 @@ public class AnsiColor {
 			
 			var str = "";
 			
+			if (IsBold) {
+				str += $"\x1B[1m";
+			}
+			else {
+				str += $"\x1B[22m";
+			}
+			
 			if (fgCode < 255) {
 				str += $"\x1B[{fgCode + 30}m";
 			}
@@ -45,6 +52,8 @@ public class AnsiColor {
 	
 	public bool IsFG => foregroundColor is not null 
 	                 && backgroundColor is     null;
+	
+	public bool IsBold { get; private init; } = false;
 	
 	public static AnsiColor Black   = new(Code.Black);
 	public static AnsiColor Red     = new(Code.Red);
@@ -110,7 +119,9 @@ public class AnsiColor {
 		}
 	}
 	
-	public AnsiColor(Color color, bool isBG = false) {
+	public AnsiColor(Color color, bool isBG = false, bool isBold = false) {
+		IsBold = isBold;
+		
 		if (isBG) {
 			BackgroundRGB = color;
 		}
@@ -119,7 +130,9 @@ public class AnsiColor {
 		}
 	}
 	
-	public AnsiColor(byte red, byte green, byte blue, bool isBG = false) {
+	public AnsiColor(byte red, byte green, byte blue, bool isBG = false, bool isBold = false) {
+		IsBold = isBold;
+		
 		if (isBG) {
 			BackgroundRGB = (red, green, blue);
 		}
@@ -128,7 +141,9 @@ public class AnsiColor {
 		}
 	}
 	
-	public AnsiColor(double red, double green, double blue, bool isBG = false) {
+	public AnsiColor(double red, double green, double blue, bool isBG = false, bool isBold = false) {
+		IsBold = isBold;
+
 		if (isBG) {
 			BackgroundRGB = (red, green, blue);
 		}
@@ -137,7 +152,9 @@ public class AnsiColor {
 		}
 	}
 	
-	public AnsiColor(Code code, bool isBG = false) {
+	public AnsiColor(Code code, bool isBG = false, bool isBold = false) {
+		IsBold = isBold;
+
 		if (isBG) {
 			BackgroundANSI = code;
 		}
@@ -146,52 +163,72 @@ public class AnsiColor {
 		}
 	}
 	
-	public AnsiColor(Color foreground, Color background) {
+	public AnsiColor(Color foreground, Color background, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundRGB = foreground;
 		BackgroundRGB = background;
 	}
 	
-	public AnsiColor(Color foreground, Code background) {
+	public AnsiColor(Color foreground, Code background, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundRGB  = foreground;
 		BackgroundANSI = background;
 	}
 	
-	public AnsiColor(Code foreground, Color background) {
+	public AnsiColor(Code foreground, Color background, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundANSI = foreground;
 		BackgroundRGB  = background;
 	}
 	
-	public AnsiColor(Code foreground, Code background) {
+	public AnsiColor(Code foreground, Code background, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundANSI = foreground;
 		BackgroundANSI = background;
 	}
 	
-	public AnsiColor(byte fgRed, byte fgGreen, byte fgBlue, byte bgRed, byte bgGreen, byte bgBlue) {
+	public AnsiColor(byte fgRed, byte fgGreen, byte fgBlue, byte bgRed, byte bgGreen, byte bgBlue, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundRGB = (fgRed, fgGreen, fgBlue);
 		BackgroundRGB = (bgRed, bgGreen, bgBlue);
 	}
 	
-	public AnsiColor(double fgRed, double fgGreen, double fgBlue, double bgRed, double bgGreen, double bgBlue) {
+	public AnsiColor(double fgRed, double fgGreen, double fgBlue, double bgRed, double bgGreen, double bgBlue, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundRGB = (fgRed, fgGreen, fgBlue);
 		BackgroundRGB = (bgRed, bgGreen, bgBlue);
 	}
 	
-	public AnsiColor(byte fgRed, byte fgGreen, byte fgBlue, Code background) {
+	public AnsiColor(byte fgRed, byte fgGreen, byte fgBlue, Code background, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundRGB  = (fgRed, fgGreen, fgBlue);
 		BackgroundANSI = background;
 	}
 	
-	public AnsiColor(double fgRed, double fgGreen, double fgBlue, Code background) {
+	public AnsiColor(double fgRed, double fgGreen, double fgBlue, Code background, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundRGB  = (fgRed, fgGreen, fgBlue);
 		BackgroundANSI = background;
 	}
 	
-	public AnsiColor(Code foreground, byte bgRed, byte bgGreen, byte bgBlue) {
+	public AnsiColor(Code foreground, byte bgRed, byte bgGreen, byte bgBlue, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundANSI = foreground;
 		BackgroundRGB  = (bgRed, bgGreen, bgBlue);
 	}
 	
-	public AnsiColor(Code foreground, double bgRed, double bgGreen, double bgBlue) {
+	public AnsiColor(Code foreground, double bgRed, double bgGreen, double bgBlue, bool isBold = false) {
+		IsBold = isBold;
+
 		ForegroundANSI = foreground;
 		BackgroundRGB  = (bgRed, bgGreen, bgBlue);
 	}
@@ -236,7 +273,7 @@ public class AnsiColor {
 			bgMatch = colorb1 == colorb2;
 		}
 		
-		return fgMatch && bgMatch;
+		return fgMatch && bgMatch && lhs.IsBold == rhs.IsBold;
 	}
 	
 	public static bool operator != (AnsiColor? lhs, AnsiColor? rhs) => !(lhs == rhs);
