@@ -233,18 +233,42 @@ public static partial class CliMain {
 	}
 	
 	static HashSet<string> ctrlFlowInstrs = new() {
-		"bbc", "bbs", "bcc", "bcs", "beq", "bmi", "bne", "bpl", "bra", "brk", "bvc", "bvs",
+		"bbc", "bbs", "bcc", "bcs", "beq", "bmi", "bne", "bpl", "bra", "bvc", "bvs",
 		"call", "cbne",
 		"dbnz",
 		"jmp",
+		"ret", "reti"
+	};
+	
+	static HashSet<string> vecInstrs = new() {
+		"brk",
 		"pcall",
-		"ret", "reti",
-		"sleep", "stop",
 		"tcall"
 	};
 	
-	static AnsiColor defaultInsColor  = new(AnsiColor.Code.BrightBlue,    isBold: true);
-	static AnsiColor ctrlFlowInsColor = new(AnsiColor.Code.BrightMagenta, isBold: true);
+	static HashSet<string> stackFlagInstrs = new() {
+		"and1",
+		"clrc", "clrp", "clrv",
+		"di",
+		"ei", "eor1",
+		"mov1",
+		"notc",
+		"or1",
+		"pop", "push",
+		"setc", "setp"
+	};
+	
+	static HashSet<string> nopInstrs = new() {
+		"nop",
+		"sleep"
+	};
+	
+	static AnsiColor defaultInsColor   = new(AnsiColor.Code.BrightBlue,    isBold: true);
+	static AnsiColor ctrlFlowInsColor  = new(AnsiColor.Code.BrightMagenta, isBold: true);
+	static AnsiColor vecInsColor       = new(AnsiColor.Code.Yellow,        isBold: true);
+	static AnsiColor stackFlagInsColor = new(AnsiColor.Code.Green,         isBold: true);
+	static AnsiColor nopInsColor       = new(AnsiColor.Code.DarkGrey,      isBold: true);
+	static AnsiColor stopInsColor      = new(AnsiColor.Code.Red,           isBold: true);
 	
 	static void unhighlight(int lineNumber) {
 		lineNumber %= Display.MaxBufferRows;
@@ -278,6 +302,26 @@ public static partial class CliMain {
 				colors[insStart + i] = ctrlFlowInsColor;
 			}
 		}
+		else if (vecInstrs.Contains(insName)) {
+			for (var i = 0; i < insName.Length; i++) {
+				colors[insStart + i] = vecInsColor;
+			}
+		}
+		else if (stackFlagInstrs.Contains(insName)) {
+			for (var i = 0; i < insName.Length; i++) {
+				colors[insStart + i] = stackFlagInsColor;
+			}
+		}
+		else if (nopInstrs.Contains(insName)) {
+			for (var i = 0; i < insName.Length; i++) {
+				colors[insStart + i] = nopInsColor;
+			}
+		}
+		else if (insName == "stop") {
+			for (var i = 0; i < insName.Length; i++) {
+				colors[insStart + i] = stopInsColor;
+			}
+		}
 		else {
 			for (var i = 0; i < insName.Length; i++) {
 				colors[insStart + i] = defaultInsColor;
@@ -286,7 +330,7 @@ public static partial class CliMain {
 		
 		for (var i = insStart + insName.Length; i < insStart + 20; i++) {
 			var ch = chars[i];
-			if (ch is 'a' or 'x' or 'y') {
+			if (ch is 'a' or 'x' or 'y' or 'p' or 's' or 'w' or 'c') {
 				colors[i] = new(AnsiColor.Code.BrightCyan);
 			}
 			else if (ch is '$' or '#' or >= '0' and <= '9' or >= 'A' and <= 'F') {
