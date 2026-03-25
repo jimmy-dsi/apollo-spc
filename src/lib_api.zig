@@ -353,6 +353,10 @@ pub export fn script700_get_label_addresses(emu_ptr: ?[*]Emu) ?[*]u32 {
     return @ptrCast(script700.get_label_addresses(@ptrCast(emu_ptr)) catch |e| emu.nerr([]u32, e, @ptrCast(emu_ptr)));
 }
 
+pub export fn script700_compile_instruction(instr: script700.InstrInfo) script700.CompiledInstr {
+    return script700.compile_instruction(instr) catch |e| main.derr(script700.CompiledInstr, e);
+}
+
 // Buffer
 pub export fn buffer_create(num_bytes: u32) ?[*]u8 {
     return @ptrCast(buffer.create(num_bytes) catch |e| main.nerr([]u8, e));

@@ -4,7 +4,7 @@ using Jimbl;
 
 using System.Text;
 
-public class Script700 {
+public partial class Script700 {
 	static Dictionary<string, int> mnemonicTable = new() {
 		["a"]   = 2,
 		["bp"]  = 1,
@@ -663,6 +663,107 @@ public class Script700 {
 		}
 		finally {
 			Emulator.MaybeReleaseLock();
+		}
+	}
+	
+	public class Operand {
+		public string? Prefix { get; internal init; }
+		public UInt32? Value  { get; internal init; }
+		
+		internal static Operand New(string? prefix, UInt32? value) {
+			return new() {
+				Prefix = prefix,
+				Value  = value
+			};
+		}
+		
+		internal Operand() { }
+		
+		public Operand(string prefix) {
+			Prefix = prefix;
+			Value  = null;
+		}
+		
+		public Operand(UInt32 value) {
+			Prefix = null;
+			Value  = value;
+		}
+		
+		public Operand(string prefix, UInt32 value) {
+			Prefix = prefix;
+			Value  = value;
+		}
+	}
+	
+	public static uint[] CompileInstruction(string mnemonic) =>
+		compileInstruction(mnemonic, null, null, null, null, null);
+	
+	public static uint[] CompileInstruction(string mnemonic, Operand operand) =>
+		compileInstruction(mnemonic, operand.Prefix, operand.Value, null, null, null);
+	
+	public static uint[] CompileInstruction(string mnemonic, Operand operandA, Operand operandB) =>
+		compileInstruction(mnemonic, operandA.Prefix, operandA.Value, null, operandB.Prefix, operandB.Value);
+	
+	public static uint[] CompileInstruction(string mnemonic, Operand operandA, char? infixOp, Operand operandB) =>
+		compileInstruction(mnemonic, operandA.Prefix, operandA.Value, infixOp, operandB.Prefix, operandB.Value);
+	
+	public static uint[] CompileInstruction(string mnemonic, string opPrefix) =>
+		compileInstruction(mnemonic, opPrefix, null, null, null, null);
+	
+	public static uint[] CompileInstruction(string mnemonic, UInt32 opValue) =>
+		compileInstruction(mnemonic, null, opValue, null, null, null);
+	
+	public static uint[] CompileInstruction(string mnemonic, string opPrefix, UInt32 opValue) =>
+		compileInstruction(mnemonic, opPrefix, opValue, null, null, null);
+	
+	public static uint[] CompileInstruction(string mnemonic, string? opPrefixA, UInt32? opValueA, string? opPrefixB, UInt32? opValueB) =>
+		compileInstruction(mnemonic, opPrefixA, opValueA, null, opPrefixB, opValueB);
+	
+	public static uint[] CompileInstruction(string mnemonic, string? opPrefixA, UInt32? opValA, char? infixOp, string? opPrefixB, UInt32? opValB) =>
+		compileInstruction(mnemonic, opPrefixA, opValA, infixOp, opPrefixB, opValB);
+	
+	static UInt32[] compileInstruction(string mnemonic, string? opPrefixA, UInt32? opValueA, char? infixOp, string? opPrefixB, UInt32? opValueB) {
+		unsafe {
+			DLL.InstrInfo instrInfo = new();
+			
+			for (var i = 0; i < 3; i++) {
+				instrInfo.Mnemonic[i] = (byte) (i < mnemonic.Length ? mnemonic[i] : 0);
+				
+				if (opPrefixA is null) {
+					instrInfo.Oper1Prefix[i] = 0;
+				}
+				else {
+					instrInfo.Oper1Prefix[i] = (byte) (i < opPrefixA.Length ? opPrefixA[i] : i == opPrefixA.Length ? 0 : 0xFF);
+				}
+				
+				if (opPrefixB is null) {
+					instrInfo.Oper2Prefix[i] = 0;
+				}
+				else {
+					instrInfo.Oper2Prefix[i] = (byte) (i < opPrefixB.Length ? opPrefixB[i] : i == opPrefixB.Length ? 0 : 0xFF);
+				}
+			}
+			
+			instrInfo.Oper1HasValue = (byte) (opValueA is not null ? 1 : 0);
+			instrInfo.Oper2HasValue = (byte) (opValueB is not null ? 1 : 0);
+			
+			instrInfo.Oper1Value = opValueA is not null ? opValueA!.Value : 0;
+			instrInfo.Oper2Value = opValueB is not null ? opValueB!.Value : 0;
+			
+			instrInfo.Operator = (byte) (infixOp is not null ? infixOp!.Value : 0);
+			
+			var compiled = DLL.Script700CompileInstruction(instrInfo);
+			if (compiled.Length == 0) {
+				var errorCode = DLL.GetLastError();
+				Error.Throw(errorCode);
+			}
+			
+			var result = new UInt32[compiled.Length];
+			for (var i = 0; i < compiled.Length; i++) {
+				result[i] = compiled.WordData[i];
+			}
+			
+			return result;
 		}
 	}
 	

@@ -1,6 +1,7 @@
 namespace SpcProgram;
 
 using Apollo;
+using Jimbl;
 using Jimbl.Graphics;
 
 public static partial class CliMain {
@@ -55,9 +56,21 @@ public static partial class CliMain {
 			PrimaryEmu.LoadSpcFile(spcFilePath);
 			PrimaryEmu.SMP.LoggingEnabled = true;
 			
-			// Enable Script700 if binary file is present
+			// Enable Script700 if binary or source file is present
 			var scriptBinary = Script700.BinaryFile(spcFilePath);
-			if (scriptBinary is not null) {
+			var scriptSource = Script700.ScriptFile(spcFilePath);
+			
+			if (scriptSource is not null &&
+			   (scriptBinary is null || Env.DateModified(scriptSource) >= Env.DateModified(scriptBinary)))
+			{
+				var binaryData = Script700.Compile(File.ReadAllText(scriptSource));
+				
+				scriptBinary = Env.StripExtension(scriptSource) + ".7sb";
+				File.WriteAllBytes(scriptBinary, binaryData);
+				
+				PrimaryEmu.Script700.LoadBinaryFile(binaryData);
+			}
+			else if (scriptBinary is not null) {
 				PrimaryEmu.Script700.LoadBinaryFile(File.ReadAllBytes(scriptBinary));
 			}
 			

@@ -32,6 +32,25 @@ pub const State = extern struct {
     wait_port:   ?[*]u8  = null,
 };
 
+pub const InstrInfo = extern struct {
+    mnemonic: [3]u8,
+
+    oper_1_prefix:    [3]u8,
+    oper_1_has_value:    u8,
+    oper_1_value:        u32,
+
+    operator: u8,
+
+    oper_2_prefix:    [3]u8,
+    oper_2_has_value:    u8,
+    oper_2_value:        u32,
+};
+
+pub const CompiledInstr = extern struct {
+    word_data: [4]u32 = .{0, 0, 0, 0},
+    length:       u32 = 0,
+};
+
 pub inline fn get_state(emu_ptr: ?*Emu) !State {
     var ep = emu.get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);
@@ -146,4 +165,55 @@ pub inline fn get_label_addresses(emu_ptr: ?*Emu) ![]u32 {
     try main.validate_ptr(Emu, ep);
 
     return &ep.?.script700.label_addresses;
+}
+
+pub inline fn compile_instruction(instr: InstrInfo) !CompiledInstr {
+    const mn_len = get_buf_len(&instr.mnemonic);
+
+    const mnemonic = instr.mnemonic[0 .. mn_len];
+
+    const p1_len = get_buf_len(&instr.oper_1_prefix);
+    const p2_len = get_buf_len(&instr.oper_2_prefix);
+
+    var oper = Script700.Operands { };
+
+    oper.oper_1_prefix = if (p1_len == 0 and instr.oper_1_prefix[1] == 0) null else instr.oper_1_prefix[0 .. p1_len];
+    oper.oper_1_value  = if (instr.oper_1_has_value != 0) instr.oper_1_value else null;
+
+    oper.operator = if (instr.operator == 0) null else instr.operator;
+
+    oper.oper_2_prefix = if (p2_len == 0 and instr.oper_2_prefix[1] == 0) null else instr.oper_2_prefix[0 .. p2_len];
+    oper.oper_2_value  = if (instr.oper_2_has_value != 0) instr.oper_2_value else null;
+
+    // Prepare return object
+    var result = CompiledInstr { };
+    inline for (0..4) |i| {
+        result.word_data[i] = 0;
+    }
+    result.length = 0;
+
+    const res = Script700.compile_instruction(&result.word_data, mnemonic, oper);
+    if (res) |r| {
+        result.length = @intCast(r.len);
+        for (0..r.len) |i| {
+            result.word_data[i] = r[i];
+        }
+        return result;
+    }
+    else |err| {
+        return err;
+    }
+}
+
+inline fn get_buf_len(buf: []const u8) u32 {
+    var len: u32 = 0;
+
+    for (buf) |item| {
+        if (item == 0) {
+            break;
+        }
+        len +%= 1;
+    }
+
+    return len;
 }

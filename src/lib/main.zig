@@ -32,10 +32,11 @@ pub const Result = enum(u32) {
                             
     script700_timeout       = 10,
     script700_load_error    = 11,
+    script700_compile_error = 12,
 
-    emu_is_not_main         = 12,
+    emu_is_not_main         = 13,
 
-    spc_not_loaded          = 13,
+    spc_not_loaded          = 14,
 };
 
 pub const LogType = enum(u32) {
@@ -147,7 +148,9 @@ pub inline fn err(e: anyerror) anyerror {
             SPCLoadError.MissingFileHeader => .spc_missing_file_header,
             SPCLoadError.SizeTooShort      => .spc_size_too_short,
 
-            Emu.Error.Timeout => .script700_timeout,
+            Emu.Error.Timeout             => .script700_timeout,
+            Script700.Compile.no_space    => .script700_compile_error,
+            Script700.Compile.unencodable => .script700_compile_error,
 
             Emu.Error.NoSingletonAttached => .emu_is_not_main,
 
