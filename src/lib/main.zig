@@ -148,9 +148,12 @@ pub inline fn err(e: anyerror) anyerror {
             SPCLoadError.MissingFileHeader => .spc_missing_file_header,
             SPCLoadError.SizeTooShort      => .spc_size_too_short,
 
-            Emu.Error.Timeout             => .script700_timeout,
-            Script700.Compile.no_space    => .script700_compile_error,
-            Script700.Compile.unencodable => .script700_compile_error,
+            Emu.Error.Timeout                 => .script700_timeout,
+            Script700.Load.bytecode_too_large => .script700_load_error,
+            Script700.Load.data_too_large     => .script700_load_error,
+            Script700.Load.malformed_file     => .script700_load_error,
+            Script700.Compile.no_space        => .script700_compile_error,
+            Script700.Compile.unencodable     => .script700_compile_error,
 
             Emu.Error.NoSingletonAttached => .emu_is_not_main,
 
