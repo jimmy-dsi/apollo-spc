@@ -39,7 +39,7 @@ public static class Display {
 	public static bool UseBufferBlending { get; set; } = true;
 	
 	// Previous scrollable display color buffers
-	static List<      char[]>[]  prevCharBuffers = new List<      char[]>[]{};
+	static List<      char[]>[] prevCharBuffers  = new List<      char[]>[]{};
 	static List<AnsiColor?[]>[] prevColorBuffers = new List<AnsiColor?[]>[]{};
 	
 	static bool windowEnabled = false;
@@ -48,6 +48,13 @@ public static class Display {
 	static int windowTop    = 0;
 	static int windowWidth  = 0;
 	static int windowHeight = 0;
+	
+	static bool cutoutEnabled = false;
+	
+	static int cutoutLeft   = 0;
+	static int cutoutTop    = 0;
+	static int cutoutWidth  = 0;
+	static int cutoutHeight = 0;
 	
 	static int  scrollTop = 0;
 	static bool scrollBufPrevSource = false;
@@ -79,6 +86,11 @@ public static class Display {
 	public static JVector2I WindowTopRight    => (windowLeft + windowWidth, windowTop               );
 	public static JVector2I WindowBottomLeft  => (windowLeft,               windowTop + windowHeight);
 	public static JVector2I WindowBottomRight => (windowLeft + windowWidth, windowTop + windowHeight);
+
+	public static JVector2I CutoutTopLeft     => (cutoutLeft,               cutoutTop               );
+	public static JVector2I CutoutTopRight    => (cutoutLeft + cutoutWidth, cutoutTop               );
+	public static JVector2I CutoutBottomLeft  => (cutoutLeft,               cutoutTop + cutoutHeight);
+	public static JVector2I CutoutBottomRight => (cutoutLeft + cutoutWidth, cutoutTop + cutoutHeight);
 	
 	public static AnsiColor? Color {
 		get => color;
@@ -180,6 +192,20 @@ public static class Display {
 		
 		prevColorBuffers = pcb .ToArray();
 		prevCharBuffers  = pchb.ToArray();
+	}
+	
+	public static void EnableCutout(int portX, int portY, int portWidth, int portHeight) {
+		cutoutEnabled = true;
+		
+		cutoutLeft = portX;
+		cutoutTop  = portY;
+		
+		cutoutWidth  = portWidth;
+		cutoutHeight = portHeight;
+	}
+	
+	public static void DisableCutout() {
+		cutoutEnabled = false;
 	}
 	
 	public static void SetWindowProps(int portX, int portY, int portWidth, int portHeight) {
@@ -292,6 +318,11 @@ public static class Display {
 		    && y >= windowTop  && y < windowTop  + windowHeight;
 	}
 	
+	public static bool IsInCutout(int x, int y) {
+		return x >= cutoutLeft && x < cutoutLeft + cutoutWidth
+		    && y >= cutoutTop  && y < cutoutTop  + cutoutHeight;
+	}
+	
 	public static JVector2I WindowCoords(int x, int y) {
 		JVector2I coords = (x - windowLeft, y - windowTop + scrollTop);
 		coords.Y %= MaxBufferRows;
@@ -299,7 +330,7 @@ public static class Display {
 	}
 	
 	public static char CharAt(int x, int y) {
-		if (windowEnabled && IsInWindow(x, y)) {
+		if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
 			var wcoords = WindowCoords(x, y);
 			
 			if (wcoords.Y >= charBuffer.Count) {
@@ -318,7 +349,7 @@ public static class Display {
 	}
 	
 	public static AnsiColor? ColorAt(int x, int y) {
-		if (windowEnabled && IsInWindow(x, y)) {
+		if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
 			var wcoords = WindowCoords(x, y);
 			
 			if (wcoords.Y >= charBuffer.Count) {
@@ -546,7 +577,9 @@ public static class Display {
 				
 				var isMultiBlended = false;
 				
-				if (windowEnabled && charBuffer.Count > windowHeight && IsInWindow(x, y) && x == WindowBottomRight.X - 1) {
+				if ((!cutoutEnabled || !IsInCutout(x, y))
+				    && windowEnabled && charBuffer.Count > windowHeight && IsInWindow(x, y) && x == WindowBottomRight.X - 1)
+				{
 					if (y >= scrollbarTop && y < scrollbarTop + scrollbarSize) {
 						ch = '█';
 						cl = AnsiColor.Grey;
@@ -557,7 +590,7 @@ public static class Display {
 					}
 				}
 				else if (cl is not null && cl.IsBG || isMulti) {
-					if (windowEnabled && IsInWindow(x, y)) {
+					if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
 						if (UseBufferBlending) {
 							var (wx, wy) = WindowCoords(x, y).AsTuple;
 						

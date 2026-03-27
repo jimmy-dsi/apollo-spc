@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Jimbl;
 
 namespace SpcProgram;
 
@@ -94,7 +95,7 @@ public static class Driver {
 						return;
 					}
 					
-					emu.StepInstruction();
+					StepInstruction();
 					Transfer.StepSignal.Reset();
 					
 					instrStep++;
@@ -197,6 +198,44 @@ public static class Driver {
 			if (!success) {
 				throw new UnreachableException($"Attempted run of fast cycles until condition, ended prematurely. This should never happen.");
 			}
+			return true;
+		}
+	}
+	
+	static bool StepInstruction() {
+		if (emu.Script700.IsRunning) {
+			var success = true;
+			try { emu.StepInstruction(); } catch (Script700Timeout) { success = false; }
+			
+			var attempts = 1;
+			var lastCycle = emu.DSP.CurrentCycle;
+			
+			while (!success) {
+				Thread.Sleep(BusyloopReliefMS);
+				
+				if (attempts >= MaxConsecutiveTimeouts) {
+					CliMain.FlagStepInTransit();
+					return false;
+				}
+				
+				success = true;
+				try { emu.StepInstruction(); } catch (Script700Timeout) { success = false; }
+				
+				if (emu.DSP.CurrentCycle > lastCycle && !success) { // Reset attempt counter if there's movement, but it hits a different Script700 snag
+					attempts = 1;
+				}
+				else {
+					attempts++;
+				}
+			}
+			
+			CliMain.InstrStepInTransit = false;
+			return true;
+		}
+		else {
+			emu.StepInstruction();
+			
+			CliMain.InstrStepInTransit = false;
 			return true;
 		}
 	}

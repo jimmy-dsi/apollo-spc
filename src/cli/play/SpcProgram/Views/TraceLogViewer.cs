@@ -26,7 +26,7 @@ public static partial class CliMain {
 	static void showTraceLogger(EmuDataBuffer buffer, EmuDataBuffer[]? prevBuffers = null, int recurseLevel = 1) {
 		Display.UseBufferBlending = false;
 		
-		if (UI_State == State.Paused) {
+		if (UI_StateIsPaused) {
 			if (InstructionsSinceTrace == 0) {
 				Display.ClearBox(Display.Width, 2, 0, 0, writeToScrollBuf: true);
 				InstructionsSinceTrace = 1;

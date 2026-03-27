@@ -44,6 +44,7 @@ public static partial class CliMain {
 	}
 	
 	static State  uiState          = State.Init;
+	static State  realUiState      = State.Init;
 	static bool   disableScript700 = false;
 	static object uiStateLock      = new();
 	
@@ -74,6 +75,8 @@ public static partial class CliMain {
 	static long   barCycle     = 0;
 	static object barCycleLock = new();
 	
+	static bool instrStepInTransit = false;
+	
 	static long frame     = 0;
 	static long prevFrame = 0;
 			
@@ -99,7 +102,28 @@ public static partial class CliMain {
 		}
 		set {
 			lock (uiStateLock) {
+				var s = uiState;
 				uiState = value;
+				
+				if (uiState == State.NonFatalError && s != State.NonFatalError) {
+					realUiState = s;
+				}
+			}
+		}
+	}
+	
+	public static State RealUI_State {
+		get {
+			lock (uiStateLock) {
+				return realUiState;
+			}
+		}
+	}
+	
+	public static bool UI_StateIsPaused {
+		get {
+			lock (uiStateLock) {
+				return uiState is State.Paused or State.NonFatalError;
 			}
 		}
 	}
@@ -114,6 +138,40 @@ public static partial class CliMain {
 			lock (uiStateLock) {
 				disableScript700 = value;
 			}
+		}
+	}
+
+	public static bool InstrStepInTransit {
+		get {
+			lock (uiStateLock) {
+				return instrStepInTransit;
+			}
+		}
+		set {
+			lock (uiStateLock) {
+				instrStepInTransit = value;
+			}
+		}
+	}
+
+	public static void FlagStepInTransit() {
+		lock (uiStateLock) {
+			var s = uiState;
+			uiState = State.NonFatalError;
+				
+			if (s != State.NonFatalError) {
+				realUiState = s;
+				instrStepInTransit = true;
+			}
+		}
+	}
+
+	public static State RestoreUIState() {
+		lock (uiStateLock) {
+			if (uiState == State.NonFatalError && realUiState != State.NonFatalError) {
+				uiState = realUiState;
+			}
+			return uiState;
 		}
 	}
 	
@@ -186,8 +244,7 @@ public static partial class CliMain {
 							}
 							
 							DisableScript700 = false;
-							UI_State         = State.Normal;
-							state            = State.Normal;
+							state = RestoreUIState();
 							
 							setStatusMsg(StatusMSG.Default);
 							setTempStatusMsg(StatusMSG.Continue);
@@ -215,8 +272,7 @@ public static partial class CliMain {
 							}
 							
 							DisableScript700 = true;
-							UI_State         = State.Normal;
-							state            = State.Normal;
+							state = RestoreUIState();
 							
 							setStatusMsg(StatusMSG.Default);
 							setTempStatusMsg(StatusMSG.Continue);
@@ -236,9 +292,13 @@ public static partial class CliMain {
 			action = KeyBindings.GetAction();
 		
 			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
+			var stepInTransit = InstrStepInTransit;
 		
-			if (action is not null) {
+			if (action is not null && !stepInTransit) {
 				doAction(action!.Value);
+			}
+			else if (stepInTransit) {
+				stepInstruction(log: false);
 			}
 			
 			if (buffer is not null) {
@@ -364,13 +424,20 @@ public static partial class CliMain {
 		if (state == State.NonFatalError) {
 			setStatusMsg(StatusMSG.Script700_Error, error: true);
 			
-			Display.DrawOutline(20, 8, Display.Width - 40, Display.Height - 18, AnsiColor.Yellow);
-			Display.ClearBox(Display.Width - 42, Display.Height - 20, 21, 9);
+			var winLeft   = 20;
+			var winTop    = 8;
+			var winWidth  = Display.Width  - 40;
+			var winHeight = Display.Height - 18;
+			
+			Display.EnableCutout(winLeft, winTop, winWidth, winHeight);
+			
+			Display.DrawOutline(winLeft, winTop, winWidth, winHeight, AnsiColor.Yellow);
+			Display.ClearBox(winWidth - 2, winHeight - 2, winLeft + 1, winTop + 1);
 			
 			Display.Write(" Error ", Display.Width / 2 - 3, 8, AnsiColor.Yellow);
 			
 			var errorText = Display.WordWrap("A non-fatal error has occurred during the processing of Script700 code.", Display.Width - 36, 3);
-			Display.WriteBox(errorText, 23, 10, AnsiColor.Yellow);
+			Display.WriteBox(errorText, winLeft + 3, winTop + 2, AnsiColor.Yellow);
 			Display.Y++;
 			Display.WriteBox([
 				"Error reason: ",
@@ -381,11 +448,11 @@ public static partial class CliMain {
 			var explainText = Display.WordWrap(
 				"This error can occur from either an infinite loop, or the execution of a long stretch of non-yielding Script700 code " +
 				"(i.e. no `w` command)",
-				Display.Width - 42 - 4, 3
+				winWidth - 2 - 4, 3
 			);
 			Display.Write("Explanation: ", col: AnsiColor.Yellow);
 			Display.Y++;
-			Display.WriteBox(explainText, x_: 22 + 4, col: AnsiColor.Yellow);
+			Display.WriteBox(explainText, x_: winLeft + 2 + 4, col: AnsiColor.Yellow);
 			Display.Y += 2;
 			
 			var displayY = Display.Y;
@@ -397,6 +464,9 @@ public static partial class CliMain {
 				Display.ClearBox(region.W + 2, region.H, region.X - 1, region.Y + displayY, col: selectedItem == i ? AnsiColor.BGBlue : AnsiColor.Cyan);
 				Display.WriteBox(option, region.X, region.Y + displayY, col: selectedItem == i ? AnsiColor.BGBlue : AnsiColor.Cyan);
 			}
+		}
+		else {
+			Display.DisableCutout();
 		}
 		
 		if (state == State.Init) {
@@ -838,24 +908,29 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.StepInstruction: {
-				if (UI_State == State.Paused) {
-					ScrollOffset = 0;
-					InstructionsSinceTrace = NextInstructionsSinceTrace;
-					refreshSignal++;
-					
-					if (currentView != View.ASMViewer) {
-						resetTraceLog();
-					}
-					
-					Transfer.StepSignal.Set(); // Signal emulating thread to step one single instruction
-				}
-				else {
-					TogglePause();
-					setTempStatusMsg(StatusMSG.Paused);
-				}
-				
+				stepInstruction();
 				break;
 			}
+		}
+	}
+	
+	static void stepInstruction(bool log = true) {
+		if (UI_State == State.Paused) {
+			if (log) {
+				ScrollOffset = 0;
+				InstructionsSinceTrace = NextInstructionsSinceTrace;
+				refreshSignal++;
+			}
+					
+			if (currentView != View.ASMViewer) {
+				resetTraceLog();
+			}
+					
+			Transfer.StepSignal.Set(); // Signal emulating thread to step one single instruction
+		}
+		else {
+			TogglePause();
+			setTempStatusMsg(StatusMSG.Paused);
 		}
 	}
 	
