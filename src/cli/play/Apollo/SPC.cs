@@ -310,6 +310,19 @@ public class SPC {
 			}
 		}
 		
+		public Int64 InstructionStartCycle {
+			get {
+				emu.MaybeAcquireLock();
+				try     { return *(Int64*) state.InstructionStartCycle; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+			set {
+				emu.MaybeAcquireLock();
+				try     { *(Int64*) state.InstructionStartCycle = value; }
+				finally { emu.MaybeReleaseLock(); }
+			}
+		}
+		
 		Emulator        emu;
 		DLL.SpcCpuState state;
 		

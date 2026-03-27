@@ -65,5 +65,6 @@ internal partial class DLL {
 		public IntPtr Mode;
 		
 		public IntPtr InstructionStartPC;
+		public IntPtr InstructionStartCycle;
 	}
 }

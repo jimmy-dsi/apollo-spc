@@ -671,7 +671,8 @@ pub const Emu = struct {
         }
 
         if (self.s_smp.instr_boundary) {
-            self.s_smp.spc.state.instruction_start_pc = self.s_smp.spc.pc();
+            self.s_smp.spc.state.instruction_start_pc    = self.s_smp.spc.pc();
+            self.s_smp.spc.state.instruction_start_cycle = @intCast(@divTrunc(cycle.*, 2));
         }
     }
 

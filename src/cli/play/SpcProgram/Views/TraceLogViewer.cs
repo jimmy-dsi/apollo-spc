@@ -21,7 +21,8 @@ public static partial class CliMain {
 	static View? tracePrevView      = null;
 	static int   tracePrevViewIndex = 0;
 	
-	static long lastEmuInstrStep = 0;
+	static long lastEmuInstrStep  = 0;
+	static long lastEmuInstrCycle = -1;
 	
 	static void showTraceLogger(EmuDataBuffer buffer, EmuDataBuffer[]? prevBuffers = null, int recurseLevel = 1) {
 		Display.UseBufferBlending = false;
@@ -227,8 +228,14 @@ public static partial class CliMain {
 				writeToScrollBuf: true
 			);
 			
-			NextInstructionsSinceTrace = InstructionsSinceTrace + 1;
 			lastEmuInstrStep = buffer.InstrStep;
+			
+			if (spc.InstrStartCycle == lastEmuInstrCycle) {
+				return;
+			}
+			
+			lastEmuInstrCycle = spc.InstrStartCycle;
+			NextInstructionsSinceTrace = InstructionsSinceTrace + 1;
 		}
 	}
 	
@@ -363,6 +370,7 @@ public static partial class CliMain {
 		
 		InstructionsSinceTrace = 1;
 		lastInstructionCycle   = -1;
+		lastEmuInstrCycle      = -1;
 		
 		Display.CurrentBufferId = bufId;
 		Display.NoResetBuffer   = noReset;

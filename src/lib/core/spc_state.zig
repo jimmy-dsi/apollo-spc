@@ -16,6 +16,7 @@ pub const SPCState = struct {
     pending_interrupt: bool = false,
 
     instruction_start_pc: u16 = undefined,
+    instruction_start_cycle: i64 = -1, // In SPC clocks, not DSP
 
     pub fn new(a: ?u8, x: ?u8, y: ?u8, sp: ?u8, pc: ?u16, psw: ?u8) SPCState {
         var cpu_state = SPCState { };
@@ -44,6 +45,7 @@ pub const SPCState = struct {
         self.psw = 0b00000010;
 
         self.instruction_start_pc = 0x0000;
+        self.instruction_start_cycle = -1;
 
         self.mode = Mode.normal;
         self.pending_interrupt = false;

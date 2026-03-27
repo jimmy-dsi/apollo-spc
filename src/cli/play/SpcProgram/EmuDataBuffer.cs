@@ -126,19 +126,20 @@ public class EmuDataBuffer: ICloneable {
 	}
 	
 	public class SPCState: ICloneable {
-		public byte         A            { get; internal set; }
-		public byte         X            { get; internal set; }
-		public byte         Y            { get; internal set; }
+		public byte         A               { get; internal set; }
+		public byte         X               { get; internal set; }
+		public byte         Y               { get; internal set; }
 		
-		public byte         SP           { get; internal set; }
-		public UInt16       PC           { get; internal set; }
+		public byte         SP              { get; internal set; }
+		public UInt16       PC              { get; internal set; }
 		
-		public byte         PSW          { get; internal set; }
-		public SPC.ExecMode Mode         { get; internal set; }
+		public byte         PSW             { get; internal set; }
+		public SPC.ExecMode Mode            { get; internal set; }
 		
-		public UInt16       InstrStartPC { get; internal set; }
+		public UInt16       InstrStartPC    { get; internal set; }
+		public Int64        InstrStartCycle { get; internal set; }
 		
-		public byte[]       ExecData     { get; internal set; } = new byte[3];
+		public byte[]       ExecData        { get; internal set; } = new byte[3];
 		
 		public SPCState Clone() {
 			var clone = (SPCState) MemberwiseClone();
@@ -432,7 +433,8 @@ public class EmuDataBuffer: ICloneable {
 				PSW          = emu.SPC.State.PSW,
 				Mode         = emu.SPC.State.Mode,
 				
-				InstrStartPC = emu.SPC.State.InstructionStartPC,
+				InstrStartPC    = emu.SPC.State.InstructionStartPC,
+				InstrStartCycle = emu.SPC.State.InstructionStartCycle,
 			};
 			
 			var pc = SPC_State.InstrStartPC;
