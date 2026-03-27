@@ -298,7 +298,7 @@ public static partial class CliMain {
 				doAction(action!.Value);
 			}
 			else if (stepInTransit) {
-				stepInstruction(log: false);
+				stepInstruction(log: true);
 			}
 			
 			if (buffer is not null) {
