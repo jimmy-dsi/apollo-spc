@@ -202,10 +202,6 @@ pub const SSMP = struct {
             if (self.instr_boundary) {
                 //self.spc.state.instruction_start_pc = self.spc.pc();
                 self.prev_spc_state = self.spc.state;
-
-                if (self.emu.singleton != null and self.emu.script700.state.has_breakpoint(self.spc.pc())) {
-                    self.emu.singleton.?.break_exec = true;
-                }
             }
             self.instr_boundary = false;
         }

@@ -111,14 +111,19 @@ pub inline fn step_instruction(emu_ptr: ?*Emu) !void {
     try ep.?.step_instruction();
 }
 
-pub inline fn step_n_cycles(cycles: u32, emu_ptr: ?*Emu) u32 {
+pub inline fn step_n_cycles(cycles: u32, emu_ptr: ?*Emu) i32 {
     var ep = get_ptr(emu_ptr);
     main.validate_ptr(Emu, ep) catch { return 0; };
 
-    var completed_cycles: u32 = 0;
+    var completed_cycles: i32 = 0;
     for (0..cycles) |_| {
         ep.?.step_cycle_safe() catch { return completed_cycles; };
         completed_cycles += 1;
+
+        // Return negative if breakpoint hit
+        if (ep.?.break_check(true)) {
+            return -completed_cycles;
+        }
     }
 
     return completed_cycles;
@@ -210,6 +215,20 @@ pub inline fn disable_echo_voice(emu_ptr: ?*Emu, index: u3) !void {
     try main.validate_ptr(Emu, ep);
 
     return ep.?.disable_echo_voice(index);
+}
+
+pub inline fn check_breakpoint(emu_ptr: ?*Emu) !bool {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.break_check(false);
+}
+
+pub inline fn consume_breakpoint(emu_ptr: ?*Emu) !bool {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.break_check(true);
 }
 
 pub inline fn copy(dest_emu_ptr: ?*Emu, src_emu_ptr: ?*const Emu) !void {

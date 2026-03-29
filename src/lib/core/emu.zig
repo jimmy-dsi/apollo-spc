@@ -241,9 +241,11 @@ pub const Emu = struct {
             emu.s_dsp.unpause();
         }
 
-        pub inline fn break_check(self: *Singleton) bool {
+        pub inline fn break_check(self: *Singleton, reset: bool) bool {
             const res = self.break_exec;
-            self.break_exec = false;
+            if (reset) {
+                self.break_exec = false;
+            }
             return res;
         }
 
@@ -673,6 +675,10 @@ pub const Emu = struct {
         if (self.s_smp.instr_boundary) {
             self.s_smp.spc.state.instruction_start_pc    = self.s_smp.spc.pc();
             self.s_smp.spc.state.instruction_start_cycle = @intCast(@divTrunc(cycle.*, 2));
+
+            if (self.singleton != null and self.script700.state.has_breakpoint(self.s_smp.spc.pc())) {
+                self.singleton.?.break_exec = true;
+            }
         }
     }
 
@@ -688,9 +694,9 @@ pub const Emu = struct {
         }
     }
 
-    pub inline fn break_check(self: *Emu) bool {
+    pub inline fn break_check(self: *Emu, reset: bool) bool {
         if (self.singleton) |s| {
-            return s.break_check();
+            return s.break_check(reset);
         }
 
         return false;

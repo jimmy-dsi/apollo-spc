@@ -62,7 +62,7 @@ pub export fn emu_step_instruction(emu_ptr: ?[*]Emu) bool {
     return true;
 }
 
-pub export fn emu_step_n_cycles(cycles: u32, emu_ptr: ?[*]Emu) u32 {
+pub export fn emu_step_n_cycles(cycles: u32, emu_ptr: ?[*]Emu) i32 {
     return emu.step_n_cycles(cycles, @ptrCast(emu_ptr));
 }
 
@@ -133,6 +133,14 @@ pub export fn emu_enable_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
 pub export fn emu_disable_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
     emu.disable_echo_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
     return true;
+}
+
+pub export fn emu_check_breakpoint(emu_ptr: ?[*]Emu) bool {
+    return emu.check_breakpoint(@ptrCast(emu_ptr)) catch |e| emu.ferr(e, @ptrCast(emu_ptr));
+}
+
+pub export fn emu_consume_breakpoint(emu_ptr: ?[*]Emu) bool {
+    return emu.consume_breakpoint(@ptrCast(emu_ptr)) catch |e| return emu.ferr(e, @ptrCast(emu_ptr));
 }
 
 pub export fn emu_copy(dest_emu_ptr: ?[*]Emu, src_emu_ptr: ?[*]Emu) bool {

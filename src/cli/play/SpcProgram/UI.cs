@@ -13,7 +13,7 @@ public static partial class CliMain {
 	class EndAppException: Exception { }
 	
 	public enum State {
-		Init, Normal, Paused, NonFatalError
+		Init, Normal, Paused, Break, NonFatalError
 	}
 	
 	enum View {
@@ -39,6 +39,7 @@ public static partial class CliMain {
 		
 		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos,
 		SteppedCycles, Paused, BreakExec, CycleDisplayChanged,
+		BreakpointHit,
 		
 		Script700_Error, Continue
 	}
@@ -58,9 +59,10 @@ public static partial class CliMain {
 	static bool       menuBarError   = false;
 	static Stopwatch? tempMsgTime    = null;
 	
-	static int  channelToToggle = 0;
-	static int  seekPosition    = 1;
-	static long stepCycles      = 0;
+	static int    channelToToggle    = 0;
+	static int    seekPosition       = 1;
+	static long   stepCycles         = 0;
+	static UInt16 execBreakpointAddr = 0;
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
@@ -288,7 +290,25 @@ public static partial class CliMain {
 			}
 		}
 		
-		if (state is not State.NonFatalError and not State.Init) {
+		if (state is State.Break) {
+			if (buffer?.BreakPC is UInt16 pc) {
+				execBreakpointAddr = pc;
+				
+				setStatusMsg(StatusMSG.BreakpointHit);
+				forceTraceLoggerView();
+		
+				if (nextView != currentView) {
+					if (buffer?.ExpectData(requests) ?? false) {
+						commitCurrentView();
+					}
+				}
+			
+				UI_State = State.Paused;
+				ignoreStepDisplay = true;
+				lastInstructionCycle = -1;
+			}
+		}
+		else if (state is not State.NonFatalError and not State.Init) {
 			action = KeyBindings.GetAction();
 		
 			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
@@ -401,7 +421,18 @@ public static partial class CliMain {
 		Display.Write("]", Display.Width - 1, Display.Height - 3, AnsiColor.Cyan);
 		
 		// Display Menu Bar
-		var barColor = menuBarError ? AnsiColor.BGRed : AnsiColor.BGBlue;
+		AnsiColor barColor;
+		
+		if (menuBarError) {
+			barColor = AnsiColor.BGRed;
+		}
+		else if (lastSetMsg is StatusMSG.BreakpointHit) {
+			barColor = AnsiColor.BGDarkGrey;
+		}
+		else {
+			barColor = AnsiColor.BGBlue;
+		}
+		
 		Display.ClearLine(Display.Height - 1, barColor);
 		
 		if (tempMsgTime is not null && tempMsgTime.ElapsedMilliseconds >= 3000) {
@@ -868,14 +899,7 @@ public static partial class CliMain {
 				
 				if (UI_State == State.Paused) {
 					setTempStatusMsg(StatusMSG.BreakExec);
-					
-					if (currentView != View.ASMViewer && nextView != View.ASMViewer) {
-						tracePrevView      = nextView;
-						tracePrevViewIndex = viewIndex;
-						
-						viewIndex = asmViewerIndex;
-						changeCurrentView(View.ASMViewer, setAsRealView: false);
-					}
+					forceTraceLoggerView();
 				}
 				else {
 					setTempStatusMsg(StatusMSG.Continue);
@@ -911,6 +935,16 @@ public static partial class CliMain {
 				stepInstruction();
 				break;
 			}
+		}
+	}
+	
+	static void forceTraceLoggerView() {
+		if (currentView != View.ASMViewer && nextView != View.ASMViewer) {
+			tracePrevView      = nextView;
+			tracePrevViewIndex = viewIndex;
+						
+			viewIndex = asmViewerIndex;
+			changeCurrentView(View.ASMViewer, setAsRealView: false);
 		}
 	}
 	
@@ -1029,6 +1063,7 @@ public static partial class CliMain {
 			}
 			
 			case View.MemoryViewer: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.SMP_Bus | Transfer.Requests.SPC_Regs | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.CurrentBufferId = "aram";
 				Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
@@ -1037,30 +1072,35 @@ public static partial class CliMain {
 			}
 			
 			case View.DSPViewer1: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.HideWindow();
 				break;
 			}
 			
 			case View.DSPViewer2: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.HideWindow();
 				break;
 			}
 			
 			case View.DSPViewer3: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.DSP_3);
 				Display.HideWindow();
 				break;
 			}
 			
 			case View.Script700Viewer: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.Script700 | Transfer.Requests.SMP_State);
 				Display.HideWindow();
 				break;
 			}
 			
 			default: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.CycleCountOnly);
 				Display.HideWindow();
 				break;
@@ -1086,7 +1126,15 @@ public static partial class CliMain {
 		menuBarError = error;
 	}
 	
+	static void resetStatusMsg() {
+		if (tempMenuBarMsg is null) {
+			setStatusMsg(StatusMSG.Default);
+		}
+	}
+	
 	static void setTempStatusMsg(StatusMSG msg, bool error = false) {
+		setStatusMsg(StatusMSG.Default);
+		
 		tempMenuBarMsg = statusMsg(msg);
 		tempMsgTime    = new();
 		menuBarError   = error;
@@ -1094,7 +1142,11 @@ public static partial class CliMain {
 		tempMsgTime.Start();
 	}
 	
+	static StatusMSG lastSetMsg = StatusMSG.Default;
+	
 	static string statusMsg(StatusMSG msg) {
+		lastSetMsg = msg;
+		
 		return msg switch {
 			StatusMSG.Default               => "Press CTRL+L for help menu",
 			StatusMSG.HeatMapOff            => "Heat map disabled",
@@ -1117,6 +1169,7 @@ public static partial class CliMain {
 			StatusMSG.CycleDisplayChanged   => $"Cycle display mode changed: {(cyclesInSpcClocks ? "SPC700" : "S-DSP")}",
 			StatusMSG.Paused                => $"Paused",
 			StatusMSG.BreakExec             => $"Execution break",
+			StatusMSG.BreakpointHit         => $"Execution breakpoint hit at {execBreakpointAddr:X4}",
 			StatusMSG.Script700_Error       => $"Script700 error occurred",
 			StatusMSG.Continue              => $"Resuming playback",
 			_                               => throw new NotImplementedException()

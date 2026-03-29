@@ -248,9 +248,10 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
-	public long Step      { get; private set; }
-	public long DSPCycle  { get; private set; }
-	public long InstrStep { get; private set; }
+	public long    Step      { get; private set; }
+	public long    DSPCycle  { get; private set; }
+	public long    InstrStep { get; private set; }
+	public UInt16? BreakPC   { get; private set; }
 	
 	public byte[]?             ARAM_Data             { get; private set; }
 	public byte[]?             SMP_BusData           { get; private set; }
@@ -266,10 +267,11 @@ public class EmuDataBuffer: ICloneable {
 	
 	static long nextStep = 0;
 	
-	public EmuDataBuffer(long dspCycle, long instrStep) {
+	public EmuDataBuffer(long dspCycle, long instrStep, UInt16? breakPC) {
 		DSPCycle = dspCycle;
 		Step = nextStep;
 		InstrStep = instrStep;
+		BreakPC = breakPC;
 		nextStep++;
 	}
 	
@@ -532,7 +534,7 @@ public class EmuDataBuffer: ICloneable {
 	}
 	
 	public EmuDataBuffer Clone() {
-		EmuDataBuffer clone = new(DSPCycle, InstrStep);
+		EmuDataBuffer clone = new(DSPCycle, InstrStep, BreakPC);
 		
 		if (ARAM_Data is not null) {
 			clone.ARAM_Data = ARAM_Data.ToArray();
@@ -587,6 +589,7 @@ public class EmuDataBuffer: ICloneable {
 	object ICloneable.Clone() => Clone();
 	
 	void resetToNull() {
+		//BreakPC               = null;
 		ARAM_Data             = null;
 		SMP_BusData           = null;
 		DSP_RegisterMem       = null;

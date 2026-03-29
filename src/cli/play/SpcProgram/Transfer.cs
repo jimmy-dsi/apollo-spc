@@ -142,10 +142,10 @@ public static class Transfer {
 		}
 	}
 	
-	public static void SendEmuData(long instrStep) {
+	public static void SendEmuData(long instrStep, UInt16? breakPC) {
 		// Transfer data from emu to main thread which the UI requests
 		Comm.UseBufferEmu(container => {
-			container.Buffer = new(emu.DSP.CurrentCycle, instrStep);
+			container.Buffer = new(emu.DSP.CurrentCycle, instrStep, breakPC);
 			container.Buffer.RequestPopulate(emu, GetRequests(), memRequestStart, memRequestLength);
 		});
 		
