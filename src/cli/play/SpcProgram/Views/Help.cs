@@ -35,8 +35,10 @@ public static partial class CliMain {
 		Display.Write("Scroll to top / bottom",         1, y); Display.Write("Home / End",          x, y); y++;
 		y++;
 		
-		Display.Write("Toggle heat map", 1, y); Display.Write("Ctrl+E+T", x, y);
+		Display.Write("Toggle heat map",           1, y); Display.Write("Ctrl+E+T", x, y);
 		Display.Write("[Warning: may produce rapid flashing]", x * 2, y, AnsiColor.Yellow);
+		y++;
+		Display.Write("Adjust heat map data size", 1, y); Display.Write("Ctrl+UpArrow / Ctrl+DownArrow", x, y);
 		y++;
 		Display.Write($"Display cycle count in {(cyclesInSpcClocks ? "DSP" : "SPC")} clocks", 1, y); Display.Write("Ctrl+D", x, y); y++;
 		y++;
