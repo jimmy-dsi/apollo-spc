@@ -29,7 +29,7 @@ public static partial class CliMain {
 	
 	enum StatusMSG {
 		Default,
-		HeatMapOff, HeatMapOn,
+		HeatMapOff, HeatMapOn, BusSizeChanged,
 		
 		ChannelX_Enabled,  MainChannelX_Enabled,  EchoChannelX_Enabled,
 		ChannelX_Disabled, MainChannelX_Disabled, EchoChannelX_Disabled,
@@ -39,7 +39,7 @@ public static partial class CliMain {
 		
 		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos,
 		SteppedCycles, Paused, BreakExec, CycleDisplayChanged,
-		BreakpointHit,
+		BreakpointHit, BreakpointsOff, BreakpointsOn,
 		
 		Script700_Error, Continue
 	}
@@ -59,17 +59,21 @@ public static partial class CliMain {
 	static bool       menuBarError   = false;
 	static Stopwatch? tempMsgTime    = null;
 	
-	static int    channelToToggle    = 0;
-	static int    seekPosition       = 1;
-	static long   stepCycles         = 0;
-	static UInt16 execBreakpointAddr = 0;
+	static int     channelToToggle    = 0;
+	static int     seekPosition       = 1;
+	static long    stepCycles         = 0;
+	static UInt16  execBreakpointAddr = 0;
+	static BusSize heatMapDataSize    = BusSize.Bit32;
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
 	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
-	static bool heatMapEnabled    = false;
-	static bool cyclesInSpcClocks = false;
+	static bool heatMapEnabled     = false;
+	static bool cyclesInSpcClocks  = false;
+	static bool breakpointsEnabled = true;
+	
+	static object breakpointToggleLock = new();
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
 	
@@ -153,6 +157,26 @@ public static partial class CliMain {
 			lock (uiStateLock) {
 				instrStepInTransit = value;
 			}
+		}
+	}
+
+	public static bool BreakpointsEnabled {
+		get {
+			lock (breakpointToggleLock) {
+				return breakpointsEnabled;
+			}
+		}
+		set {
+			lock (breakpointToggleLock) {
+				breakpointsEnabled = value;
+			}
+		}
+	}
+	
+	public static bool ToggleBreakpoints() {
+		lock (breakpointToggleLock) {
+			breakpointsEnabled = !breakpointsEnabled;
+			return breakpointsEnabled;
 		}
 	}
 
@@ -935,6 +959,31 @@ public static partial class CliMain {
 				stepInstruction();
 				break;
 			}
+			
+			case KeyBindings.Action.ToggleBreakpoints: {
+				var enabled = ToggleBreakpoints();
+				
+				if (enabled) {
+					setTempStatusMsg(StatusMSG.BreakpointsOn);
+				}
+				else {
+					setTempStatusMsg(StatusMSG.BreakpointsOff);
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.IncHeatMapDataSize: {
+				heatMapDataSize = heatMapDataSize.Next();
+				setTempStatusMsg(StatusMSG.BusSizeChanged);
+				break;
+			}
+			
+			case KeyBindings.Action.DecHeatMapDataSize: {
+				heatMapDataSize = heatMapDataSize.Prev();
+				setTempStatusMsg(StatusMSG.BusSizeChanged);
+				break;
+			}
 		}
 	}
 	
@@ -1151,6 +1200,7 @@ public static partial class CliMain {
 			StatusMSG.Default               => "Press CTRL+L for help menu",
 			StatusMSG.HeatMapOff            => "Heat map disabled",
 			StatusMSG.HeatMapOn             => "Heat map enabled",
+			StatusMSG.BusSizeChanged        => $"Heat map data size changed to {heatMapDataSize.Name()}",
 			StatusMSG.ChannelX_Disabled     => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
 			StatusMSG.ChannelX_Enabled      => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
 			StatusMSG.MainChannelX_Disabled => $"Main channel {channelToToggle} disabled {showActiveChannels()}",
@@ -1169,7 +1219,9 @@ public static partial class CliMain {
 			StatusMSG.CycleDisplayChanged   => $"Cycle display mode changed: {(cyclesInSpcClocks ? "SPC700" : "S-DSP")}",
 			StatusMSG.Paused                => $"Paused",
 			StatusMSG.BreakExec             => $"Execution break",
-			StatusMSG.BreakpointHit         => $"Execution breakpoint hit at {execBreakpointAddr:X4}",
+			StatusMSG.BreakpointHit         => $"Execution breakpoint hit at ${execBreakpointAddr:X4}",
+			StatusMSG.BreakpointsOn         => $"All breakpoints enabled",
+			StatusMSG.BreakpointsOff        => $"All breakpoints disabled",
 			StatusMSG.Script700_Error       => $"Script700 error occurred",
 			StatusMSG.Continue              => $"Resuming playback",
 			_                               => throw new NotImplementedException()
@@ -1201,7 +1253,7 @@ public static partial class CliMain {
 		tempMsgTime    = null;
 	}
 	
-	enum BusSize {
+	public enum BusSize {
 		Bit8, Bit16, Bit24, Bit32, Bit64
 	}
 	
@@ -1465,7 +1517,114 @@ public static partial class CliMain {
 		}
 	}
 	
-	static AnsiColor heatMapColor(BusSize dataSize, bool signed, double scale, long value) {
+	static void displayHeatMap24(char baseChar, UInt32 value, int x, int y, bool isBG = true) {
+		switch (heatMapDataSize) {
+			case BusSize.Bit8: {
+				for (var i = 1; i < 4; i++) {
+					Display.Write(
+						new(baseChar, 2), x + 2 * i - 2, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG)
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit16: {
+				Display.Write(new(baseChar, 2), x,     y, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1, (value & 0xFFFFFF) >> 16, isBG));
+				Display.Write(new(baseChar, 4), x + 2, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1,  value & 0xFFFF,          isBG));
+				break;
+			}
+			
+			case BusSize.Bit32 or BusSize.Bit64: {
+				Display.Write(
+					new(baseChar, 6), x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value * 256, isBG)
+				);
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
+			}
+		}
+	}
+	
+	static void displayHeatMap32(char baseChar, UInt32 value, int x, int y, bool isBG = true) {
+		switch (heatMapDataSize) {
+			case BusSize.Bit8: {
+				for (var i = 0; i < 4; i++) {
+					Display.Write(
+						new(baseChar, 2), x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG)
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit16: {
+				for (var i = 0; i < 2; i++) {
+					Display.Write(
+						new(baseChar, 4), x + 4 * i, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value >> 16 - i * 16 & 0xFFFF, isBG)
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit32 or BusSize.Bit64: {
+				Display.Write(
+					new(baseChar, 8), x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value, isBG)
+				);
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
+			}
+		}
+	}
+	
+	static void displayHeatMap64(char baseChar, UInt64 value, int x, int y, bool isBG = true) {
+		switch (heatMapDataSize) {
+			case BusSize.Bit8: {
+				for (var i = 0; i < 8; i++) {
+					Display.Write(
+						new(baseChar, 2), x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, (long) (value >> 56 - i * 8 & 0xFF), isBG)
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit16: {
+				for (var i = 0; i < 4; i++) {
+					Display.Write(
+						new(baseChar, 4),
+						x + 4 * i, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, (long) (value >> 48 - i * 16 & 0xFFFF), isBG)
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit32: {
+				for (var i = 0; i < 2; i++) {
+					Display.Write(
+						new(baseChar, 8),
+						x + 8 * i, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, (long) (value >> 32 - i * 32 & 0xFFFFFFFF), isBG)
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit64: {
+				Display.Write(
+					new(baseChar, 16), x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, (long) value, isBG)
+				);
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
+			}
+		}
+	}
+	
+	static AnsiColor heatMapColor(BusSize dataSize, bool signed, double scale, long value, bool isBG = true) {
 		double interp;
 		
 		switch (dataSize) {
@@ -1570,7 +1729,7 @@ public static partial class CliMain {
 			col = maxUns.Blend(zero, 1 - Math.Abs(interp), Color.Space.LCh);
 		}
 		
-		return new(col, isBG: true);
+		return new(col, isBG);
 	}
 	
 	static (char Char, AnsiColor Color)[] drawHeatMapFlags(BusSize dataSize, ulong value) {

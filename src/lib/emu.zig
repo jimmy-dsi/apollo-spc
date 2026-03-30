@@ -111,7 +111,7 @@ pub inline fn step_instruction(emu_ptr: ?*Emu) !void {
     try ep.?.step_instruction();
 }
 
-pub inline fn step_n_cycles(cycles: u32, emu_ptr: ?*Emu) i32 {
+pub inline fn step_n_cycles(cycles: u32, emu_ptr: ?*Emu, comptime bp_enabled: bool) i32 {
     var ep = get_ptr(emu_ptr);
     main.validate_ptr(Emu, ep) catch { return 0; };
 
@@ -121,7 +121,7 @@ pub inline fn step_n_cycles(cycles: u32, emu_ptr: ?*Emu) i32 {
         completed_cycles += 1;
 
         // Return negative if breakpoint hit
-        if (ep.?.break_check(true)) {
+        if (bp_enabled and ep.?.break_check(true)) {
             return -completed_cycles;
         }
     }

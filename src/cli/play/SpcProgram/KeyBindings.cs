@@ -173,6 +173,9 @@ public static class KeyBindings {
 		TogglePause,
 		ToggleBreak,
 		StepInstruction,
+		ToggleBreakpoints,
+		IncHeatMapDataSize,
+		DecHeatMapDataSize,
 	}
 		
 	static Key?      lastCtrlKey    = null;

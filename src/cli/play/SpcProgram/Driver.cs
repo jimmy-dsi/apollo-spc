@@ -138,7 +138,9 @@ public static class Driver {
 	
 	static bool StepCycles(int cycles) {
 		if (emu.Script700.IsRunning) {
-			var completed = emu.StepNCycles(cycles);
+			var bpEnabled = CliMain.BreakpointsEnabled;
+			var completed = emu.StepNCycles(cycles, breakpointsEnabled: bpEnabled);
+			
 			if (completed < 0) {
 				CliMain.UI_State = CliMain.State.Break;
 				breakPC = emu.SPC.State.InstructionStartPC;
@@ -156,7 +158,8 @@ public static class Driver {
 				}
 				
 				var remainingCycles = cycles - completed;
-				var c = emu.StepNCycles(remainingCycles);
+				var c = emu.StepNCycles(remainingCycles, breakpointsEnabled: bpEnabled);
+				
 				if (c < 0) {
 					CliMain.UI_State = CliMain.State.Break;
 					breakPC = emu.SPC.State.InstructionStartPC;
@@ -181,7 +184,9 @@ public static class Driver {
 	
 	static bool StepCycles(Func<bool> condition) {
 		if (emu.Script700.IsRunning) {
-			var success = emu.StepCyclesUntil(condition, out var steps, out var breakpoint);
+			var bpEnabled = CliMain.BreakpointsEnabled;
+			var success = emu.StepCyclesUntil(condition, out var steps, out var breakpoint, breakpointsEnabled: bpEnabled);
+			
 			if (breakpoint) {
 				CliMain.UI_State = CliMain.State.Break;
 				breakPC = emu.SPC.State.InstructionStartPC;
@@ -198,7 +203,8 @@ public static class Driver {
 					return false;
 				}
 				
-				success = emu.StepCyclesUntil(condition, out steps, out breakpoint);
+				success = emu.StepCyclesUntil(condition, out steps, out breakpoint, breakpointsEnabled: bpEnabled);
+				
 				if (breakpoint) {
 					CliMain.UI_State = CliMain.State.Break;
 					breakPC = emu.SPC.State.InstructionStartPC;

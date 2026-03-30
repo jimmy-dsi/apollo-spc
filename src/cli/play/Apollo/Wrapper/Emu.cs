@@ -30,7 +30,7 @@ internal partial class DLL {
 	public static partial bool EmuStepInstruction(Emulator.Handle emuPtr);
 	
 	[LibraryImport("apollo", EntryPoint = "emu_step_n_cycles")]
-	public static partial Int32 EmuStepNCycles(UInt32 cycles, Emulator.Handle emuPtr);
+	public static partial Int32 EmuStepNCycles(UInt32 cycles, Emulator.Handle emuPtr, [MarshalAs(UnmanagedType.I1)] bool breakpointsEnabled);
 	
 	[LibraryImport("apollo", EntryPoint = "emu_step_n_cycles_fast")]
 	public static partial UInt32 EmuStepNCyclesFast(UInt32 cycles, Emulator.Handle emuPtr);

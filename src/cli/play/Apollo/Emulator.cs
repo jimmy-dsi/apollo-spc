@@ -323,9 +323,9 @@ public class Emulator {
 		}
 	}
 	
-	public int StepNCycles(int cycles) {
+	public int StepNCycles(int cycles, bool breakpointsEnabled = true) {
 		MaybeAcquireLock();
-		try     { return DLL.EmuStepNCycles(cycles.SafeUnsigned(), handle); }
+		try     { return DLL.EmuStepNCycles(cycles.SafeUnsigned(), handle, breakpointsEnabled); }
 		finally { MaybeReleaseLock(); }
 	}
 	
@@ -335,7 +335,7 @@ public class Emulator {
 		finally { MaybeReleaseLock(); }
 	}
 	
-	public bool StepCyclesUntil(Func<bool> condition, out int steps, out bool breakpoint) {
+	public bool StepCyclesUntil(Func<bool> condition, out int steps, out bool breakpoint, bool breakpointsEnabled = true) {
 		breakpoint = false;
 		MaybeAcquireLock();
 		
@@ -351,7 +351,7 @@ public class Emulator {
 				
 				result = DLL.EmuConsumeBreakpoint(handle);
 				
-				if (result) {
+				if (breakpointsEnabled && result) {
 					breakpoint = true;
 					return true;
 				}

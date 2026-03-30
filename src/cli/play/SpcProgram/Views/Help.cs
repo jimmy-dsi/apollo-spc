@@ -7,7 +7,7 @@ public static partial class CliMain {
 	static void showHelpMenu() {
 		var topY = 0;
 		
-		var y = 1;
+		var y = 0;
 		var x = 38;
 		
 		Display.Write("Exit current menu",              1, y); Display.Write("Escape",              x, y); y++;
@@ -44,7 +44,10 @@ public static partial class CliMain {
 		Display.Write("Pause / Resume",                 1, y); Display.Write("Space",               x, y); y++;
 		Display.Write("Break execution / Resume",       1, y); Display.Write("F5",                  x, y); y++;
 		Display.Write("Step SPC700 instruction",        1, y); Display.Write("F6",                  x, y); y++;
+		y++;
 		
-		Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
+		Display.Write("Toggle all breakpoints",         1, y); Display.Write("Ctrl+B",              x, y); y++;
+		
+		//Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
 	}
 }

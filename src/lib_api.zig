@@ -62,8 +62,13 @@ pub export fn emu_step_instruction(emu_ptr: ?[*]Emu) bool {
     return true;
 }
 
-pub export fn emu_step_n_cycles(cycles: u32, emu_ptr: ?[*]Emu) i32 {
-    return emu.step_n_cycles(cycles, @ptrCast(emu_ptr));
+pub export fn emu_step_n_cycles(cycles: u32, emu_ptr: ?[*]Emu, bp_enabled: bool) i32 {
+    if (bp_enabled) {
+        return emu.step_n_cycles(cycles, @ptrCast(emu_ptr), true);
+    }
+    else {
+        return emu.step_n_cycles(cycles, @ptrCast(emu_ptr), false);
+    }
 }
 
 pub export fn emu_step_n_cycles_fast(cycles: u32, emu_ptr: ?[*]Emu) u32 {
