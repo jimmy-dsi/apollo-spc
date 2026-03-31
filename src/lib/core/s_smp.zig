@@ -227,14 +227,6 @@ pub const SSMP = struct {
                 self.prev_exec_cycle = self.cur_exec_cycle;
                 self.cur_exec_cycle  = self.s_dsp().cur_cycle();
 
-                self.change_interrupt_mode();
-
-                // Update SPC interrupt vector if necessary
-                if (self.vector_changed) {
-                    self.spc.current_interrupt_vector = self.next_vector;
-                    self.vector_changed = false;
-                }
-
                 // Apply debug mode transitions if applicable
                 self.maybe_transition_debug_mode();
             }
@@ -542,7 +534,7 @@ pub const SSMP = struct {
         }
     }
 
-    inline fn change_interrupt_mode(self: *SSMP) void {
+    pub inline fn change_interrupt_mode(self: *SSMP) void {
         if (self.spc.pending_interrupt()) {
             // If previously pending interrupt, kick off the execution of interrupt mode for this "instruction"
             self.spc.state.pending_interrupt = false;

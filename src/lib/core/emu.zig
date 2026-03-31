@@ -673,6 +673,14 @@ pub const Emu = struct {
         }
 
         if (self.s_smp.instr_boundary) {
+            self.s_smp.change_interrupt_mode();
+
+            // Update SPC interrupt vector if necessary
+            if (self.s_smp.vector_changed) {
+                self.s_smp.spc.current_interrupt_vector = self.s_smp.next_vector;
+                self.s_smp.vector_changed = false;
+            }
+
             self.s_smp.spc.state.instruction_start_pc    = self.s_smp.spc.pc();
             self.s_smp.spc.state.instruction_start_cycle = @intCast(@divTrunc(cycle.*, 2));
 

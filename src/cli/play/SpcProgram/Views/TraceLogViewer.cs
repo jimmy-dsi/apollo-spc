@@ -209,9 +209,11 @@ public static partial class CliMain {
 			var insName  = insParts[0];
 			var operands = string.Join(' ', insParts[1..]);
 			
-			Display.Write($"{pc:X4} |  ", x,                      y, col: highlight,     writeToScrollBuf: true);
-			Display.Write($"{insName} ",  x + 8,                  y, col: highlightName, writeToScrollBuf: true);
-			Display.Write($"{operands}",  x + 9 + insName.Length, y, col: highlight,     writeToScrollBuf: true);
+			var c = spc.Mode == SPC.ExecMode.Interrupt ? '*' : ' ';
+			
+			Display.Write($"{pc:X4} | {c}", x,                      y, col: highlight,     writeToScrollBuf: true);
+			Display.Write($"{insName} ",    x + 8,                  y, col: highlightName, writeToScrollBuf: true);
+			Display.Write($"{operands}",    x + 9 + insName.Length, y, col: highlight,     writeToScrollBuf: true);
 			
 			var byteString = string.Join(' ', spc.ExecData.Take(instructionBytes).Select(x => $"{x:X2}"));
 			
