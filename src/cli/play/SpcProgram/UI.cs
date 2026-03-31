@@ -1524,26 +1524,26 @@ public static partial class CliMain {
 		}
 	}
 	
-	static void displayHeatMap24(char baseChar, UInt32 value, int x, int y, bool isBG = true) {
+	static void displayHeatMap24(UInt32 value, int x, int y, bool isBG = true) {
 		switch (heatMapDataSize) {
 			case BusSize.Bit8: {
 				for (var i = 1; i < 4; i++) {
-					Display.Write(
-						new(baseChar, 2), x + 2 * i - 2, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG)
+					Display.Highlight(
+						2, x + 2 * i - 2, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
 					);
 				}
 				break;
 			}
 			
 			case BusSize.Bit16: {
-				Display.Write(new(baseChar, 2), x,     y, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1, (value & 0xFFFFFF) >> 16, isBG));
-				Display.Write(new(baseChar, 4), x + 2, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1,  value & 0xFFFF,          isBG));
+				Display.Highlight(2, x,     y, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1, (value & 0xFFFFFF) >> 16, isBG).BackgroundRGB);
+				Display.Highlight(4, x + 2, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value & 0xFFFF,           isBG).BackgroundRGB);
 				break;
 			}
 			
 			case BusSize.Bit32 or BusSize.Bit64: {
-				Display.Write(
-					new(baseChar, 6), x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value * 256, isBG)
+				Display.Highlight(
+					6, x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value * 256, isBG).BackgroundRGB
 				);
 				break;
 			}
@@ -1554,12 +1554,12 @@ public static partial class CliMain {
 		}
 	}
 	
-	static void displayHeatMap32(char baseChar, UInt32 value, int x, int y, bool isBG = true) {
+	static void displayHeatMap32(UInt32 value, int x, int y, bool isBG = true) {
 		switch (heatMapDataSize) {
 			case BusSize.Bit8: {
 				for (var i = 0; i < 4; i++) {
-					Display.Write(
-						new(baseChar, 2), x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG)
+					Display.Highlight(
+						2, x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1567,16 +1567,16 @@ public static partial class CliMain {
 			
 			case BusSize.Bit16: {
 				for (var i = 0; i < 2; i++) {
-					Display.Write(
-						new(baseChar, 4), x + 4 * i, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value >> 16 - i * 16 & 0xFFFF, isBG)
+					Display.Highlight(
+						4, x + 4 * i, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value >> 16 - i * 16 & 0xFFFF, isBG).BackgroundRGB
 					);
 				}
 				break;
 			}
 			
 			case BusSize.Bit32 or BusSize.Bit64: {
-				Display.Write(
-					new(baseChar, 8), x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value, isBG)
+				Display.Highlight(
+					8, x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value, isBG).BackgroundRGB
 				);
 				break;
 			}
@@ -1587,12 +1587,12 @@ public static partial class CliMain {
 		}
 	}
 	
-	static void displayHeatMap64(char baseChar, UInt64 value, int x, int y, bool isBG = true) {
+	static void displayHeatMap64(UInt64 value, int x, int y, bool isBG = true) {
 		switch (heatMapDataSize) {
 			case BusSize.Bit8: {
 				for (var i = 0; i < 8; i++) {
-					Display.Write(
-						new(baseChar, 2), x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, (long) (value >> 56 - i * 8 & 0xFF), isBG)
+					Display.Highlight(
+						2, x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, (long) (value >> 56 - i * 8 & 0xFF), isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1600,9 +1600,9 @@ public static partial class CliMain {
 			
 			case BusSize.Bit16: {
 				for (var i = 0; i < 4; i++) {
-					Display.Write(
-						new(baseChar, 4),
-						x + 4 * i, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, (long) (value >> 48 - i * 16 & 0xFFFF), isBG)
+					Display.Highlight(
+						4, x + 4 * i, y,
+						col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, (long) (value >> 48 - i * 16 & 0xFFFF), isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1610,17 +1610,17 @@ public static partial class CliMain {
 			
 			case BusSize.Bit32: {
 				for (var i = 0; i < 2; i++) {
-					Display.Write(
-						new(baseChar, 8),
-						x + 8 * i, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, (long) (value >> 32 - i * 32 & 0xFFFFFFFF), isBG)
+					Display.Highlight(
+						8, x + 8 * i, y,
+						col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, (long) (value >> 32 - i * 32 & 0xFFFFFFFF), isBG).BackgroundRGB
 					);
 				}
 				break;
 			}
 			
 			case BusSize.Bit64: {
-				Display.Write(
-					new(baseChar, 16), x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, (long) value, isBG)
+				Display.Highlight(
+					16, x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, (long) value, isBG).BackgroundRGB
 				);
 				break;
 			}
@@ -1629,6 +1629,10 @@ public static partial class CliMain {
 				throw new UnreachableException();
 			}
 		}
+	}
+	
+	static Color heatMapZero() {
+		return Color.FromLCh(0.1, 70, 280);
 	}
 	
 	static AnsiColor heatMapColor(BusSize dataSize, bool signed, double scale, long value, bool isBG = true) {

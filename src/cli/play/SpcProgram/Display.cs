@@ -376,6 +376,14 @@ public static class Display {
 		}
 	}
 	
+	public static void SetBufferColorAt(int x, int y, AnsiColor? col) {
+		y %= MaxBufferRows;
+		
+		if (y < charBuffer.Count && x < charBuffer[y].Length) {
+			colorBuffer[y][x] = col;
+		}
+	}
+	
 	public static void Clear(AnsiColor? col = null) {
 		for (var y = 0; y < Height; y++) {
 			for (var x = 0; x < Width; x++) {
@@ -425,6 +433,18 @@ public static class Display {
 				writeChar(c, x, y, col ?? color, writeToScrollBuf);
 				x++;
 			}
+		}
+	}
+	
+	public static void Highlight(int length, int? x_ = null, int? y_ = null, Color? col = null, bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
+		if (x_ != null) x = x_.Value;
+		if (y_ != null) y = y_.Value;
+		
+		for (var i = 0; i < length; i++) {
+			highlightChar(x, y, col, writeToScrollBuf);
+			x++;
 		}
 	}
 	
@@ -836,6 +856,38 @@ public static class Display {
 		
 			charGrid[y][x]  = c;
 			colorGrid[y][x] = color;
+		}
+	}
+	
+	static void highlightChar(int x, int y, Color? color, bool writeToScrollBuf = false) {
+		var baseCol = ColorAt(x, y);
+		var fgCol   = (object?) baseCol?.ForegroundRGB ?? baseCol?.ForegroundANSI;
+		
+		AnsiColor? newCol;
+		
+		switch (fgCol) {
+			case Color c: {
+				newCol = color is null ? new(c) : new(c, color);
+				break;
+			}
+			
+			case AnsiColor.Code c: {
+				newCol = color is null ? new(c) : new(c, color);
+				break;
+			}
+			
+			default: {
+				newCol = color is null ? null : new(color, isBG: true);
+				break;
+			}
+		}
+		
+		if (writeToScrollBuf) {
+			SetBufferColorAt(x, y, newCol);
+		}
+		else {
+			if (x >= Width || y >= Height) return;
+			colorGrid[y][x] = newCol;
 		}
 	}
 	
