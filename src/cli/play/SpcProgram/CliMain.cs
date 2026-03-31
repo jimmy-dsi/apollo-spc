@@ -173,6 +173,8 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('B'),  KeyBindings.Action.ToggleBreakpoints,  ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.IncHeatMapDataSize, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.DecHeatMapDataSize, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F9,         KeyBindings.Action.IncHeatMapDataSize);
+			KeyBindings.Register(KeyBindings.Key.F10,        KeyBindings.Action.DecHeatMapDataSize);
 			
 			// Create RAM memory view buffer and Trace logger view buffer
 			Display.CurrentBufferId = "aram";
