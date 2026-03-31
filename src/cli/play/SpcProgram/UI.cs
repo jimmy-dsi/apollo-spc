@@ -318,7 +318,14 @@ public static partial class CliMain {
 			if (buffer?.BreakPC is UInt16 pc) {
 				execBreakpointAddr = pc;
 				
-				setStatusMsg(StatusMSG.BreakpointHit);
+				if (HideFirstBreakAddr) {
+					ignoreStepDisplay = true;
+					resetTraceLog();
+				}
+				else {
+					setStatusMsg(StatusMSG.BreakpointHit);
+				}
+				
 				forceTraceLoggerView();
 		
 				if (nextView != currentView) {

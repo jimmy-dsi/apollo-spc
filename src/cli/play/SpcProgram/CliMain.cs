@@ -20,6 +20,36 @@ public static partial class CliMain {
 	
 	static bool   killAllThreads     = false;
 	static object killAllThreadsLock = new();
+	
+	static bool   startInDebugMode   = false;
+	static bool   hideFirstBreakAddr = false;
+	static object debugModeLock      = new();
+
+	public static bool StartInDebugMode {
+		get {
+			lock (debugModeLock) {
+				var res = startInDebugMode;
+				startInDebugMode = false;
+				return res;
+			}
+		}
+		set {
+			lock (debugModeLock) {
+				startInDebugMode   = value;
+				hideFirstBreakAddr = value;
+			}
+		}
+	}
+
+	public static bool HideFirstBreakAddr {
+		get {
+			lock (debugModeLock) {
+				var res = hideFirstBreakAddr;
+				hideFirstBreakAddr = false;
+				return res;
+			}
+		}
+	}
 
 	public static bool KillAllThreads {
 		get {
@@ -44,12 +74,16 @@ public static partial class CliMain {
 		
 		Lib.Init();
 		try {
+			var debugMode = args.Any(x => x is "--debug" or "-d");
+			args = args.Where(x => x is not "--debug" and not "-d").ToArray();
+			
 			if (args.Length == 0) {
 				Console.Error.WriteLine($"error: SPC file not provided");
 				return 1;
 			}
 			
-			spcFilePath = args[0];
+			StartInDebugMode = debugMode;
+			spcFilePath      = args[0];
 			
 			//emu = LibTest.Test(spcFilePath);
 			PrimaryEmu = new(setAsMain: true, makeShared: true);

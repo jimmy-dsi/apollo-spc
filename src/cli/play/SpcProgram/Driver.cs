@@ -75,6 +75,8 @@ public static class Driver {
 	static long    instrStep = 0;
 	static UInt16? breakPC = null;
 	
+	static bool debugMode = false;
+	
 	const int MaxConsecutiveTimeouts = 90;
 	const int BusyloopReliefMS       = 20;
 	
@@ -137,6 +139,18 @@ public static class Driver {
 	}
 	
 	static bool StepCycles(int cycles) {
+		if (CliMain.StartInDebugMode || debugMode) {
+			if (CliMain.UI_State is not CliMain.State.Init) {
+				CliMain.UI_State = CliMain.State.Break;
+				breakPC = emu.SPC.State.InstructionStartPC;
+				debugMode = false;
+			}
+			else {
+				debugMode = true;
+			}
+			return false;
+		}
+		
 		if (emu.Script700.IsRunning) {
 			var bpEnabled = CliMain.BreakpointsEnabled;
 			var completed = emu.StepNCycles(cycles, breakpointsEnabled: bpEnabled);
@@ -183,6 +197,18 @@ public static class Driver {
 	}
 	
 	static bool StepCycles(Func<bool> condition) {
+		if (CliMain.StartInDebugMode || debugMode) {
+			if (CliMain.UI_State is not CliMain.State.Init) {
+				CliMain.UI_State = CliMain.State.Break;
+				breakPC = emu.SPC.State.InstructionStartPC;
+				debugMode = false;
+			}
+			else {
+				debugMode = true;
+			}
+			return false;
+		}
+		
 		if (emu.Script700.IsRunning) {
 			var bpEnabled = CliMain.BreakpointsEnabled;
 			var success = emu.StepCyclesUntil(condition, out var steps, out var breakpoint, breakpointsEnabled: bpEnabled);

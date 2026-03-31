@@ -230,7 +230,7 @@ public static partial class CliMain {
 			
 			lastEmuInstrStep = buffer.InstrStep;
 			
-			if (spc.InstrStartCycle == lastEmuInstrCycle) {
+			if (Math.Max(0, spc.InstrStartCycle) == lastEmuInstrCycle) {
 				return;
 			}
 			
