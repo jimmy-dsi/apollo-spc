@@ -3,30 +3,96 @@ namespace SpcProgram;
 using System.Text;
 
 using Jimbl;
+using Jimbl.JMath;
+using Jimbl.Graphics;
 
 public static class Display {
+	public class BufferTuple {
+		public required List<char[]>       CharBuffer  { get; set; }
+		public required List<AnsiColor?[]> ColorBuffer { get; set; }
+		public required int                VirtualSize { get; set; }
+		
+		public static implicit operator BufferTuple ((List<char[]>, List<AnsiColor?[]>, int) tup) =>
+			new() {
+				CharBuffer  = tup.Item1,
+				ColorBuffer = tup.Item2,
+				VirtualSize = tup.Item3
+			};
+	}
+	
+	public const int MaxBufferRows = 16384;
+	
+	// Swappable display region buffers
+	static Dictionary<string, BufferTuple> namedBuffers = new() {
+		["default"] = (new(), new(), 0)
+	};
+	
 	// For scrollable display region
-	static List<List<char>>    charBuffer;
-	static List<List<Color?>> colorBuffer;
+	static string currentBufferId = "default";
+	
+	static List<      char[]>  charBuffer = namedBuffers[currentBufferId].CharBuffer;
+	static List<AnsiColor?[]> colorBuffer = namedBuffers[currentBufferId].ColorBuffer;
+	
+	public static List<      char[]>  CharBuffer =>  charBuffer;
+	public static List<AnsiColor?[]> ColorBuffer => colorBuffer;
+	
+	public static bool UseBufferBlending { get; set; } = true;
+	
+	// Previous scrollable display color buffers
+	static List<      char[]>[] prevCharBuffers  = new List<      char[]>[]{};
+	static List<AnsiColor?[]>[] prevColorBuffers = new List<AnsiColor?[]>[]{};
+	
+	static bool windowEnabled = false;
+	
+	static int windowLeft   = 0;
+	static int windowTop    = 0;
+	static int windowWidth  = 0;
+	static int windowHeight = 0;
+	
+	static bool cutoutEnabled = false;
+	
+	static int cutoutLeft   = 0;
+	static int cutoutTop    = 0;
+	static int cutoutWidth  = 0;
+	static int cutoutHeight = 0;
+	
+	static int  scrollTop = 0;
+	static bool scrollBufPrevSource = false;
 	
 	// For static display
-	static   char[][]  charGrid;
-	static Color?[][] colorGrid;
+	static       char[][]  charGrid;
+	static AnsiColor?[][] colorGrid;
 	
 	// Previous static display color buffers
-	static Color?[][][] prevColorGrids;
+	static       char[][][]  prevCharGrids;
+	static AnsiColor?[][][] prevColorGrids;
 	
 	static int x = 0;
 	static int y = 0;
-	static Color? color = null;
+	static AnsiColor? color = null;
 	
 	static long frame     = 0;
 	static long prevFrame = 0;
 	
 	public static int Width  { get; private set; }
 	public static int Height { get; private set; }
+
+	public static int ScrollTop {
+		get => scrollTop;
+		set => scrollTop = value;
+	}
+
+	public static JVector2I WindowTopLeft     => (windowLeft,               windowTop               );
+	public static JVector2I WindowTopRight    => (windowLeft + windowWidth, windowTop               );
+	public static JVector2I WindowBottomLeft  => (windowLeft,               windowTop + windowHeight);
+	public static JVector2I WindowBottomRight => (windowLeft + windowWidth, windowTop + windowHeight);
+
+	public static JVector2I CutoutTopLeft     => (cutoutLeft,               cutoutTop               );
+	public static JVector2I CutoutTopRight    => (cutoutLeft + cutoutWidth, cutoutTop               );
+	public static JVector2I CutoutBottomLeft  => (cutoutLeft,               cutoutTop + cutoutHeight);
+	public static JVector2I CutoutBottomRight => (cutoutLeft + cutoutWidth, cutoutTop + cutoutHeight);
 	
-	public static Color? Color {
+	public static AnsiColor? Color {
 		get => color;
 		set => color = value;
 	}
@@ -41,38 +107,284 @@ public static class Display {
 		set => y = value;
 	}
 	
+	public static int VirtualSize { get; private set; } = 0;
+	
+	public static bool NoResetBuffer { get; set; } = false;
+
+	public static string CurrentBufferId {
+		get => currentBufferId;
+		set {
+			var prevBufferId = currentBufferId;
+			currentBufferId = value;
+			
+			if (prevBufferId == currentBufferId) {
+				return;
+			}
+			
+			if (!namedBuffers.ContainsKey(currentBufferId)) {
+				namedBuffers[currentBufferId] = (new(), new(), 0);
+			}
+			
+			charBuffer  = namedBuffers[currentBufferId].CharBuffer;
+			colorBuffer = namedBuffers[currentBufferId].ColorBuffer;
+			VirtualSize = namedBuffers[currentBufferId].VirtualSize;
+			
+			if (!NoResetBuffer) {
+				initBuffers();
+				ResetPrevBuffers();
+			}
+		}
+	}
+	
+	public static ItemGetter<string, BufferTuple> Buffer = new() {
+		Get = k => namedBuffers[k]
+	};
+
 	public static void Init(int width, int height) {
 		Width  = width;
 		Height = height;
 		
-		charGrid  = new   char[height][];
-		colorGrid = new Color?[height][];
+		charGrid  = new       char[height][];
+		colorGrid = new AnsiColor?[height][];
 		
-		List<Color?[][]> pcg = new();
+		List<AnsiColor?[][]>  pcg = new();
+		List<      char[][]> pchg = new();
 		
 		for (var i = 0; i < 4; i++) {
-			pcg.Add(new Color?[][]{ });
+			pcg .Add(new AnsiColor?[][]{ });
+			pchg.Add(new       char[][]{ });
 		}
 		
-		prevColorGrids = pcg.ToArray();
+		prevColorGrids = pcg .ToArray();
+		prevCharGrids  = pchg.ToArray();
 			
 		for (var i = 0; i < 4; i++) {
-			prevColorGrids[i] = new Color?[height][];
+			prevColorGrids[i] = new AnsiColor?[height][];
+			prevCharGrids [i] = new       char[height][];
 		}
 		
 		for (var y = 0; y < height; y++) {
-			charGrid[y]  = new   char[width];
-			colorGrid[y] = new Color?[width];
+			charGrid[y]  = new       char[width];
+			colorGrid[y] = new AnsiColor?[width];
 			
 			for (var i = 0; i < 4; i++) {
-				prevColorGrids[i][y] = new Color?[width];
+				prevColorGrids[i][y] = new AnsiColor?[width];
+				prevCharGrids [i][y] = new       char[width];
 			}
 		}
 		
+		initBuffers();
 		Clear();
 	}
 	
-	public static void Clear(Color? col = null) {
+	static void initBuffers() {
+		if (prevCharBuffers.Length > 0) {
+			return;
+		}
+		
+		List<List<AnsiColor?[]>>  pcb = new();
+		List<List<      char[]>> pchb = new();
+		
+		for (var i = 0; i < 4; i++) {
+			pcb .Add(new List<AnsiColor?[]>());
+			pchb.Add(new List<      char[]>());
+		}
+		
+		prevColorBuffers = pcb .ToArray();
+		prevCharBuffers  = pchb.ToArray();
+	}
+	
+	public static void EnableCutout(int portX, int portY, int portWidth, int portHeight) {
+		cutoutEnabled = true;
+		
+		cutoutLeft = portX;
+		cutoutTop  = portY;
+		
+		cutoutWidth  = portWidth;
+		cutoutHeight = portHeight;
+	}
+	
+	public static void DisableCutout() {
+		cutoutEnabled = false;
+	}
+	
+	public static void SetWindowProps(int portX, int portY, int portWidth, int portHeight) {
+		windowLeft = portX;
+		windowTop  = portY;
+		
+		windowWidth  = portWidth;
+		windowHeight = portHeight;
+	}
+	
+	public static void ResetPrevBuffers() {
+		var bufHeight = charBuffer.Count;
+		var bufWidth  = charBuffer.Count > 0 ? charBuffer[^1].Length : 0;
+		
+		for (var i = 0; i < prevCharBuffers.Length; i++) {
+			prevCharBuffers [i].Clear();
+			prevColorBuffers[i].Clear();
+		
+			for (var _ = 0; _ < bufHeight; _++) {
+				prevCharBuffers [i].Add(new       char[bufWidth]);
+				prevColorBuffers[i].Add(new AnsiColor?[bufWidth]);
+			
+				for (var x = 0; x < bufWidth; x++) {
+					prevCharBuffers [i][^1][x] = ' ';
+					prevColorBuffers[i][^1][x] = null;
+				}
+			}
+		}
+		
+		windowEnabled = true;
+	}
+	
+	public static void AddBufferRow() {
+		VirtualSize++;
+		namedBuffers[currentBufferId].VirtualSize = VirtualSize;
+		
+		if (CharBuffer.Count < MaxBufferRows) {
+			CharBuffer .Add(new       char[windowWidth]);
+			ColorBuffer.Add(new AnsiColor?[windowWidth]);
+		
+			for (var i = 0; i < windowWidth; i++) {
+				CharBuffer [(CharBuffer .Count - 1) % MaxBufferRows][i] = ' ';
+				ColorBuffer[(ColorBuffer.Count - 1) % MaxBufferRows][i] = null;
+			}
+		}
+	}
+	
+	public static void SyncVirtualSize() {
+		VirtualSize = namedBuffers[currentBufferId].CharBuffer.Count;
+		namedBuffers[currentBufferId].VirtualSize = VirtualSize;
+	}
+	
+	public static void ResetWindowBuffer(int bufWidth, int bufHeight, int portX, int portY, int portWidth, int portHeight) {
+		bufHeight %= MaxBufferRows;
+		VirtualSize = bufHeight;
+		namedBuffers[currentBufferId].VirtualSize = VirtualSize;
+		
+		charBuffer .Clear();
+		colorBuffer.Clear();
+		
+		for (var i = 0; i < prevCharBuffers.Length; i++) {
+			prevCharBuffers [i].Clear();
+			prevColorBuffers[i].Clear();
+		
+			for (var _ = 0; _ < bufHeight; _++) {
+				prevCharBuffers [i].Add(new       char[bufWidth]);
+				prevColorBuffers[i].Add(new AnsiColor?[bufWidth]);
+			
+				for (var x = 0; x < bufWidth; x++) {
+					prevCharBuffers [i][^1][x] = ' ';
+					prevColorBuffers[i][^1][x] = null;
+				}
+			}
+		}
+		
+		for (var _ = 0; _ < bufHeight; _++) {
+			charBuffer .Add(new       char[bufWidth]);
+			colorBuffer.Add(new AnsiColor?[bufWidth]);
+			
+			for (var x = 0; x < bufWidth; x++) {
+				charBuffer [^1][x] = ' ';
+				colorBuffer[^1][x] = null;
+			}
+		}
+		
+		windowLeft = portX;
+		windowTop  = portY;
+		
+		windowWidth  = portWidth;
+		windowHeight = portHeight;
+		
+		windowEnabled = true;
+		scrollTop = 0;
+	}
+	
+	public static void UpdateState(bool writeToScrollBuf) {
+		updateState(writeToScrollBuf);
+	}
+	
+	public static void HideWindow() {
+		windowEnabled = false;
+	}
+	
+	public static void EnableWindow() {
+		windowEnabled = true;
+	}
+	
+	public static bool IsInWindow(int x, int y) {
+		return x >= windowLeft && x < windowLeft + windowWidth
+		    && y >= windowTop  && y < windowTop  + windowHeight;
+	}
+	
+	public static bool IsInCutout(int x, int y) {
+		return x >= cutoutLeft && x < cutoutLeft + cutoutWidth
+		    && y >= cutoutTop  && y < cutoutTop  + cutoutHeight;
+	}
+	
+	public static JVector2I WindowCoords(int x, int y) {
+		JVector2I coords = (x - windowLeft, y - windowTop + scrollTop);
+		coords.Y %= MaxBufferRows;
+		return coords;
+	}
+	
+	public static char CharAt(int x, int y) {
+		if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
+			var wcoords = WindowCoords(x, y);
+			
+			if (wcoords.Y >= charBuffer.Count) {
+				return ' ';
+			}
+			else if (wcoords.X >= charBuffer[wcoords.Y].Length) {
+				return ' ';
+			}
+			else {
+				return charBuffer[wcoords.Y][wcoords.X];
+			}
+		}
+		else {
+			return charGrid[y][x];
+		}
+	}
+	
+	public static AnsiColor? ColorAt(int x, int y) {
+		if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
+			var wcoords = WindowCoords(x, y);
+			
+			if (wcoords.Y >= charBuffer.Count) {
+				return null;
+			}
+			else if (wcoords.X >= charBuffer[wcoords.Y].Length) {
+				return null;
+			}
+			else {
+				return colorBuffer[wcoords.Y][wcoords.X];
+			}
+		}
+		else {
+			return colorGrid[y][x];
+		}
+	}
+	
+	public static void SetBufferCharAt(int x, int y, char ch, AnsiColor? col) {
+		y %= MaxBufferRows;
+		
+		if (y < charBuffer.Count && x < charBuffer[y].Length) {
+			charBuffer [y][x] = ch;
+			colorBuffer[y][x] = col;
+		}
+	}
+	
+	public static void SetBufferColorAt(int x, int y, AnsiColor? col) {
+		y %= MaxBufferRows;
+		
+		if (y < charBuffer.Count && x < charBuffer[y].Length) {
+			colorBuffer[y][x] = col;
+		}
+	}
+	
+	public static void Clear(AnsiColor? col = null) {
 		for (var y = 0; y < Height; y++) {
 			for (var x = 0; x < Width; x++) {
 				charGrid[y][x]  = ' ';
@@ -84,7 +396,9 @@ public static class Display {
 		y = 0;
 	}
 	
-	public static void Write(string text, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void Write(string text, int? x_ = null, int? y_ = null, AnsiColor? col = null, bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
 		if (x_ != null) x = x_.Value;
 		if (y_ != null) y = y_.Value;
 		
@@ -109,75 +423,99 @@ public static class Display {
 					var rem = 4 - x % 4;
 					
 					for (var i = 0; i < rem; i++) {
-						writeChar(' ', x, y, col ?? color);
+						writeChar(' ', x, y, col ?? color, writeToScrollBuf);
 						x++;
 					}
 				}
 			}
 			
 			if (print) {
-				writeChar(c, x, y, col ?? color);
+				writeChar(c, x, y, col ?? color, writeToScrollBuf);
 				x++;
 			}
 		}
 	}
 	
-	public static void WriteBox(string[] lines, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void Highlight(int length, int? x_ = null, int? y_ = null, Color? col = null, bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
+		if (x_ != null) x = x_.Value;
+		if (y_ != null) y = y_.Value;
+		
+		for (var i = 0; i < length; i++) {
+			highlightChar(x, y, col, writeToScrollBuf);
+			x++;
+		}
+	}
+	
+	public static void WriteBox(string[] lines, int? x_ = null, int? y_ = null, AnsiColor? col = null, bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
 		var initX = x_ ?? x;
 		var initY = y_ ?? y;
 		
 		var maxLength = lines.Max(line => line.Length);
-		ClearBox(maxLength, lines.Length, initX, initY, col, writeThruToScrollBuf);
+		ClearBox(maxLength, lines.Length, initX, initY, col, writeToScrollBuf);
 		
 		x = initX;
 		y = initY;
 		
 		foreach (var line in lines) {
-			Write(line, x, y, col, writeThruToScrollBuf);
+			Write(line, x, y, col, writeToScrollBuf);
 			x = initX;
 			y++;
 		}
 	}
 	
-	public static void ClearLine(int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void ClearLine(int? y_ = null, AnsiColor? col = null, bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
 		if (y_ != null) y = y_.Value;
 		var initY = y;
 		
-		Write(new(' ', Width), 0, y_, col ?? color, writeThruToScrollBuf);
+		Write(new(' ', Width), 0, y_, col ?? color, writeToScrollBuf);
 		x = 0;
 		y = initY + 1;
 	}
 	
-	public static void ClearBox(int width, int height, int? x_ = null, int? y_ = null, Color? col = null, bool writeThruToScrollBuf = false) {
+	public static void ClearBox(int width, int height, int? x_ = null, int? y_ = null, AnsiColor? col = null, bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
 		var initX = x_ ?? x;
 		var initY = y_ ?? y;
 		
 		for (var yy = 0; yy < height; yy++) {
-			Write(new(' ', width), x_, initY + yy, col ?? color, writeThruToScrollBuf);
+			Write(new(' ', width), x_, initY + yy, col ?? color, writeToScrollBuf);
 			x = initX;
 		}
 	}
 	
-	public static void DrawOutline(int x, int y, int width, int height, Color? col = null, bool removeSides = false) {
+	public static void DrawOutline(int x, int y,
+	                               int width, int height,
+	                               AnsiColor? col = null,
+	                               bool removeSides = false,
+	                               bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
 		var left   = x;
 		var right  = x + width - 1;
 		var top    = y;
 		var bottom = y + height - 1;
 			
 		for (var xx = left; xx <= right; xx++) {
-			writeChar('-', xx, top,    col ?? color);
-			writeChar('-', xx, bottom, col ?? color);
+			writeChar('-', xx, top,    col ?? color, writeToScrollBuf);
+			writeChar('-', xx, bottom, col ?? color, writeToScrollBuf);
 		}
 		
 		if (!removeSides) {
-			writeChar('+', left,  top,    col ?? color);
-			writeChar('+', right, top,    col ?? color);
-			writeChar('+', left,  bottom, col ?? color);
-			writeChar('+', right, bottom, col ?? color);
+			writeChar('+', left,  top,    col ?? color, writeToScrollBuf);
+			writeChar('+', right, top,    col ?? color, writeToScrollBuf);
+			writeChar('+', left,  bottom, col ?? color, writeToScrollBuf);
+			writeChar('+', right, bottom, col ?? color, writeToScrollBuf);
 			
 			for (var yy = top + 1; yy < bottom; yy++) {
-				writeChar('|', left,  yy, col ?? color);
-				writeChar('|', right, yy, col ?? color);
+				writeChar('|', left,  yy, col ?? color, writeToScrollBuf);
+				writeChar('|', right, yy, col ?? color, writeToScrollBuf);
 			}
 		}
 	}
@@ -191,58 +529,143 @@ public static class Display {
 		StringBuilder sb = new("\x1B[H");
 		
 		sb.Append("\x1B[0m");
-		if (colorGrid[0][0] != null) {
-			sb.Append(colorGrid[0][0]!.AnsiString);
+		if (ColorAt(0, 0) != null) {
+			sb.Append(ColorAt(0, 0)!.AnsiString);
 		}
 		
-		Color? prevColor = null;
-				
-		// Update positions
-		var offset0 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr1 / 0x10;
-		var offset1 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr2 / 0x10;
-		var offset2 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr3 / 0x10;
-		var offset3 = CliMain.StartAddr / 0x10 - CliMain.PrevStartAddr4 / 0x10;
+		AnsiColor? prevColor = null;
 		
-		// Update color grids
+		// Update color and char grids
 		for (var i = 0; i < framesSinceLastDisplay; i++) {
 			for (var y = 0; y < Height; y++) {
 				for (var x = 0; x < Width; x++) {
-					var cl = colorGrid[y][x];
+					var ch =  CharAt(x, y);
+					var cl = ColorAt(x, y);
+					
+					if (windowEnabled && IsInWindow(x, y)) {
+						if (UseBufferBlending) {
+							var (wx, wy) = WindowCoords(x, y).AsTuple;
+							
+							// Update color buffers
+							prevColorBuffers[3][wy][wx] = prevColorBuffers[2][wy][wx];
+							prevColorBuffers[2][wy][wx] = prevColorBuffers[1][wy][wx];
+							prevColorBuffers[1][wy][wx] = prevColorBuffers[0][wy][wx];
+							prevColorBuffers[0][wy][wx] = cl;
+					
+							// Update char buffers
+							prevCharBuffers[3][wy][wx] = prevCharBuffers[2][wy][wx];
+							prevCharBuffers[2][wy][wx] = prevCharBuffers[1][wy][wx];
+							prevCharBuffers[1][wy][wx] = prevCharBuffers[0][wy][wx];
+							prevCharBuffers[0][wy][wx] = ch;
+						}
+					}
+					else {
+						// Update color grids
+						prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
+						prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
+						prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
+						prevColorGrids[0][y][x] = cl;
 				
-					// Update color grids
-					prevColorGrids[3][y][x] = prevColorGrids[2][y][x];
-					prevColorGrids[2][y][x] = prevColorGrids[1][y][x];
-					prevColorGrids[1][y][x] = prevColorGrids[0][y][x];
-					prevColorGrids[0][y][x] = cl;
+						// Update char grids
+						prevCharGrids[3][y][x] = prevCharGrids[2][y][x];
+						prevCharGrids[2][y][x] = prevCharGrids[1][y][x];
+						prevCharGrids[1][y][x] = prevCharGrids[0][y][x];
+						prevCharGrids[0][y][x] = ch;
+					}
 				}
 			}
 		}
 		
+		var screenToAreaRatio = 1.0;
+		var scrollbarSize     = 0;
+		var scrollbarTop      = 0;
+		
+		if (windowEnabled) {
+			screenToAreaRatio = (double) windowHeight / charBuffer.Count;
+			scrollbarSize     = (int) Math.Ceiling(screenToAreaRatio * windowHeight);
+			scrollbarTop      = windowTop + windowHeight * (ScrollTop - Math.Max(0, VirtualSize - charBuffer.Count)) / charBuffer.Count;
+		}
+		
 		for (var y = 0; y < Height; y++) {
 			for (var x = 0; x < Width; x++) {
-				var ch =  charGrid[y][x];
-				var cl = colorGrid[y][x];
+				var ch =  CharAt(x, y);
+				var cl = ColorAt(x, y);
 				
-				if (cl is not null) {
-					var (y0, y1, y2, y3) = (y + offset0, y + offset1, y + offset2, y + offset3);
-					
-					if (x < Width - 32 && y0 >= 0 && y0 < Height && y1 >= 0 && y1 < Height && y2 >= 0 && y2 < Height && y3 >= 0 && y3 < Height) {
-						cl = blendColors(
-							cl,
-							prevColorGrids[0][y0][x],
-							prevColorGrids[1][y1][x],
-							prevColorGrids[2][y2][x],
-							prevColorGrids[3][y3][x]
-						);
+				var isMulti = cl is not null
+				           && cl.BackgroundRGB is not null && cl.ForegroundRGB is not null
+				           && ch is ' ' or '▄' or '▀' or '█';
+				
+				var isMultiBlended = false;
+				
+				if ((!cutoutEnabled || !IsInCutout(x, y))
+				    && windowEnabled && charBuffer.Count > windowHeight && IsInWindow(x, y) && x == WindowBottomRight.X - 1)
+				{
+					if (y >= scrollbarTop && y < scrollbarTop + scrollbarSize) {
+						ch = '█';
+						cl = AnsiColor.Grey;
 					}
 					else {
-						cl = blendColors(
-							cl,
-							prevColorGrids[0][y][x],
-							prevColorGrids[1][y][x],
-							prevColorGrids[2][y][x],
-							prevColorGrids[3][y][x]
-						);
+						ch = '▒';
+						cl = AnsiColor.DarkGrey;
+					}
+				}
+				else if (cl is not null && cl.IsBG || isMulti) {
+					if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
+						if (UseBufferBlending) {
+							var (wx, wy) = WindowCoords(x, y).AsTuple;
+						
+							cl = blendColors(
+								cl,
+								prevColorBuffers[0][wy][wx],
+								prevColorBuffers[1][wy][wx],
+								prevColorBuffers[2][wy][wx],
+								prevColorBuffers[3][wy][wx]
+							);
+						}
+					}
+					else if (x < Width - 32 && y >= 0 && y < Height) {
+						if (isMulti) {
+							isMultiBlended = true;
+							
+							cl = blendDualColors(
+								(cl!, ch),
+								(prevColorGrids[0][y][x], prevCharGrids[0][y][x]),
+								(prevColorGrids[1][y][x], prevCharGrids[1][y][x]),
+								(prevColorGrids[2][y][x], prevCharGrids[2][y][x]),
+								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
+							);
+						}
+						else {
+							cl = blendColors(
+								cl,
+								prevColorGrids[0][y][x],
+								prevColorGrids[1][y][x],
+								prevColorGrids[2][y][x],
+								prevColorGrids[3][y][x]
+							);
+						}
+					}
+					else {
+						if (isMulti) {
+							isMultiBlended = true;
+							
+							cl = blendDualColors(
+								(cl!, ch),
+								(prevColorGrids[0][y][x], prevCharGrids[0][y][x]),
+								(prevColorGrids[1][y][x], prevCharGrids[1][y][x]),
+								(prevColorGrids[2][y][x], prevCharGrids[2][y][x]),
+								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
+							);
+						}
+						else {
+							cl = blendColors(
+								cl,
+								prevColorGrids[0][y][x],
+								prevColorGrids[1][y][x],
+								prevColorGrids[2][y][x],
+								prevColorGrids[3][y][x]
+							);
+						}
 					}
 				}
 				
@@ -256,7 +679,7 @@ public static class Display {
 					prevColor = cl;
 				}
 				
-				sb.Append(ch);
+				sb.Append(isMultiBlended ? '▀' : ch);
 			}
 			
 			if (y < Height - 1) {
@@ -416,11 +839,56 @@ public static class Display {
 		return sb.ToString();
 	}
 	
-	static void writeChar(char c, int x, int y, Color? color) {
-		if (x >= Width || y >= Height) return;
+	static void updateState(bool useScrollBuffer) {
+		if (useScrollBuffer != scrollBufPrevSource) {
+			x = 0;
+			y = 0;
+			scrollBufPrevSource = useScrollBuffer;
+		}
+	}
+	
+	static void writeChar(char c, int x, int y, AnsiColor? color, bool writeToScrollBuf = false) {
+		if (writeToScrollBuf) {
+			SetBufferCharAt(x, y, c, color);
+		}
+		else {
+			if (x >= Width || y >= Height) return;
 		
-		charGrid[y][x]  = c;
-		colorGrid[y][x] = color;
+			charGrid[y][x]  = c;
+			colorGrid[y][x] = color;
+		}
+	}
+	
+	static void highlightChar(int x, int y, Color? color, bool writeToScrollBuf = false) {
+		var baseCol = ColorAt(x, y);
+		var fgCol   = (object?) baseCol?.ForegroundRGB ?? baseCol?.ForegroundANSI;
+		
+		AnsiColor? newCol;
+		
+		switch (fgCol) {
+			case Color c: {
+				newCol = color is null ? new(c) : new(c, color);
+				break;
+			}
+			
+			case AnsiColor.Code c: {
+				newCol = color is null ? new(c) : new(c, color);
+				break;
+			}
+			
+			default: {
+				newCol = color is null ? null : new(color, isBG: true);
+				break;
+			}
+		}
+		
+		if (writeToScrollBuf) {
+			SetBufferColorAt(x, y, newCol);
+		}
+		else {
+			if (x >= Width || y >= Height) return;
+			colorGrid[y][x] = newCol;
+		}
 	}
 	
 	static double[] blendFilter = [
@@ -431,53 +899,75 @@ public static class Display {
 		0.10,
 	];
 	
-	const double Gamma = 2.2;
+	static AnsiColor? blendColors(params AnsiColor?[] colors) {
+		if (colors.Length == 0) {
+			return null;
+		}
+		
+		var cc1 = colors[0];
+		
+		if (cc1?.BackgroundRGB is null && cc1?.ForegroundRGB is null) {
+			return cc1;
+		}
+		
+		List<Color> prevColors = [];
+		
+		foreach (var col in colors) {
+			if (col?.BackgroundRGB is Color c) {
+				prevColors.Add(c);
+			}
+			else {
+				break;
+			}
+		}
+		
+		var blended = prevColors[0].Filter(prevColors[1..], blendFilter, Jimbl.Graphics.Color.Space.RGB);
+		return new(blended, isBG: true);
+	}
 	
-	static Color? blendColors(Color c1, Color? c2, Color? c3, Color? c4, Color? c5) {
-		if (!c1.IsRGB || !c1.IsBG) {
-			return c1;
+	static AnsiColor? blendDualColors(params (AnsiColor? Color, char Char)[] colors) {
+		if (colors.Length == 0) {
+			return null;
 		}
 		
-		Color lastColor = c1;
+		var cc1 = colors[0];
 		
-		var (red, green, blue) = (0.0, 0.0, 0.0);
-		
-		red   += Math.Pow(c1.Red   / 255.0, 1 / Gamma) * blendFilter[0];
-		green += Math.Pow(c1.Green / 255.0, 1 / Gamma) * blendFilter[0];
-		blue  += Math.Pow(c1.Blue  / 255.0, 1 / Gamma) * blendFilter[0];
-		
-		if (c2 is not null && c2.IsRGB && c2.IsBG) {
-			lastColor = c2;
+		if (cc1.Color?.BackgroundRGB is null && cc1.Color?.ForegroundRGB is null) {
+			return cc1.Color;
 		}
 		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[1];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[1];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[1];
+		List<Color> topPrevColors    = [];
+		List<Color> bottomPrevColors = [];
 		
-		if (c3 is not null && c3.IsRGB && c3.IsBG) {
-			lastColor = c3;
+		// Top blending
+		foreach (var col in colors) {
+			if (col.Char is ' ' or '▄' && col.Color?.BackgroundRGB is Color bc) {
+				topPrevColors.Add(bc);
+			}
+			else if (col.Char is '█' or '▀' && col.Color?.ForegroundRGB is Color fc) {
+				topPrevColors.Add(fc);
+			}
+			else {
+				break;
+			}
 		}
 		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[2];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[2];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[2];
-		
-		if (c4 is not null && c4.IsRGB && c4.IsBG) {
-			lastColor = c4;
+		// Bottom blending
+		foreach (var col in colors) {
+			if (col.Char is '█' or '▄' && col.Color?.ForegroundRGB is Color fc) {
+				bottomPrevColors.Add(fc);
+			}
+			else if (col.Char is ' ' or '▀' && col.Color?.BackgroundRGB is Color bc) {
+				bottomPrevColors.Add(bc);
+			}
+			else {
+				break;
+			}
 		}
 		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[3];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[3];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[3];
+		var topBlended    =    topPrevColors[0].Filter(   topPrevColors[1..], blendFilter, Jimbl.Graphics.Color.Space.RGB);
+		var bottomBlended = bottomPrevColors[0].Filter(bottomPrevColors[1..], blendFilter, Jimbl.Graphics.Color.Space.RGB);
 		
-		if (c5 is not null && c5.IsRGB && c5.IsBG) {
-			lastColor = c5;
-		}
-		
-		red   += Math.Pow(lastColor.Red   / 255.0, 1 / Gamma) * blendFilter[4];
-		green += Math.Pow(lastColor.Green / 255.0, 1 / Gamma) * blendFilter[4];
-		blue  += Math.Pow(lastColor.Blue  / 255.0, 1 / Gamma) * blendFilter[4];
-		
-		return new(Math.Pow(red, 2.2), Math.Pow(green, 2.2), Math.Pow(blue, 2.2), bg: true);
+		return new(topBlended, bottomBlended); // Convention: Top is FG, bottom is BG. Caller will force char to '▀'
 	}
 }

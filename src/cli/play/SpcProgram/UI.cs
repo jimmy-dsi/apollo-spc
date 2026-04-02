@@ -5,6 +5,7 @@ using System.Text;
 
 using Apollo;
 using Jimbl;
+using Jimbl.Graphics;
 
 public static partial class CliMain {
 	const int ScrollAreaRows = 0x1E;
@@ -12,7 +13,7 @@ public static partial class CliMain {
 	class EndAppException: Exception { }
 	
 	public enum State {
-		Init, Normal, Paused, NonFatalError
+		Init, Normal, Paused, Break, NonFatalError
 	}
 	
 	enum View {
@@ -28,7 +29,7 @@ public static partial class CliMain {
 	
 	enum StatusMSG {
 		Default,
-		HeatMapOff, HeatMapOn,
+		HeatMapOff, HeatMapOn, BusSizeChanged,
 		
 		ChannelX_Enabled,  MainChannelX_Enabled,  EchoChannelX_Enabled,
 		ChannelX_Disabled, MainChannelX_Disabled, EchoChannelX_Disabled,
@@ -37,13 +38,18 @@ public static partial class CliMain {
 		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
 		
 		SeekFwd, SeekBack, SeekFwdFar, SeekBackFar, SeekPos,
+		SteppedCycles, Paused, BreakExec, CycleDisplayChanged,
+		BreakpointHit, BreakpointsOff, BreakpointsOn,
 		
 		Script700_Error, Continue
 	}
 	
 	static State  uiState          = State.Init;
+	static State  realUiState      = State.Init;
 	static bool   disableScript700 = false;
 	static object uiStateLock      = new();
+	
+	static bool ignoreStepDisplay = false;
 	
 	static View       realView       = View.Metadata;
 	static View       currentView    = View.Metadata;
@@ -53,20 +59,29 @@ public static partial class CliMain {
 	static bool       menuBarError   = false;
 	static Stopwatch? tempMsgTime    = null;
 	
-	static int channelToToggle = 0;
-	static int seekPosition    = 1;
+	static int     channelToToggle    = 0;
+	static int     seekPosition       = 1;
+	static long    stepCycles         = 0;
+	static UInt16  execBreakpointAddr = 0;
+	static BusSize heatMapDataSize    = BusSize.Bit32;
 	
 	static int viewIndex = 0;
-	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer];
+	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
+	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
-	static bool heatMapEnabled    = false;
-	static bool cyclesInSpcClocks = false;
+	static bool heatMapEnabled     = false;
+	static bool cyclesInSpcClocks  = false;
+	static bool breakpointsEnabled = true;
+	
+	static object breakpointToggleLock = new();
 	
 	static Transfer.Requests requests = Transfer.Requests.CycleCountOnly;
 	
 	static long   curCycle     = 0;
 	static long   barCycle     = 0;
 	static object barCycleLock = new();
+	
+	static bool instrStepInTransit = false;
 	
 	static long frame     = 0;
 	static long prevFrame = 0;
@@ -93,7 +108,28 @@ public static partial class CliMain {
 		}
 		set {
 			lock (uiStateLock) {
+				var s = uiState;
 				uiState = value;
+				
+				if (uiState == State.NonFatalError && s != State.NonFatalError) {
+					realUiState = s;
+				}
+			}
+		}
+	}
+	
+	public static State RealUI_State {
+		get {
+			lock (uiStateLock) {
+				return realUiState;
+			}
+		}
+	}
+	
+	public static bool UI_StateIsPaused {
+		get {
+			lock (uiStateLock) {
+				return uiState is State.Paused or State.NonFatalError;
 			}
 		}
 	}
@@ -110,6 +146,64 @@ public static partial class CliMain {
 			}
 		}
 	}
+
+	public static bool InstrStepInTransit {
+		get {
+			lock (uiStateLock) {
+				return instrStepInTransit;
+			}
+		}
+		set {
+			lock (uiStateLock) {
+				instrStepInTransit = value;
+			}
+		}
+	}
+
+	public static bool BreakpointsEnabled {
+		get {
+			lock (breakpointToggleLock) {
+				return breakpointsEnabled;
+			}
+		}
+		set {
+			lock (breakpointToggleLock) {
+				breakpointsEnabled = value;
+			}
+		}
+	}
+	
+	public static bool ToggleBreakpoints() {
+		lock (breakpointToggleLock) {
+			breakpointsEnabled = !breakpointsEnabled;
+			return breakpointsEnabled;
+		}
+	}
+
+	public static void FlagStepInTransit() {
+		lock (uiStateLock) {
+			var s = uiState;
+			uiState = State.NonFatalError;
+				
+			if (s != State.NonFatalError) {
+				realUiState = s;
+				instrStepInTransit = true;
+			}
+		}
+	}
+
+	public static State RestoreUIState() {
+		lock (uiStateLock) {
+			if (uiState == State.NonFatalError && realUiState != State.NonFatalError) {
+				uiState = realUiState;
+			}
+			return uiState;
+		}
+	}
+	
+	public static void ToggleBreak() {
+		TogglePause();
+	}
 	
 	public static void TogglePause() {
 		lock (uiStateLock) {
@@ -123,6 +217,8 @@ public static partial class CliMain {
 	}
 	
 	static void handleUI(EmuDataBuffer? buffer) {
+		PrevStartAddr = StartAddr;
+		
 		KeyBindings.Action? action = null;
 		var state = UI_State;
 		
@@ -174,8 +270,7 @@ public static partial class CliMain {
 							}
 							
 							DisableScript700 = false;
-							UI_State         = State.Normal;
-							state            = State.Normal;
+							state = RestoreUIState();
 							
 							setStatusMsg(StatusMSG.Default);
 							setTempStatusMsg(StatusMSG.Continue);
@@ -203,8 +298,7 @@ public static partial class CliMain {
 							}
 							
 							DisableScript700 = true;
-							UI_State         = State.Normal;
-							state            = State.Normal;
+							state = RestoreUIState();
 							
 							setStatusMsg(StatusMSG.Default);
 							setTempStatusMsg(StatusMSG.Continue);
@@ -220,20 +314,57 @@ public static partial class CliMain {
 			}
 		}
 		
-		if (state is not State.NonFatalError and not State.Init) {
+		if (state is State.Break) {
+			if (buffer?.BreakPC is UInt16 pc) {
+				execBreakpointAddr = pc;
+				
+				if (HideFirstBreakAddr) {
+					ignoreStepDisplay = true;
+					resetTraceLog();
+				}
+				else {
+					setStatusMsg(StatusMSG.BreakpointHit);
+				}
+				
+				forceTraceLoggerView();
+		
+				if (nextView != currentView) {
+					if (buffer?.ExpectData(requests) ?? false) {
+						commitCurrentView();
+					}
+				}
+			
+				UI_State = State.Paused;
+				ignoreStepDisplay = true;
+				lastInstructionCycle = -1;
+			}
+		}
+		else if (state is not State.NonFatalError and not State.Init) {
 			action = KeyBindings.GetAction();
 		
 			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
+			var stepInTransit = InstrStepInTransit;
 		
-			for (var _ = 0; _ < framesSinceLastDisplay; _++) {
-				PrevStartAddr4 = PrevStartAddr3;
-				PrevStartAddr3 = PrevStartAddr2;
-				PrevStartAddr2 = PrevStartAddr1;
-				PrevStartAddr1 = StartAddr;
-			}
-		
-			if (action is not null) {
+			if (action is not null && !stepInTransit) {
 				doAction(action!.Value);
+			}
+			else if (stepInTransit) {
+				stepInstruction(log: true);
+			}
+			
+			if (buffer is not null) {
+				if (!ignoreStepDisplay) {
+					if (state == State.Paused && lastInstructionCycle >= 0) {
+						stepCycles = buffer.DSPCycle - lastInstructionCycle;
+						if (stepCycles > 0) {
+							setTempStatusMsg(StatusMSG.SteppedCycles);
+						}
+					}
+			
+					lastInstructionCycle = buffer.DSPCycle;
+				}
+				
+				ignoreStepDisplay = false;
 			}
 		
 			if (nextView != currentView) {
@@ -254,8 +385,18 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case View.ASMViewer: {
+				if (Display.CurrentBufferId == "trace") {
+					showTraceLogger(buffer!);
+				}
+				break;
+			}
+			
 			case View.MemoryViewer: {
-				showMemoryViewer(buffer!);
+				if (Display.CurrentBufferId == "aram") {
+					showMemoryViewer(buffer!);
+				}
+				
 				break;
 			}
 			
@@ -292,7 +433,7 @@ public static partial class CliMain {
 			}
 			
 			Display.ClearLine(Display.Height - 3);
-			Display.Write(formatTime((int) (curCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, Color.Cyan);
+			Display.Write(formatTime((int) (curCycle / 32), TimeUnit.Timer2s), 0, Display.Height - 3, AnsiColor.Cyan);
 			
 			var fullTimeInCycles = (long) (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12)  * 2048000;
 			var barLength        = Display.Width - 1 - 14;
@@ -303,15 +444,26 @@ public static partial class CliMain {
 			cursorPos  = Math  .Min(cursorPos,                          Display.Width - 1);
 			cursorPos2 = Math.Clamp(cursorPos2, Math.Max(1, cursorPos), Display.Width);
 			
-			Display.Write(new string('=', cursorPos) + '|',                         14,                 Display.Height - 3, Color    .Cyan);
-			Display.Write(new string('=', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, Color.DarkGrey);
+			Display.Write(new string('=', cursorPos) + '|',                         14,                 Display.Height - 3, AnsiColor    .Cyan);
+			Display.Write(new string('=', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, AnsiColor.DarkGrey);
 		}
 		
-		Display.Write("[", 13,                Display.Height - 3, Color.Cyan);
-		Display.Write("]", Display.Width - 1, Display.Height - 3, Color.Cyan);
+		Display.Write("[", 13,                Display.Height - 3, AnsiColor.Cyan);
+		Display.Write("]", Display.Width - 1, Display.Height - 3, AnsiColor.Cyan);
 		
 		// Display Menu Bar
-		var barColor = menuBarError ? Color.BGRed : Color.BGBlue;
+		AnsiColor barColor;
+		
+		if (menuBarError) {
+			barColor = AnsiColor.BGRed;
+		}
+		else if (lastSetMsg is StatusMSG.BreakpointHit) {
+			barColor = AnsiColor.BGDarkGrey;
+		}
+		else {
+			barColor = AnsiColor.BGBlue;
+		}
+		
 		Display.ClearLine(Display.Height - 1, barColor);
 		
 		if (tempMsgTime is not null && tempMsgTime.ElapsedMilliseconds >= 3000) {
@@ -334,28 +486,35 @@ public static partial class CliMain {
 		if (state == State.NonFatalError) {
 			setStatusMsg(StatusMSG.Script700_Error, error: true);
 			
-			Display.DrawOutline(20, 8, Display.Width - 40, Display.Height - 18, Color.Yellow);
-			Display.ClearBox(Display.Width - 42, Display.Height - 20, 21, 9);
+			var winLeft   = 20;
+			var winTop    = 8;
+			var winWidth  = Display.Width  - 40;
+			var winHeight = Display.Height - 18;
 			
-			Display.Write(" Error ", Display.Width / 2 - 3, 8, Color.Yellow);
+			Display.EnableCutout(winLeft, winTop, winWidth, winHeight);
+			
+			Display.DrawOutline(winLeft, winTop, winWidth, winHeight, AnsiColor.Yellow);
+			Display.ClearBox(winWidth - 2, winHeight - 2, winLeft + 1, winTop + 1);
+			
+			Display.Write(" Error ", Display.Width / 2 - 3, 8, AnsiColor.Yellow);
 			
 			var errorText = Display.WordWrap("A non-fatal error has occurred during the processing of Script700 code.", Display.Width - 36, 3);
-			Display.WriteBox(errorText, 23, 10, Color.Yellow);
+			Display.WriteBox(errorText, winLeft + 3, winTop + 2, AnsiColor.Yellow);
 			Display.Y++;
 			Display.WriteBox([
 				"Error reason: ",
 				"    Script700 execution timed out",
 				""
-			], col: Color.Yellow);
+			], col: AnsiColor.Yellow);
 			
 			var explainText = Display.WordWrap(
 				"This error can occur from either an infinite loop, or the execution of a long stretch of non-yielding Script700 code " +
 				"(i.e. no `w` command)",
-				Display.Width - 42 - 4, 3
+				winWidth - 2 - 4, 3
 			);
-			Display.Write("Explanation: ", col: Color.Yellow);
+			Display.Write("Explanation: ", col: AnsiColor.Yellow);
 			Display.Y++;
-			Display.WriteBox(explainText, x_: 22 + 4, col: Color.Yellow);
+			Display.WriteBox(explainText, x_: winLeft + 2 + 4, col: AnsiColor.Yellow);
 			Display.Y += 2;
 			
 			var displayY = Display.Y;
@@ -364,9 +523,12 @@ public static partial class CliMain {
 				var region = menuRegions[i];
 				var option = menuOptions[i];
 				
-				Display.ClearBox(region.W + 2, region.H, region.X - 1, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
-				Display.WriteBox(option, region.X, region.Y + displayY, col: selectedItem == i ? Color.BGBlue : Color.Cyan);
+				Display.ClearBox(region.W + 2, region.H, region.X - 1, region.Y + displayY, col: selectedItem == i ? AnsiColor.BGBlue : AnsiColor.Cyan);
+				Display.WriteBox(option, region.X, region.Y + displayY, col: selectedItem == i ? AnsiColor.BGBlue : AnsiColor.Cyan);
 			}
+		}
+		else {
+			Display.DisableCutout();
 		}
 		
 		if (state == State.Init) {
@@ -379,7 +541,17 @@ public static partial class CliMain {
 	static void doAction(KeyBindings.Action action) {
 		switch (action) {
 			case KeyBindings.Action.ExitCurrentMenu: {
-				changeCurrentView(realView, setAsRealView: false);
+				if (currentView != View.Help && tracePrevView is not null && currentView != tracePrevView && nextView != tracePrevView) {
+					viewIndex = tracePrevViewIndex;
+					changeCurrentView(tracePrevView!.Value, setAsRealView: false);
+						
+					tracePrevView      = null;
+					tracePrevViewIndex = 0;
+				}
+				else if (currentView == View.Help) {
+					changeCurrentView(realView, setAsRealView: false);
+				}
+				
 				break;
 			}
 			
@@ -396,6 +568,7 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.NavNextView: {
+				tracePrevView = null;
 				viewIndex++;
 				viewIndex %= views.Length;
 				changeCurrentView(views[viewIndex], setAsRealView: false);
@@ -403,6 +576,7 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.NavPrevView: {
+				tracePrevView = null;
 				viewIndex--;
 				viewIndex += views.Length;
 				viewIndex %= views.Length;
@@ -546,6 +720,12 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset < getScrollTopOffset()) {
+						ScrollOffset++;
+					}
+				}
+				
 				break;
 			}
 			
@@ -556,6 +736,13 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					//scrollSignal = true;
+					if (ScrollOffset > 0) {
+						ScrollOffset--;
+					}
+				}
+				
 				break;
 			}
 			
@@ -566,10 +753,20 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 					else if (StartAddr > 0) {
-						StartAddr = 0;
+						//scrollSignal = true;
+						StartAddr    = 0;
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset + 16 <= getScrollTopOffset()) {
+						ScrollOffset += 16;
+					}
+					else {
+						ScrollOffset = getScrollTopOffset();
+					}
+				}
+				
 				break;
 			}
 			
@@ -583,6 +780,15 @@ public static partial class CliMain {
 					}
 					requestEmuData(requests);
 				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset - 16 >= 0) {
+						ScrollOffset -= 16;
+					}
+					else {
+						ScrollOffset = 0;
+					}
+				}
+				
 				break;
 			}
 			
@@ -593,6 +799,10 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					ScrollOffset = getScrollTopOffset();
+				}
+				
 				break;
 			}
 			
@@ -603,6 +813,10 @@ public static partial class CliMain {
 						requestEmuData(requests);
 					}
 				}
+				else if (currentView == View.ASMViewer) {
+					ScrollOffset = 0;
+				}
+				
 				break;
 			}
 			
@@ -623,6 +837,7 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ToggleCycleUnit: {
 				cyclesInSpcClocks = !cyclesInSpcClocks;
+				setTempStatusMsg(StatusMSG.CycleDisplayChanged);
 				break;
 			}
 			
@@ -710,10 +925,102 @@ public static partial class CliMain {
 				break;
 			}
 			
-			case KeyBindings.Action.TogglePause: {
-				TogglePause();
+			case KeyBindings.Action.ToggleBreak: {
+				ToggleBreak();
+				
+				if (UI_State == State.Paused) {
+					setTempStatusMsg(StatusMSG.BreakExec);
+					forceTraceLoggerView();
+				}
+				else {
+					setTempStatusMsg(StatusMSG.Continue);
+					resetTraceLog();
+					
+					if (tracePrevView is not null && currentView != tracePrevView && nextView != tracePrevView) {
+						viewIndex = tracePrevViewIndex;
+						changeCurrentView(tracePrevView!.Value, setAsRealView: false);
+						
+						tracePrevView      = null;
+						tracePrevViewIndex = 0;
+					}
+				}
+				
 				break;
 			}
+			
+			case KeyBindings.Action.TogglePause: {
+				TogglePause();
+				
+				if (UI_State == State.Paused) {
+					setTempStatusMsg(StatusMSG.Paused);
+				}
+				else {
+					setTempStatusMsg(StatusMSG.Continue);
+					resetTraceLog();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.StepInstruction: {
+				stepInstruction();
+				break;
+			}
+			
+			case KeyBindings.Action.ToggleBreakpoints: {
+				var enabled = ToggleBreakpoints();
+				
+				if (enabled) {
+					setTempStatusMsg(StatusMSG.BreakpointsOn);
+				}
+				else {
+					setTempStatusMsg(StatusMSG.BreakpointsOff);
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.IncHeatMapDataSize: {
+				heatMapDataSize = heatMapDataSize.Next();
+				setTempStatusMsg(StatusMSG.BusSizeChanged);
+				break;
+			}
+			
+			case KeyBindings.Action.DecHeatMapDataSize: {
+				heatMapDataSize = heatMapDataSize.Prev();
+				setTempStatusMsg(StatusMSG.BusSizeChanged);
+				break;
+			}
+		}
+	}
+	
+	static void forceTraceLoggerView() {
+		if (currentView != View.ASMViewer && nextView != View.ASMViewer) {
+			tracePrevView      = nextView;
+			tracePrevViewIndex = viewIndex;
+						
+			viewIndex = asmViewerIndex;
+			changeCurrentView(View.ASMViewer, setAsRealView: false);
+		}
+	}
+	
+	static void stepInstruction(bool log = true) {
+		if (UI_State == State.Paused) {
+			if (log) {
+				ScrollOffset = 0;
+				InstructionsSinceTrace = NextInstructionsSinceTrace;
+				refreshSignal++;
+			}
+					
+			if (currentView != View.ASMViewer) {
+				resetTraceLog();
+			}
+					
+			Transfer.StepSignal.Set(); // Signal emulating thread to step one single instruction
+		}
+		else {
+			TogglePause();
+			setTempStatusMsg(StatusMSG.Paused);
 		}
 	}
 	
@@ -765,6 +1072,9 @@ public static partial class CliMain {
 	}
 	
 	static void loadSnapshot(int targetSnapshotIndex) {
+		ignoreStepDisplay = true;
+		resetTraceLog();
+		
 		Emulator? snapshot = null;
 		
 		lock (seekBarLock) {
@@ -784,6 +1094,7 @@ public static partial class CliMain {
 		
 		lock (EmuRestoreLock) {
 			PrimaryEmu.LoadStateFrom(snapshot);
+			lastInstructionCycle = PrimaryEmu.DSP.CurrentCycle;
 		}
 	}
 	
@@ -793,33 +1104,61 @@ public static partial class CliMain {
 		
 		// Make requests
 		switch (nextView) {
+			case View.ASMViewer: {
+				requestEmuData(Transfer.Requests.SPC_Regs | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
+				Display.CurrentBufferId = "trace";
+				Display.ScrollTop = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows - ScrollOffset);
+				Display.SetWindowProps(0, 0, Display.Width, ScrollAreaRows);
+				Display.EnableWindow();
+				
+				if (UI_State != State.Paused) {
+					resetTraceLog();
+				}
+				
+				break;
+			}
+			
 			case View.MemoryViewer: {
-				requestEmuData(Transfer.Requests.SMP_Bus);
+				resetStatusMsg();
+				requestEmuData(Transfer.Requests.SMP_Bus | Transfer.Requests.SPC_Regs | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
+				Display.CurrentBufferId = "aram";
+				Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
+				Display.EnableWindow();
 				break;
 			}
 			
 			case View.DSPViewer1: {
-				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1);
+				resetStatusMsg();
+				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
+				Display.HideWindow();
 				break;
 			}
 			
 			case View.DSPViewer2: {
-				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2);
+				resetStatusMsg();
+				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
+				Display.HideWindow();
 				break;
 			}
 			
 			case View.DSPViewer3: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.DSP_3);
+				Display.HideWindow();
 				break;
 			}
 			
 			case View.Script700Viewer: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.Script700 | Transfer.Requests.SMP_State);
+				Display.HideWindow();
 				break;
 			}
 			
 			default: {
+				resetStatusMsg();
 				requestEmuData(Transfer.Requests.CycleCountOnly);
+				Display.HideWindow();
 				break;
 			}
 		}
@@ -843,7 +1182,15 @@ public static partial class CliMain {
 		menuBarError = error;
 	}
 	
+	static void resetStatusMsg() {
+		if (tempMenuBarMsg is null) {
+			setStatusMsg(StatusMSG.Default);
+		}
+	}
+	
 	static void setTempStatusMsg(StatusMSG msg, bool error = false) {
+		setStatusMsg(StatusMSG.Default);
+		
 		tempMenuBarMsg = statusMsg(msg);
 		tempMsgTime    = new();
 		menuBarError   = error;
@@ -851,11 +1198,16 @@ public static partial class CliMain {
 		tempMsgTime.Start();
 	}
 	
+	static StatusMSG lastSetMsg = StatusMSG.Default;
+	
 	static string statusMsg(StatusMSG msg) {
+		lastSetMsg = msg;
+		
 		return msg switch {
 			StatusMSG.Default               => "Press CTRL+L for help menu",
 			StatusMSG.HeatMapOff            => "Heat map disabled",
 			StatusMSG.HeatMapOn             => "Heat map enabled",
+			StatusMSG.BusSizeChanged        => $"Heat map data size changed to {heatMapDataSize.Name()}",
 			StatusMSG.ChannelX_Disabled     => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
 			StatusMSG.ChannelX_Enabled      => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
 			StatusMSG.MainChannelX_Disabled => $"Main channel {channelToToggle} disabled {showActiveChannels()}",
@@ -868,9 +1220,18 @@ public static partial class CliMain {
 			StatusMSG.SeekFwdFar            => $"Seek +30 seconds",
 			StatusMSG.SeekBackFar           => $"Seek -30 seconds",
 			StatusMSG.SeekPos               => $"Seek to position {seekPosition}",
+			StatusMSG.SteppedCycles         => cyclesInSpcClocks ? 
+			                                         $"Stepped {stepCycles / 2} SPC cycle{(stepCycles / 2 == 1 ? "" : "s")}"
+			                                       : $"Stepped {stepCycles} DSP cycles",
+			StatusMSG.CycleDisplayChanged   => $"Cycle display mode changed: {(cyclesInSpcClocks ? "SPC700" : "S-DSP")}",
+			StatusMSG.Paused                => $"Paused",
+			StatusMSG.BreakExec             => $"Execution break",
+			StatusMSG.BreakpointHit         => $"Execution breakpoint hit at ${execBreakpointAddr:X4}",
+			StatusMSG.BreakpointsOn         => $"All breakpoints enabled",
+			StatusMSG.BreakpointsOff        => $"All breakpoints disabled",
 			StatusMSG.Script700_Error       => $"Script700 error occurred",
-			StatusMSG.Continue              => $"Resuming...",
-			_ => throw new NotImplementedException()
+			StatusMSG.Continue              => $"Resuming playback",
+			_                               => throw new NotImplementedException()
 		};
 	}
 	
@@ -899,103 +1260,203 @@ public static partial class CliMain {
 		tempMsgTime    = null;
 	}
 	
-	enum BusSize {
+	public enum BusSize {
 		Bit8, Bit16, Bit24, Bit32, Bit64
 	}
+	
+	static AnsiColor writeRegColor = new(AnsiColor.Code.Black, AnsiColor.Code.White);
+	static AnsiColor writeErrColor = new(AnsiColor.Code.BrightRed);
+	static AnsiColor writeRomColor = new(AnsiColor.Code.BrightCyan);
+	static AnsiColor writeColor    = new(AnsiColor.Code.Cyan,    isBG: true);
+	static AnsiColor pcColor       = new(AnsiColor.Code.Magenta, isBG: true);
+	static AnsiColor execColor     = new(AnsiColor.Code.Blue,    isBG: true);
+	static AnsiColor fetchColor    = new(AnsiColor.Code.BrightBlue);
+	static AnsiColor readColor     = new(AnsiColor.Code.Green,   isBG: true);
+	static AnsiColor readRegColor1 = new(AnsiColor.Code.Yellow,  isBG: true);
+	static AnsiColor readRegColor2 = new(250, 125, 25,           isBG: true);
+	static AnsiColor readErrColor  = new(AnsiColor.Code.Red,     isBG: true);
+	static AnsiColor readRomColor  = new(AnsiColor.Code.Grey,    isBG: true);
 	
 	static void memDisplayRows(BusSize addrBusSize,
 	                           int startRow,
 	                           int endRow,
 	                           byte[] data,
-	                           Color?[]? colorData = null,
-	                           bool useHeatMap = false)
+	                           AnsiColor?[]? colorData = null,
+	                           SMP.MemAccessLog[]? memLogs = null,
+	                           bool readDisabled   = false,
+	                           bool writeDisabled  = false,
+	                           bool bootRomEnabled = false,
+	                           UInt32? pc = null,
+	                           bool isDSP = false,
+	                           bool useHeatMap = false,
+	                           int yOffset = 0,
+	                           bool writeToScrollBuf = false)
 	{
+		Display.UpdateState(writeToScrollBuf);
+		
 		Display.X = 0;
-		Display.Y = 0;
+		Display.Y = yOffset;
 		
 		for (var i = startRow; i <= endRow; i++) {
 			var startAddr = (uint) i * 16;
+			
+			AnsiColor? getColor(int c) {
+				var realAddr = startAddr + c;
+				var idx      = (i - startRow) * 16 + c;
+				
+				var color = colorData?[idx];
+				
+				if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Write) is not null) {
+					if (realAddr is >= 0x0F0 and <= 0x00FF) {
+						color = writeRegColor;
+					}
+					else if (writeDisabled) {
+						color = writeErrColor;
+					}
+					else if (realAddr >= 0xFFC0 && bootRomEnabled) {
+						color = writeRomColor;
+					}
+					else {
+						color = writeColor;
+					}
+				}
+				else if (realAddr == pc) {
+					color = pcColor;
+				}
+				else if (memLogs?.FirstOrDefault()?.Type == SMP.MemAccessLog.LogType.Exec && memLogs[0].Address == realAddr) {
+					color = execColor;
+				}
+				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Fetch) is not null) {
+					color = fetchColor;
+				}
+				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Fetch) is not null) {
+					color = fetchColor;
+				}
+				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Read) is not null) {
+					if (realAddr is >= 0x0F0 and <= 0x00FC) {
+						color = readRegColor1;
+					}
+					else if (realAddr is >= 0x0FD and <= 0x00FF) {
+						color = readRegColor2;
+					}
+					else if (realAddr >= 0xFFC0 && bootRomEnabled) {
+						color = readRomColor;
+					}
+					else if (readDisabled) {
+						color = readErrColor;
+					}
+					else {
+						color = readColor;
+					}
+				}
+				
+				return color;
+			}
+
 			switch (addrBusSize) {
 				case BusSize.Bit8: {
-					Display.Write($"{startAddr:X2} | ");
+					Display.Write($"{startAddr:X2} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit16: {
-					Display.Write($"{startAddr:X4} | ");
+					Display.Write($"{startAddr:X4} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit24: {
-					Display.Write($"{startAddr:X6} | ");
+					Display.Write($"{startAddr:X6} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit32: {
-					Display.Write($"{startAddr:X8} | ");
+					Display.Write($"{startAddr:X8} | ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 			}
 			
 			for (var c = 0; c < 16; c++) {
 				var idx = (i - startRow) * 16 + c;
-				Display.Write($"{data[idx]:X2} ", col: colorData?[idx]);
+				
+				if (idx >= 0 && idx < data.Length) {
+					var color = getColor(c);
+					
+					Display.Write($"{data[idx]:X2}", col: color, writeToScrollBuf: writeToScrollBuf);
+					Display.Write(" ", writeToScrollBuf: writeToScrollBuf);
+				}
 			}
-			Display.Write("| ");
+			Display.Write("| ", writeToScrollBuf: writeToScrollBuf);
 			
 			if (useHeatMap) {
 				for (var c = 0; c < 16; c++) {
 					var idx = (i - startRow) * 16 + c;
-					var val = data[idx];
-					var col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
-					Display.Write("  ", col: col);
+					
+					if (idx >= 0 && idx < data.Length) {
+						var val = data[idx];
+						var col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
+						Display.Write("  ", col: col, writeToScrollBuf: writeToScrollBuf);
+					}
 				}
 			}
 			else {
 				for (var c = 0; c < 16; c++) {
 					var idx = (i - startRow) * 16 + c;
-					var val = data[idx];
-					Display.Write($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}", col: colorData?[idx]);
+					
+					if (idx >= 0 && idx < data.Length) {
+						var val   = data[idx];
+						var color = getColor(c);
+
+						Display.Write($"{(val is >= 0x20 and <= 0x7E ? (char) val : '.')}", col: color, writeToScrollBuf: writeToScrollBuf);
+					}
 				}
-				Display.Write(new string(' ', 16));
+				Display.Write(new string(' ', 16), writeToScrollBuf: writeToScrollBuf);
 			}
 			
-			Display.Write("\n");
+			Display.Write("\n", writeToScrollBuf: writeToScrollBuf);
 		}
 	}
 	
-	static byte[] heatValues = [0x50, 0x68, 0xA0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0];
+	static byte[] heatValues = [0x48, 0x50, 0x5C, 0x68, 0x84, 0xA0, 0xC0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0];
 	
 	static void showBar(double value, int displayHeight, int x, int y) {
-		var color  = Color.CRed;
+		if (eqInsideColor is null) {
+			eqInsideColor = heatMapColor(BusSize.Bit8, false, 1, 0);
+		}
+		
+		var eqInsideRGB = eqInsideColor.BackgroundRGB!.Multiply(5.0 / 7);
+		
+		var color  = AnsiColor.Red;
 		var height = (int) Math.Round(value * displayHeight * 8);
 		
-		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF);
+		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF).BackgroundRGB!;
 		
 		x -= 1;
 		
 		if (height > 0) {
 			for (var i = 0; i < displayHeight; i++) {
-				Color bgcol;
-				Color fgCol;
+				AnsiColor fgAnsi;
+				Color midColor;
 				
 				if (i >= displayHeight / 2) {
-					var interp = (double) (displayHeight - i) / (displayHeight / 2 + 1);
-					interp = Math.Pow(interp, 2);
+					var interp  = (double) (displayHeight         - i) / (displayHeight / 2 + 1);
+					var interp2 = (double) (displayHeight - (i + 0.5)) / (displayHeight / 2 + 1);
+					interp  = Math.Pow(interp,  2);
+					interp2 = Math.Pow(interp2, 2);
 					
-					bgcol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i]);
-					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
-					fgCol = Color.FromLCH(
-						refColor.L * interp + fgCol.L * (1 - interp),
-						refColor.C * interp + fgCol.C * (1 - interp),
-						refColor.H * interp + fgCol.H * (1 - interp)
-					);
+					var bgCol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i * 2]).BackgroundRGB!;
+					var fgCol = refColor.Blend(bgCol, 1 - interp, Color.Space.LCh);
+					
+					midColor = refColor.Blend(bgCol, 1 - interp2, Color.Space.LCh);
+					
+					fgAnsi = new(fgCol, eqInsideRGB);
 				}
 				else {
-					bgcol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i]);
-					fgCol = new(bgcol.Red, bgcol.Green, bgcol.Blue, bg: false);
+					var bgCol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2    ]).BackgroundRGB!;
+					midColor  = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2 + 1]).BackgroundRGB!;
+					fgAnsi    = new(bgCol, eqInsideRGB);
 				}
 				
 				#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
 					if (i < height / 8) {
-						Display.Write("███", x, y - i - 1, fgCol);
+						fgAnsi = new(fgAnsi.ForegroundRGB!, midColor);
+						Display.Write("▄▄▄", x, y - i - 1, fgAnsi);
 					}
 					else if (i == height / 8 && height % 8 > 0) {
 						var barString = (height % 8) switch {
@@ -1008,11 +1469,12 @@ public static partial class CliMain {
 							7 => "▇▇▇",
 							_ => throw new UnreachableException()
 						};
-						Display.Write(barString, x, y - i - 1, fgCol);
+						Display.Write(barString, x, y - i - 1, fgAnsi);
 					}
 				#else
 					if (i < height / 8) {
-						Display.Write("███", x, y - i - 1, fgCol);
+						fgAnsi = new(fgAnsi.ForegroundRGB!, midColor);
+						Display.Write("▄▄▄", x, y - i - 1, fgAnsi);
 					}
 					else if (i == height / 8 && height % 8 >= 4) {
 						var barString = (height % 8) switch {
@@ -1022,7 +1484,7 @@ public static partial class CliMain {
 							7 => "▄▄▄",
 							_ => throw new UnreachableException()
 						};
-						Display.Write(barString, x, y - i - 1, fgCol);
+						Display.Write(barString, x, y - i - 1, fgAnsi);
 					}
 				#endif
 			}
@@ -1062,7 +1524,118 @@ public static partial class CliMain {
 		}
 	}
 	
-	static Color heatMapColor(BusSize dataSize, bool signed, double scale, long value) {
+	static void displayHeatMap24(UInt32 value, int x, int y, bool isBG = true) {
+		switch (heatMapDataSize) {
+			case BusSize.Bit8: {
+				for (var i = 1; i < 4; i++) {
+					Display.Highlight(
+						2, x + 2 * i - 2, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit16: {
+				Display.Highlight(2, x,     y, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1, (value & 0xFFFFFF) >> 16, isBG).BackgroundRGB);
+				Display.Highlight(4, x + 2, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value & 0xFFFF,           isBG).BackgroundRGB);
+				break;
+			}
+			
+			case BusSize.Bit32 or BusSize.Bit64: {
+				Display.Highlight(
+					6, x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value * 256, isBG).BackgroundRGB
+				);
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
+			}
+		}
+	}
+	
+	static void displayHeatMap32(UInt32 value, int x, int y, bool isBG = true) {
+		switch (heatMapDataSize) {
+			case BusSize.Bit8: {
+				for (var i = 0; i < 4; i++) {
+					Display.Highlight(
+						2, x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit16: {
+				for (var i = 0; i < 2; i++) {
+					Display.Highlight(
+						4, x + 4 * i, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value >> 16 - i * 16 & 0xFFFF, isBG).BackgroundRGB
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit32 or BusSize.Bit64: {
+				Display.Highlight(
+					8, x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value, isBG).BackgroundRGB
+				);
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
+			}
+		}
+	}
+	
+	static void displayHeatMap64(UInt64 value, int x, int y, bool isBG = true) {
+		switch (heatMapDataSize) {
+			case BusSize.Bit8: {
+				for (var i = 0; i < 8; i++) {
+					Display.Highlight(
+						2, x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, (long) (value >> 56 - i * 8 & 0xFF), isBG).BackgroundRGB
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit16: {
+				for (var i = 0; i < 4; i++) {
+					Display.Highlight(
+						4, x + 4 * i, y,
+						col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, (long) (value >> 48 - i * 16 & 0xFFFF), isBG).BackgroundRGB
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit32: {
+				for (var i = 0; i < 2; i++) {
+					Display.Highlight(
+						8, x + 8 * i, y,
+						col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, (long) (value >> 32 - i * 32 & 0xFFFFFFFF), isBG).BackgroundRGB
+					);
+				}
+				break;
+			}
+			
+			case BusSize.Bit64: {
+				Display.Highlight(
+					16, x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, (long) value, isBG).BackgroundRGB
+				);
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
+			}
+		}
+	}
+	
+	static Color heatMapZero() {
+		return Color.FromLCh(0.1, 70, 280);
+	}
+	
+	static AnsiColor heatMapColor(BusSize dataSize, bool signed, double scale, long value, bool isBG = true) {
 		double interp;
 		
 		switch (dataSize) {
@@ -1147,109 +1720,103 @@ public static partial class CliMain {
 			interp = -Math.Pow(-interp, 1 / 1.9);
 		}
 		
-		Color zero = Color.FromLCH(0.1, 70, (280 - 360) * 2 * Math.PI / 360); //new(0, 31, 82);
+		var zero = Color.FromLCh(0.1, 70, 280);
 		
-		Color maxUns = Color.FromLCH(85.5, 47, 4.8     * Math.PI /   3); //new(242, 222, 255);
-		Color maxPos = Color.FromLCH(94.0, 97, 125 * 2 * Math.PI / 360); //new(225, 249, 122);
-		Color maxNeg = Color.FromLCH(89.0, 87, 2.0     * Math.PI /   6); //new(255, 201,  93);
+		var maxUns = Color.FromLCh(85.5, 47, 288);
+		var maxPos = Color.FromLCh(94.0, 97, 125);
+		var maxNeg = Color.FromLCh(89.0, 87,  60);
 		
-		double L;
-		double C;
-		double H;
-		
-		double rm;
-		double gm;
-		double bm;
+		Color col;
 		
 		if (signed) {
 			if (interp >= 0) {
-				var h = maxPos.H;
-				
-				if (maxPos.H - zero.H > Math.PI) {
-					h -= 2 * Math.PI;
-				}
-				else if (zero.H - maxPos.H < -Math.PI) {
-					h += 2 * Math.PI;
-				}
-				
-				L = maxPos.L *  interp + zero.L * (1 -  interp);
-				C = maxPos.C *  interp + zero.C * (1 -  interp);
-				H = h        *  interp + zero.H * (1 -  interp);
-				
-				rm = 1.0; //1.0 + origInterp * 0.4;
-				gm = 1.0; //1.1;
-				bm = 1.0; //1.0 + origInterp * 0.45;
+				col = maxPos.Blend(zero, 1 - Math.Abs(interp), Color.Space.LCh);
 			}
 			else {
-				var h = maxNeg.H;
-				
-				if (maxNeg.H - zero.H > Math.PI) {
-					h -= 2 * Math.PI;
-				}
-				else if (zero.H - maxNeg.H < -Math.PI) {
-					h += 2 * Math.PI;
-				}
-				
-				L = maxNeg.L * -interp + zero.L * (1 - -interp);
-				C = maxNeg.C * -interp + zero.C * (1 - -interp);
-				H = h        * -interp + zero.H * (1 - -interp);
-				
-				rm = 1.0; //1.0 + -origInterp * 0.4;
-				gm = 1.0; //1.1;
-				bm = 1.0; //1.0 + -origInterp * 0.45;
+				col = maxNeg.Blend(zero, 1 - Math.Abs(interp), Color.Space.LCh);
 			}
 		}
 		else {
-			var h = maxUns.H;
-				
-			if (maxUns.H - zero.H > Math.PI) {
-				h -= 2 * Math.PI;
-			}
-			else if (zero.H - maxUns.H < -Math.PI) {
-				h += 2 * Math.PI;
-			}
-			
-			L = maxUns.L * interp + zero.L * (1 - interp);
-			C = maxUns.C * interp + zero.C * (1 - interp);
-			H = h        * interp + zero.H * (1 - interp);
-				
-			rm = 1.0; //1.0 + origInterp * 0.3;
-			gm = 1.0; //1.1;
-			bm = 1.0; //1.1; //1.0 + origInterp * 0.35;
+			col = maxUns.Blend(zero, 1 - Math.Abs(interp), Color.Space.LCh);
 		}
 		
-		var col = Color.FromLCH(L, C, H);
-		
-		return new(
-			(byte) Math.Clamp(col.Red   * rm, 0, 255),
-			(byte) Math.Clamp(col.Green * gm, 0, 255),
-			(byte) Math.Clamp(col.Blue  * bm, 0, 255),
-			bg: true
-		);
+		return new(col, isBG);
 	}
 	
-	static void softFadeHeatmap(byte[] dataBuffer, byte[] progBuffer) {
-		const int FadeStep = 72;
+	static (char Char, AnsiColor Color)[] drawHeatMapFlags(BusSize dataSize, ulong value) {
+		var zero = heatMapColor(BusSize.Bit8, signed: false, scale: 1, value:   0).BackgroundRGB!;
+		var one  = heatMapColor(BusSize.Bit8, signed: false, scale: 1, value: 255).BackgroundRGB!;
 		
-		// Smooth transition to avoid rapid flashing
-		for (var i = 0; i < progBuffer.Length; i++) {
-			var progVal = progBuffer[i];
-			var target  = dataBuffer[i];
-				
-			if (target > progVal + FadeStep) {
-				progBuffer[i] += FadeStep;
+		bool[] flags;
+		int midIndex;
+		
+		switch (dataSize) {
+			case BusSize.Bit8: {
+				flags    = Enumerable.Range(0,  8).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 4;
+				break;
 			}
-			else if (target < progVal - FadeStep) {
-				progBuffer[i] -= FadeStep;
+			
+			case BusSize.Bit16: {
+				flags    = Enumerable.Range(0, 16).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 8;
+				break;
 			}
-			else if (target != progVal) {
-				progBuffer[i] = target;
+			
+			case BusSize.Bit24: {
+				flags    = Enumerable.Range(0, 24).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 12;
+				break;
+			}
+			
+			case BusSize.Bit32: {
+				flags    = Enumerable.Range(0, 32).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 16;
+				break;
+			}
+			
+			case BusSize.Bit64: {
+				flags    = Enumerable.Range(0, 64).Select(i => value.GetBit(i)).ToArray();
+				midIndex = 32;
+				break;
+			}
+			
+			default: {
+				throw new UnreachableException();
 			}
 		}
+		
+		var result = new (char Char, AnsiColor Color)[midIndex];
+		
+		for (var i = 0; i < midIndex; i++) {
+			var top    = flags[i];
+			var bottom = flags[i + midIndex];
+			
+			if (top && bottom) {
+				result[i].Char = '█';
+			}
+			else if (top && !bottom) {
+				result[i].Char = '▀';
+			}
+			else if (!top && bottom) {
+				result[i].Char = '▄';
+			}
+			else {
+				result[i].Char = ' ';
+			}
+			
+			result[i].Color = new(one, zero);
+		}
+		
+		return result;
 	}
 	
 	static void requestEmuData(Transfer.Requests reqs) {
+		requestEmuData(reqs, StartAddr, ScrollAreaRows * 0x10);
+	}
+	
+	static void requestEmuData(Transfer.Requests reqs, int startAddress, uint length) {
 		requests = reqs;
-		Transfer.RequestEmuData(reqs, StartAddr, ScrollAreaRows * 0x10);
+		Transfer.RequestEmuData(reqs, startAddress, length);
 	}
 }

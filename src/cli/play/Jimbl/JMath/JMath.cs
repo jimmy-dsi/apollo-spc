@@ -1,8 +1,22 @@
-namespace Jimbl;
+namespace Jimbl.JMath;
 
 using System.Numerics;
 
 public static class JMath {
+	/// <summary>
+	/// True modulus for floating points
+	/// </summary>
+	/// <param name="x"></param>
+	/// <param name="y"></param>
+	/// <returns>The mathematical modulus of x and y</returns>
+	public static double Mod(double x, double y) {
+		var r = x % y;
+		if (r < 0) {
+			r += Math.Abs(y);
+		}
+		return r;
+	}
+	
 	/// <summary>
 	/// Integer Power-of-2 Saturation algorithm
 	/// </summary>

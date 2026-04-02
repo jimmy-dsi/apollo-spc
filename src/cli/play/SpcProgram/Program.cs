@@ -10,11 +10,14 @@ var fwdArgs       = args.Where(x => x != "--force-no-resize").ToArray();
 var forceNoResize = args.  Any(x => x == "--force-no-resize");
 var fileError     = false;
 
-if (fwdArgs.Length == 0 || fwdArgs[0].StartsWith("--")) {
+var debugMode   = fwdArgs  .Any(x => x is     "--debug" or      "-d");
+var noDebugArgs = fwdArgs.Where(x => x is not "--debug" and not "-d").ToArray();
+
+if (noDebugArgs.Length == 0 || noDebugArgs[0].StartsWith("--")) {
 	forceNoResize = true;
 	fileError     = true;
 }
-else if (!File.Exists(fwdArgs[0])) {
+else if (!File.Exists(noDebugArgs[0])) {
 	// Attempt to open first argument as file - If fails, mark as error
 	forceNoResize = true;
 	fileError     = true;

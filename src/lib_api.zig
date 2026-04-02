@@ -62,8 +62,13 @@ pub export fn emu_step_instruction(emu_ptr: ?[*]Emu) bool {
     return true;
 }
 
-pub export fn emu_step_n_cycles(cycles: u32, emu_ptr: ?[*]Emu) u32 {
-    return emu.step_n_cycles(cycles, @ptrCast(emu_ptr));
+pub export fn emu_step_n_cycles(cycles: u32, emu_ptr: ?[*]Emu, bp_enabled: bool) i32 {
+    if (bp_enabled) {
+        return emu.step_n_cycles(cycles, @ptrCast(emu_ptr), true);
+    }
+    else {
+        return emu.step_n_cycles(cycles, @ptrCast(emu_ptr), false);
+    }
 }
 
 pub export fn emu_step_n_cycles_fast(cycles: u32, emu_ptr: ?[*]Emu) u32 {
@@ -133,6 +138,14 @@ pub export fn emu_enable_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
 pub export fn emu_disable_echo_voice(emu_ptr: ?[*]Emu, index: u8) bool {
     emu.disable_echo_voice(@ptrCast(emu_ptr), @intCast(index & 7)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
     return true;
+}
+
+pub export fn emu_check_breakpoint(emu_ptr: ?[*]Emu) bool {
+    return emu.check_breakpoint(@ptrCast(emu_ptr)) catch |e| emu.ferr(e, @ptrCast(emu_ptr));
+}
+
+pub export fn emu_consume_breakpoint(emu_ptr: ?[*]Emu) bool {
+    return emu.consume_breakpoint(@ptrCast(emu_ptr)) catch |e| return emu.ferr(e, @ptrCast(emu_ptr));
 }
 
 pub export fn emu_copy(dest_emu_ptr: ?[*]Emu, src_emu_ptr: ?[*]Emu) bool {
@@ -351,6 +364,10 @@ pub export fn script700_get_data(emu_ptr: ?[*]Emu) ?[*]u8 {
 
 pub export fn script700_get_label_addresses(emu_ptr: ?[*]Emu) ?[*]u32 {
     return @ptrCast(script700.get_label_addresses(@ptrCast(emu_ptr)) catch |e| emu.nerr([]u32, e, @ptrCast(emu_ptr)));
+}
+
+pub export fn script700_compile_instruction(instr: script700.InstrInfo) script700.CompiledInstr {
+    return script700.compile_instruction(instr) catch |e| main.derr(script700.CompiledInstr, e);
 }
 
 // Buffer

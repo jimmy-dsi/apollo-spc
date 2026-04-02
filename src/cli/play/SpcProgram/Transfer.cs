@@ -25,13 +25,14 @@ public static class Transfer {
 		Script700_Data  = 1 << 11,
 	}
 	
-	public static AutoResetEvent Signal = new(false);
+	public static AutoResetEvent Signal     = new(false);
+	public static AutoResetEvent StepSignal = new(false);
 	
 	static object requestLock = new();
 	
 	static Requests requests         = Requests.CycleCountOnly;
-	static UInt16   memRequestStart  = 0;
-	static UInt16   memRequestLength = 0x100;
+	static  Int32   memRequestStart  = 0;
+	static UInt32   memRequestLength = 0x100;
 	
 	static Emulator emu => CliMain.PrimaryEmu;
 	
@@ -141,10 +142,10 @@ public static class Transfer {
 		}
 	}
 	
-	public static void SendEmuData() {
+	public static void SendEmuData(long instrStep, UInt16? breakPC) {
 		// Transfer data from emu to main thread which the UI requests
 		Comm.UseBufferEmu(container => {
-			container.Buffer = new(emu.DSP.CurrentCycle);
+			container.Buffer = new(emu.DSP.CurrentCycle, instrStep, breakPC);
 			container.Buffer.RequestPopulate(emu, GetRequests(), memRequestStart, memRequestLength);
 		});
 		
@@ -152,7 +153,7 @@ public static class Transfer {
 		Signal.Set();
 	}
 	
-	public static void RequestEmuData(Requests reqs, UInt16 startAddress, UInt16 length) {
+	public static void RequestEmuData(Requests reqs, Int32 startAddress, UInt32 length) {
 		lock (requestLock) {
 			requests = reqs;
 			memRequestStart  = startAddress;

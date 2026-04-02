@@ -1,13 +1,13 @@
 namespace SpcProgram;
 
 using Apollo;
-using Jimbl;
+using Jimbl.Graphics;
 
 public static partial class CliMain {
 	static void showHelpMenu() {
 		var topY = 0;
 		
-		var y = 1;
+		var y = 0;
 		var x = 38;
 		
 		Display.Write("Exit current menu",              1, y); Display.Write("Escape",              x, y); y++;
@@ -30,22 +30,26 @@ public static partial class CliMain {
 		Display.Write("Toggle channel 5-8 echo output", 1, y); Display.Write("Ctrl+F5-F8",          x, y); y++;
 		y++;
 		
-		Display.Write("Scroll up one row",              1, y); Display.Write("UpArrow",             x, y); y++;
-		Display.Write("Scroll down one row",            1, y); Display.Write("DownArrow",           x, y); y++;
-		Display.Write("Scroll up 16 rows",              1, y); Display.Write("PageUp",              x, y); y++;
-		Display.Write("Scroll down 16 rows",            1, y); Display.Write("PageDown",            x, y); y++;
-		Display.Write("Scroll to top",                  1, y); Display.Write("Home",                x, y); y++;
-		Display.Write("Scroll to bottom",               1, y); Display.Write("End",                 x, y); y++;
+		Display.Write("Scroll up / down one row",       1, y); Display.Write("UpArrow / DownArrow", x, y); y++;
+		Display.Write("Scroll up / down 16 rows",       1, y); Display.Write("PageUp / PageDown",   x, y); y++;
+		Display.Write("Scroll to top / bottom",         1, y); Display.Write("Home / End",          x, y); y++;
 		y++;
 		
-		Display.Write("Toggle heat map", 1, y); Display.Write("Ctrl+E+T", x, y);
-		Display.Write("[Warning: may produce rapid flashing]", x * 2, y, Color.Yellow);
+		Display.Write("Toggle heat map",           1, y); Display.Write("Ctrl+E+T", x, y);
+		Display.Write("[Warning: may produce rapid flashing]", x * 2 + 5, y, AnsiColor.Yellow);
+		y++;
+		Display.Write("Adjust heat map data size", 1, y); Display.Write("Ctrl+UpArrow / Ctrl+DownArrow or F9 / F10", x, y);
 		y++;
 		Display.Write($"Display cycle count in {(cyclesInSpcClocks ? "DSP" : "SPC")} clocks", 1, y); Display.Write("Ctrl+D", x, y); y++;
 		y++;
 		
-		Display.Write("Pause/Resume",                   1, y); Display.Write("Space",               x, y); y++;
+		Display.Write("Pause / Resume",                 1, y); Display.Write("Space",               x, y); y++;
+		Display.Write("Break execution / Resume",       1, y); Display.Write("F5",                  x, y); y++;
+		Display.Write("Step SPC700 instruction",        1, y); Display.Write("F6",                  x, y); y++;
+		y++;
 		
-		Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
+		Display.Write("Toggle all breakpoints",         1, y); Display.Write("Ctrl+B",              x, y); y++;
+		
+		//Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
 	}
 }

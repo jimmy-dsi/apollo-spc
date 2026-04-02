@@ -1,6 +1,6 @@
 pub const SPCState = struct {
-    pub const Mode = enum {
-        normal, asleep, stopped, interrupt
+    pub const Mode = enum(u8) {
+        normal = 0, asleep, stopped, interrupt
     };
 
     a: u8 = undefined,
@@ -15,6 +15,9 @@ pub const SPCState = struct {
     mode: Mode = Mode.normal,
     pending_interrupt: bool = false,
 
+    instruction_start_pc: u16 = undefined,
+    instruction_start_cycle: i64 = -1, // In SPC clocks, not DSP
+
     pub fn new(a: ?u8, x: ?u8, y: ?u8, sp: ?u8, pc: ?u16, psw: ?u8) SPCState {
         var cpu_state = SPCState { };
         cpu_state.reset();
@@ -25,6 +28,8 @@ pub const SPCState = struct {
         if (sp)  |val| { cpu_state.sp  = val; }
         if (pc)  |val| { cpu_state.pc  = val; }
         if (psw) |val| { cpu_state.psw = val; }
+
+        cpu_state.instruction_start_pc = cpu_state.pc;
 
         return cpu_state;
     }
@@ -38,6 +43,9 @@ pub const SPCState = struct {
         self.pc = 0x0000;
 
         self.psw = 0b00000010;
+
+        self.instruction_start_pc = 0x0000;
+        self.instruction_start_cycle = -1;
 
         self.mode = Mode.normal;
         self.pending_interrupt = false;

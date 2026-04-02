@@ -169,8 +169,17 @@ public static class Env {
 		return false;
 	}
 	
-	
 	public static string? ContainingDirectory(string filePath) {
 		return SPath.GetDirectoryName(filePath);
+	}
+	
+	public static DateTime DateModified(string filePath) {
+		return File.GetLastWriteTimeUtc(filePath);
+	}
+	
+	public static string StripExtension(string filePath) {
+		var splits = filePath.Split('.');
+		splits = splits[..^1];
+		return string.Join('.', splits);
 	}
 }

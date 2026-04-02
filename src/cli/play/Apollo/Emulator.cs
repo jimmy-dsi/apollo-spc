@@ -300,7 +300,7 @@ public class Emulator {
 		}
 	}
 	
-	public void StepInstruction() {
+	public void StepInstruction(bool consumeBreakpoint = false) {
 		MaybeAcquireLock();
 
 		try {
@@ -309,15 +309,23 @@ public class Emulator {
 				var errorCode = DLL.EmuGetLastError(handle);
 				Error.Throw(errorCode);
 			}
+			
+			if (consumeBreakpoint) {
+				result = DLL.EmuConsumeBreakpoint(handle);
+				if (!result) {
+					var resultCode = DLL.EmuGetLastResult(handle);
+					Error.Throw(resultCode);
+				}
+			}
 		}
 		finally {
 			MaybeReleaseLock();
 		}
 	}
 	
-	public int StepNCycles(int cycles) {
+	public int StepNCycles(int cycles, bool breakpointsEnabled = true) {
 		MaybeAcquireLock();
-		try     { return (int) DLL.EmuStepNCycles(cycles.SafeUnsigned(), handle); }
+		try     { return DLL.EmuStepNCycles(cycles.SafeUnsigned(), handle, breakpointsEnabled); }
 		finally { MaybeReleaseLock(); }
 	}
 	
@@ -327,16 +335,31 @@ public class Emulator {
 		finally { MaybeReleaseLock(); }
 	}
 	
-	public bool StepCyclesUntil(Func<bool> condition, out int steps) {
+	public bool StepCyclesUntil(Func<bool> condition, out int steps, out bool breakpoint, bool breakpointsEnabled = true) {
+		breakpoint = false;
 		MaybeAcquireLock();
+		
 		try {
 			steps = 0;
 			while (condition()) {
 				var result = DLL.EmuStepCycle(handle);
+				
 				if (!result) {
 					_ = DLL.EmuGetLastError(handle); // Swallow error code and discard (resets next last result to success)
 					return false;
 				}
+				
+				result = DLL.EmuConsumeBreakpoint(handle);
+				
+				if (breakpointsEnabled && result) {
+					breakpoint = true;
+					return true;
+				}
+				else {
+					var resultCode = DLL.EmuGetLastResult(handle);
+					Error.Throw(resultCode); // This only throws if the result is an error
+				}
+				
 				steps++;
 			}
 			return true;

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Jimbl;
 
 namespace SpcProgram;
 
@@ -70,6 +71,12 @@ public static class Driver {
 	static Random rng = new();
 	static int cycleSpillOver = 0;
 	
+	static bool    paused = false;
+	static long    instrStep = 0;
+	static UInt16? breakPC = null;
+	
+	static bool debugMode = false;
+	
 	const int MaxConsecutiveTimeouts = 90;
 	const int BusyloopReliefMS       = 20;
 	
@@ -80,9 +87,25 @@ public static class Driver {
 		
 		lock (CliMain.EmuRestoreLock) {
 			try {
-				if (CliMain.UI_State is not CliMain.State.Normal) {
+				if (CliMain.UI_State is CliMain.State.Break) {
 					return;
 				}
+				else if (CliMain.UI_State is not CliMain.State.Normal) {
+					if (!Transfer.StepSignal.WaitOne(0)) {
+						return;
+					}
+					
+					StepInstruction();
+					Transfer.StepSignal.Reset();
+					
+					instrStep++;
+					
+					breakPC = null;
+					return;
+				}
+					
+				breakPC = null;
+				paused = false;
 				
 				var samples = numShorts / 2;
 		
@@ -109,15 +132,34 @@ public static class Driver {
 				// Copy managed array into unmanaged buffer
 				Marshal.Copy(buffer, 0, stream, numShorts);
 				
-				Transfer.SendEmuData();
+				Transfer.SendEmuData(instrStep, breakPC);
 				advanceFrame();
 			}
 		}
 	}
 	
 	static bool StepCycles(int cycles) {
+		if (CliMain.StartInDebugMode || debugMode) {
+			if (CliMain.UI_State is not CliMain.State.Init) {
+				CliMain.UI_State = CliMain.State.Break;
+				breakPC = emu.SPC.State.InstructionStartPC;
+				debugMode = false;
+			}
+			else {
+				debugMode = true;
+			}
+			return false;
+		}
+		
 		if (emu.Script700.IsRunning) {
-			var completed = emu.StepNCycles(cycles);
+			var bpEnabled = CliMain.BreakpointsEnabled;
+			var completed = emu.StepNCycles(cycles, breakpointsEnabled: bpEnabled);
+			
+			if (completed < 0) {
+				CliMain.UI_State = CliMain.State.Break;
+				breakPC = emu.SPC.State.InstructionStartPC;
+				return false;
+			}
 			
 			var attempts = 1;
 			
@@ -130,7 +172,15 @@ public static class Driver {
 				}
 				
 				var remainingCycles = cycles - completed;
-				cycles = emu.StepNCycles(remainingCycles);
+				var c = emu.StepNCycles(remainingCycles, breakpointsEnabled: bpEnabled);
+				
+				if (c < 0) {
+					CliMain.UI_State = CliMain.State.Break;
+					breakPC = emu.SPC.State.InstructionStartPC;
+					return false;
+				}
+				
+				completed += c;
 				
 				attempts++;
 			}
@@ -147,8 +197,27 @@ public static class Driver {
 	}
 	
 	static bool StepCycles(Func<bool> condition) {
+		if (CliMain.StartInDebugMode || debugMode) {
+			if (CliMain.UI_State is not CliMain.State.Init) {
+				CliMain.UI_State = CliMain.State.Break;
+				breakPC = emu.SPC.State.InstructionStartPC;
+				debugMode = false;
+			}
+			else {
+				debugMode = true;
+			}
+			return false;
+		}
+		
 		if (emu.Script700.IsRunning) {
-			var success = emu.StepCyclesUntil(condition, out var steps);
+			var bpEnabled = CliMain.BreakpointsEnabled;
+			var success = emu.StepCyclesUntil(condition, out var steps, out var breakpoint, breakpointsEnabled: bpEnabled);
+			
+			if (breakpoint) {
+				CliMain.UI_State = CliMain.State.Break;
+				breakPC = emu.SPC.State.InstructionStartPC;
+				return false;
+			}
 			
 			var attempts = 1;
 			
@@ -160,7 +229,13 @@ public static class Driver {
 					return false;
 				}
 				
-				success = emu.StepCyclesUntil(condition, out steps);
+				success = emu.StepCyclesUntil(condition, out steps, out breakpoint, breakpointsEnabled: bpEnabled);
+				
+				if (breakpoint) {
+					CliMain.UI_State = CliMain.State.Break;
+					breakPC = emu.SPC.State.InstructionStartPC;
+					return false;
+				}
 				
 				if (steps > 0 && !success) { // Reset attempt counter if there's movement, but it hits a different Script700 snag afterward
 					attempts = 1;
@@ -177,6 +252,44 @@ public static class Driver {
 			if (!success) {
 				throw new UnreachableException($"Attempted run of fast cycles until condition, ended prematurely. This should never happen.");
 			}
+			return true;
+		}
+	}
+	
+	static bool StepInstruction() {
+		if (emu.Script700.IsRunning) {
+			var success = true;
+			try { emu.StepInstruction(consumeBreakpoint: true); } catch (Script700Timeout) { success = false; }
+			
+			var attempts = 1;
+			var lastCycle = emu.DSP.CurrentCycle;
+			
+			while (!success) {
+				Thread.Sleep(BusyloopReliefMS);
+				
+				if (attempts >= MaxConsecutiveTimeouts) {
+					CliMain.FlagStepInTransit();
+					return false;
+				}
+				
+				success = true;
+				try { emu.StepInstruction(consumeBreakpoint: true); } catch (Script700Timeout) { success = false; }
+				
+				if (emu.DSP.CurrentCycle > lastCycle && !success) { // Reset attempt counter if there's movement, but it hits a different Script700 snag
+					attempts = 1;
+				}
+				else {
+					attempts++;
+				}
+			}
+			
+			CliMain.InstrStepInTransit = false;
+			return true;
+		}
+		else {
+			emu.StepInstruction();
+			
+			CliMain.InstrStepInTransit = false;
 			return true;
 		}
 	}

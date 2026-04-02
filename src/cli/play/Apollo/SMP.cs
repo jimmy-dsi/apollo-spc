@@ -1,5 +1,7 @@
 namespace Apollo;
 
+using System.Diagnostics.CodeAnalysis;
+
 using System.Collections;
 using Jimbl;
 
@@ -321,7 +323,7 @@ public class SMP {
 		}
 	}
 	
-	public class MemAccessLog {
+	public class MemAccessLog: ICloneable {
 		public enum LogType {
 			None      = 0,
 			Read      = 1,
@@ -331,23 +333,37 @@ public class SMP {
 			DummyRead = 5
 		}
 		
-		public LogType Type      { get; }
-		public UInt64  DSPCycle  { get; }
-		public UInt16  Address   { get; }
+		public required LogType Type      { get; init; }
+		public required UInt64  DSPCycle  { get; init; }
+		public required UInt16  Address   { get; init; }
 		
-		public byte?   PreData   { get; }
-		public byte?   WriteData { get; }
-		public byte?   PostData  { get; }
+		public required byte?   ReadData  { get; init; }
 		
+		public required byte?   PreData   { get; init; }
+		public required byte?   WriteData { get; init; }
+		public required byte?   PostData  { get; init; }
+		
+		public MemAccessLog() { }
+		
+		[SetsRequiredMembers]
 		internal MemAccessLog(DLL.SmpLog log) {
 			Type      = (LogType) log.Type;
 			DSPCycle  = log.DspCycle;
 			Address   = log.Address;
 			
+			ReadData  = Type == LogType.Read  ? log.PostData  : null;
+			
 			PreData   = Type == LogType.Write ? log.PreData   : null;
 			WriteData = Type == LogType.Write ? log.WriteData : null;
 			PostData  = Type == LogType.Write ? log.PostData  : null;
 		}
+		
+		public MemAccessLog Clone() {
+			var clone = (MemAccessLog) MemberwiseClone();
+			return clone;
+		}
+		
+		object ICloneable.Clone() => Clone();
 	}
 	
 	bool loggingEnabled = false;

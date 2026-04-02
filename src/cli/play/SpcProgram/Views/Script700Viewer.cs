@@ -51,54 +51,67 @@ public static partial class CliMain {
 		Display.Write($"{s700.SyncPoint :X16} ({s700 .SyncPoint})".PadRight(x + 36), x, y); y++;
 		
 		if (heatMapEnabled) {
-			x += 36;
+			//x += 36;
 			y = 1;
 			
+			Display.Highlight(11, x, y, col: heatMapZero());
+			
 			for (var i = 0; i < 4; i++) {
-				Display.Write("  ", x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.InputPorts[i]));
+				Display.Highlight(2, x + 3 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.InputPorts[i]).BackgroundRGB);
 			}
 			y++;
 			
-			for (var i = 0; i < 4; i++) {
-				Display.Write("  ", x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.InputPorts[i]));
-			}
+			Display.Highlight(11, x, y, col: heatMapZero());
 			
 			for (var i = 0; i < 4; i++) {
-				Display.Write("  ", x + 2 * i + 8, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.OutputPorts[i]));
+				Display.Highlight(2, x + 3 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.InputPorts[i]).BackgroundRGB);
+			}
+			
+			Display.Highlight(11, x + 21, y, col: heatMapZero());
+			
+			for (var i = 0; i < 4; i++) {
+				Display.Highlight(2, x + 3 * i + 21, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.OutputPorts[i]).BackgroundRGB);
 			}
 			y++;
 			
+			Display.Highlight(35, x, y, col: heatMapZero());
+			
 			for (var i = 0; i < 4; i++) {
-				Display.Write("  ", x + 2 * i, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, s700.Work[i]));
+				displayHeatMap32(s700.Work[i], x + 9 * i, y);
 			}
 			y++;
+			
+			Display.Highlight(35, x, y, col: heatMapZero());
 			
 			for (var i = 4; i < 8; i++) {
-				Display.Write("  ", x + 2 * (i % 4), y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, s700.Work[i]));
+				displayHeatMap32(s700.Work[i], x + 9 * (i % 4), y);
 			}
 			y++;
 			
+			Display.Highlight(17, x, y, col: heatMapZero());
+			
 			for (var i = 0; i < 2; i++) {
-				Display.Write("  ", x + 2 * i, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, s700.Cmp[i]));
+				displayHeatMap32(s700.Cmp[i], x + 9 * i, y);
 			}
 			y++;
 			
 			if (s700.WaitUntil > 0) {
-				Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, s700.WaitUntil.SafeSigned()));
+				displayHeatMap64((uint) s700.WaitUntil.SafeSigned(), x, y);
 			}
 			y++;
 			
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 256, s700.BytecodeLength)); y++;
+			displayHeatMap24((uint) s700.BytecodeLength, x, y); y++;
 			
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 256, s700.DataLength));
-			Display.Write("  ", col: heatMapColor(BusSize.Bit32, signed: false, scale: 256, s700.PC));
-			Display.Write("  ", col: heatMapColor(BusSize.Bit8,  signed: false, scale:   1, s700.SP));
-			Display.Write("  ", col: heatMapColor(BusSize.Bit8,  signed: false, scale:   1, s700.SPTop));
+			displayHeatMap24((uint) s700.DataLength, x,      y);
+			displayHeatMap24(       s700.PC,         x + 11, y);
+			
+			Display.Highlight(2, x + 21, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.SP   ).BackgroundRGB);
+			Display.Highlight(2, x + 27, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.SPTop).BackgroundRGB);
 			y++;
 			
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, s700.CurCycle  .SafeSigned())); y++;
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, s700.BeginCycle.SafeSigned())); y++;
-			Display.Write("  ", x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, s700.SyncPoint .SafeSigned())); y++;
+			displayHeatMap64((uint) s700.CurCycle.  SafeSigned(), x, y); y++;
+			displayHeatMap64((uint) s700.BeginCycle.SafeSigned(), x, y); y++;
+			displayHeatMap64((uint) s700.SyncPoint .SafeSigned(), x, y); y++;
 		}
 		
 		showColorCoding();

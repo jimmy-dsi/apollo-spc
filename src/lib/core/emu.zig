@@ -241,9 +241,11 @@ pub const Emu = struct {
             emu.s_dsp.unpause();
         }
 
-        pub inline fn break_check(self: *Singleton) bool {
+        pub inline fn break_check(self: *Singleton, reset: bool) bool {
             const res = self.break_exec;
-            self.break_exec = false;
+            if (reset) {
+                self.break_exec = false;
+            }
             return res;
         }
 
@@ -506,7 +508,13 @@ pub const Emu = struct {
 
     pub fn step_instruction(self: *Emu) Error! void {
         if (self.script700.enabled) {
-            try self.step_cycle(true);
+            if (!self.s_smp.instr_boundary) {
+                try self.step_cycle_inst(true);
+            }
+            else {
+                try self.step_cycle(true);
+            }
+
             // Add timeout for infinite loop protection
             var steps: u32 = 0;
             while (!self.s_smp.instr_boundary) {
@@ -527,11 +535,19 @@ pub const Emu = struct {
             }
         }
         else {
-            self.step_cycle_fast();
+            if (!self.s_smp.instr_boundary) {
+                self.step_cycle_fast_inst();
+            }
+            else {
+                self.step_cycle_fast();
+            }
+
             while (!self.s_smp.instr_boundary) {
                 self.step();
             }
         }
+
+        //self.s_smp.spc.state.instruction_start_pc = self.s_smp.spc.pc();
     }
 
     pub inline fn step_cycle(self: *Emu, comptime script700_enabled: bool) Error! void {
@@ -540,6 +556,15 @@ pub const Emu = struct {
         }
         else {
             self.step_cycle_fast();
+        }
+    }
+
+    pub inline fn step_cycle_inst(self: *Emu, comptime script700_enabled: bool) Error! void {
+        if (script700_enabled) {
+            try self.step_cycle_safe_inst();
+        }
+        else {
+            self.step_cycle_fast_inst();
         }
     }
 
@@ -557,10 +582,39 @@ pub const Emu = struct {
         }
     }
 
+    pub inline fn step_cycle_safe_inst(self: *Emu) Error! void {
+        const cur_cycle = self.s_dsp.clock_counter;
+        
+        // Add timeout for infinite loop protection
+        var steps: u32 = 0;
+        while (self.s_dsp.clock_counter == cur_cycle) {
+            if (steps == StepTimeout) {
+                return Error.Timeout;
+            }
+            self.step();
+            steps += 1;
+
+            if (self.s_smp.instr_boundary) {
+                return;
+            }
+        }
+    }
+
     pub inline fn step_cycle_fast(self: *Emu) void {
         const cur_cycle = self.s_dsp.clock_counter;
         while (self.s_dsp.clock_counter == cur_cycle) {
             self.step();
+        }
+    }
+
+    pub inline fn step_cycle_fast_inst(self: *Emu) void {
+        const cur_cycle = self.s_dsp.clock_counter;
+        while (self.s_dsp.clock_counter == cur_cycle) {
+            self.step();
+
+            if (self.s_smp.instr_boundary) {
+                return;
+            }
         }
     }
 
@@ -617,6 +671,23 @@ pub const Emu = struct {
         if (self.script700.enabled and cycle.* > self.script700.state.last_cycle) {
             self.run_script700();
         }
+
+        if (self.s_smp.instr_boundary) {
+            self.s_smp.change_interrupt_mode();
+
+            // Update SPC interrupt vector if necessary
+            if (self.s_smp.vector_changed) {
+                self.s_smp.spc.current_interrupt_vector = self.s_smp.next_vector;
+                self.s_smp.vector_changed = false;
+            }
+
+            self.s_smp.spc.state.instruction_start_pc    = self.s_smp.spc.pc();
+            self.s_smp.spc.state.instruction_start_cycle = @intCast(@divTrunc(cycle.*, 2));
+
+            if (self.singleton != null and self.script700.state.has_breakpoint(self.s_smp.spc.pc())) {
+                self.singleton.?.break_exec = true;
+            }
+        }
     }
 
     pub fn pause_sdsp(self: *Emu) void {
@@ -631,9 +702,9 @@ pub const Emu = struct {
         }
     }
 
-    pub inline fn break_check(self: *Emu) bool {
+    pub inline fn break_check(self: *Emu, reset: bool) bool {
         if (self.singleton) |s| {
-            return s.break_check();
+            return s.break_check(reset);
         }
 
         return false;

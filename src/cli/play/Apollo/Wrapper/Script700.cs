@@ -52,6 +52,9 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "script700_get_label_addresses")]
 	public static partial IntPtr Script700GetLabelAddresses(Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "script700_compile_instruction")]
+	public static partial CompiledInstr Script700CompileInstruction(InstrInfo instr);
+	
 	[StructLayout(LayoutKind.Sequential)]
 	internal struct Script700State {
 		public IntPtr PortIn;
@@ -76,5 +79,26 @@ internal partial class DLL {
 		
 		public IntPtr WaitDevice;
 		public IntPtr WaitPort;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal unsafe struct InstrInfo {
+		public fixed byte   Mnemonic[3];
+		
+		public fixed byte   Oper1Prefix[3];
+		public       byte   Oper1HasValue;
+		public       UInt32 Oper1Value;
+		
+		public       byte   Operator;
+		
+		public fixed byte   Oper2Prefix[3];
+		public       byte   Oper2HasValue;
+		public       UInt32 Oper2Value;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal unsafe struct CompiledInstr {
+		public fixed UInt32 WordData[4];
+		public       UInt32 Length;
 	}
 }

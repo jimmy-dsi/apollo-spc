@@ -111,14 +111,19 @@ pub inline fn step_instruction(emu_ptr: ?*Emu) !void {
     try ep.?.step_instruction();
 }
 
-pub inline fn step_n_cycles(cycles: u32, emu_ptr: ?*Emu) u32 {
+pub inline fn step_n_cycles(cycles: u32, emu_ptr: ?*Emu, comptime bp_enabled: bool) i32 {
     var ep = get_ptr(emu_ptr);
     main.validate_ptr(Emu, ep) catch { return 0; };
 
-    var completed_cycles: u32 = 0;
+    var completed_cycles: i32 = 0;
     for (0..cycles) |_| {
         ep.?.step_cycle_safe() catch { return completed_cycles; };
         completed_cycles += 1;
+
+        // Return negative if breakpoint hit
+        if (bp_enabled and ep.?.break_check(true)) {
+            return -completed_cycles;
+        }
     }
 
     return completed_cycles;
@@ -210,6 +215,20 @@ pub inline fn disable_echo_voice(emu_ptr: ?*Emu, index: u3) !void {
     try main.validate_ptr(Emu, ep);
 
     return ep.?.disable_echo_voice(index);
+}
+
+pub inline fn check_breakpoint(emu_ptr: ?*Emu) !bool {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.break_check(false);
+}
+
+pub inline fn consume_breakpoint(emu_ptr: ?*Emu) !bool {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.break_check(true);
 }
 
 pub inline fn copy(dest_emu_ptr: ?*Emu, src_emu_ptr: ?*const Emu) !void {
@@ -311,7 +330,12 @@ pub inline fn err(e: anyerror, emu_ptr: ?*Emu) anyerror {
             SPCLoadError.MissingFileHeader => .spc_missing_file_header,
             SPCLoadError.SizeTooShort      => .spc_size_too_short,
 
-            Emu.Error.Timeout => .script700_timeout,
+            Emu.Error.Timeout                 => .script700_timeout,
+            Script700.Load.bytecode_too_large => .script700_load_error,
+            Script700.Load.data_too_large     => .script700_load_error,
+            Script700.Load.malformed_file     => .script700_load_error,
+            Script700.Compile.no_space        => .script700_compile_error,
+            Script700.Compile.unencodable     => .script700_compile_error,
 
             Emu.Error.NoSingletonAttached => .emu_is_not_main,
 

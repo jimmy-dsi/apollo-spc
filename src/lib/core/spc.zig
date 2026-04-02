@@ -185,6 +185,10 @@ pub const SPC = struct {
         return self.state.c();
     }
 
+    pub inline fn instruction_start_pc(self: *const SPC) u16 {
+        return self.state.instruction_start_pc;
+    }
+
     pub inline fn mode(self: *const SPC) SPCState.Mode {
         return self.state.mode;
     }

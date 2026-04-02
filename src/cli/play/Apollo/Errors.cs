@@ -3,28 +3,29 @@ namespace Apollo;
 using System.Diagnostics;
 
 public enum ResultType {
-	Success              = 0,
+	Success               = 0,
 
-	UnknownError         = 1,
-	                        
-	MultipleDeinit       = 2,
-	AlreadyInited        = 3,
-	InvalidState         = 4,
-	NullPtr              = 5,
-	                        
-	MultipleMainEmu      = 6,
-	                        
-	AllocError           = 7,
-	                        
-	SpcMissingFileHeader = 8,
-	SpcSizeTooShort      = 9,
-	                        
-	Script700Timeout     = 10,
-	Script700LoadError   = 11,
+	UnknownError          = 1,
+	                         
+	MultipleDeinit        = 2,
+	AlreadyInited         = 3,
+	InvalidState          = 4,
+	NullPtr               = 5,
+	                         
+	MultipleMainEmu       = 6,
+	                         
+	AllocError            = 7,
+	                         
+	SpcMissingFileHeader  = 8,
+	SpcSizeTooShort       = 9,
+	                         
+	Script700Timeout      = 10,
+	Script700LoadError    = 11,
+	Script700CompileError = 12,
 
-	EmuIsNotMain         = 12,
+	EmuIsNotMain          = 13,
 	
-	SpcNotLoaded         = 13,
+	SpcNotLoaded          = 14,
 }
 
 public class Error: Exception {
@@ -34,20 +35,21 @@ public class Error: Exception {
 		}
 		
 		switch ((ResultType) errorCode) {
-			case ResultType.Success:              throw new UnreachableException();
-			case ResultType.UnknownError:         throw new UnknownError();
-			case ResultType.MultipleDeinit:       throw new DeinitError();
-			case ResultType.AlreadyInited:        throw new InitError();
-			case ResultType.InvalidState:         throw new StateError();
-			case ResultType.NullPtr:              throw new NullError();
-			case ResultType.MultipleMainEmu:      throw new MultipleMainEmuError();
-			case ResultType.AllocError:           throw new AllocError();
-			case ResultType.SpcMissingFileHeader: throw new SpcMissingHeaderError();
-			case ResultType.SpcSizeTooShort:      throw new SpcSizeTooShortError();
-			case ResultType.Script700Timeout:     throw new Script700Timeout();
-			case ResultType.Script700LoadError:   throw new Script700LoadError();
-			case ResultType.EmuIsNotMain:         throw new EmuNotMainError();
-			case ResultType.SpcNotLoaded:         throw new SpcNotLoadedError();
+			case ResultType.Success:               throw new UnreachableException();
+			case ResultType.UnknownError:          throw new UnknownError();
+			case ResultType.MultipleDeinit:        throw new DeinitError();
+			case ResultType.AlreadyInited:         throw new InitError();
+			case ResultType.InvalidState:          throw new StateError();
+			case ResultType.NullPtr:               throw new NullError();
+			case ResultType.MultipleMainEmu:       throw new MultipleMainEmuError();
+			case ResultType.AllocError:            throw new AllocError();
+			case ResultType.SpcMissingFileHeader:  throw new SpcMissingHeaderError();
+			case ResultType.SpcSizeTooShort:       throw new SpcSizeTooShortError();
+			case ResultType.Script700Timeout:      throw new Script700Timeout();
+			case ResultType.Script700LoadError:    throw new Script700LoadError();
+			case ResultType.Script700CompileError: throw new Script700CompileError();
+			case ResultType.EmuIsNotMain:          throw new EmuNotMainError();
+			case ResultType.SpcNotLoaded:          throw new SpcNotLoadedError();
 		}
 	}
 }
@@ -63,5 +65,6 @@ public class SpcMissingHeaderError: Error { }
 public class SpcSizeTooShortError:  Error { }
 public class Script700Timeout:      Error { }
 public class Script700LoadError:    Error { }
+public class Script700CompileError: Error { }
 public class EmuNotMainError:       Error { }
 public class SpcNotLoadedError:     Error { }

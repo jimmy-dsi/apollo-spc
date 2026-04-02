@@ -2,6 +2,7 @@ namespace SpcProgram;
 
 using Apollo;
 using Jimbl;
+using Jimbl.Graphics;
 
 public static partial class CliMain {
 	public static Emulator PrimaryEmu  { get; private set; }
@@ -19,6 +20,36 @@ public static partial class CliMain {
 	
 	static bool   killAllThreads     = false;
 	static object killAllThreadsLock = new();
+	
+	static bool   startInDebugMode   = false;
+	static bool   hideFirstBreakAddr = false;
+	static object debugModeLock      = new();
+
+	public static bool StartInDebugMode {
+		get {
+			lock (debugModeLock) {
+				var res = startInDebugMode;
+				startInDebugMode = false;
+				return res;
+			}
+		}
+		set {
+			lock (debugModeLock) {
+				startInDebugMode   = value;
+				hideFirstBreakAddr = value;
+			}
+		}
+	}
+
+	public static bool HideFirstBreakAddr {
+		get {
+			lock (debugModeLock) {
+				var res = hideFirstBreakAddr;
+				hideFirstBreakAddr = false;
+				return res;
+			}
+		}
+	}
 
 	public static bool KillAllThreads {
 		get {
@@ -43,21 +74,37 @@ public static partial class CliMain {
 		
 		Lib.Init();
 		try {
+			var debugMode = args.Any(x => x is "--debug" or "-d");
+			args = args.Where(x => x is not "--debug" and not "-d").ToArray();
+			
 			if (args.Length == 0) {
 				Console.Error.WriteLine($"error: SPC file not provided");
 				return 1;
 			}
 			
-			spcFilePath = args[0];
+			StartInDebugMode = debugMode;
+			spcFilePath      = args[0];
 			
 			//emu = LibTest.Test(spcFilePath);
 			PrimaryEmu = new(setAsMain: true, makeShared: true);
 			PrimaryEmu.LoadSpcFile(spcFilePath);
 			PrimaryEmu.SMP.LoggingEnabled = true;
 			
-			// Enable Script700 if binary file is present
+			// Enable Script700 if binary or source file is present
 			var scriptBinary = Script700.BinaryFile(spcFilePath);
-			if (scriptBinary is not null) {
+			var scriptSource = Script700.ScriptFile(spcFilePath);
+			
+			if (scriptSource is not null &&
+			   (scriptBinary is null || Env.DateModified(scriptSource) >= Env.DateModified(scriptBinary)))
+			{
+				var binaryData = Script700.Compile(File.ReadAllText(scriptSource));
+				
+				scriptBinary = Env.StripExtension(scriptSource) + ".7sb";
+				File.WriteAllBytes(scriptBinary, binaryData);
+				
+				PrimaryEmu.Script700.LoadBinaryFile(binaryData);
+			}
+			else if (scriptBinary is not null) {
 				PrimaryEmu.Script700.LoadBinaryFile(File.ReadAllBytes(scriptBinary));
 			}
 			
@@ -121,6 +168,22 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('*'), KeyBindings.Action.SeekPos_8, ctrl: false);
 			KeyBindings.Register(KeyBindings.Key.Char('A'),  KeyBindings.Key.Char('('), KeyBindings.Action.SeekPos_9, ctrl: false);
 			KeyBindings.Register(KeyBindings.Key.Char(' '),  KeyBindings.Action.TogglePause);
+			KeyBindings.Register(KeyBindings.Key.F5,         KeyBindings.Action.ToggleBreak);
+			KeyBindings.Register(KeyBindings.Key.F6,         KeyBindings.Action.StepInstruction);
+			KeyBindings.Register(KeyBindings.Key.Char('B'),  KeyBindings.Action.ToggleBreakpoints,  ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.IncHeatMapDataSize, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.DecHeatMapDataSize, ctrl: true);
+			KeyBindings.Register(KeyBindings.Key.F9,         KeyBindings.Action.IncHeatMapDataSize);
+			KeyBindings.Register(KeyBindings.Key.F10,        KeyBindings.Action.DecHeatMapDataSize);
+			
+			// Create RAM memory view buffer and Trace logger view buffer
+			Display.CurrentBufferId = "aram";
+			Display.ResetWindowBuffer(91, 0x1000, 0, 0, 91, ScrollAreaRows);
+			Display.CurrentBufferId = "trace";
+			Display.ResetWindowBuffer(Display.Width, ScrollAreaRows, 0, 0, Display.Width, ScrollAreaRows);
+			Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
+			
+			Display.HideWindow();
 			
 			Console.Clear();
 			Console.CursorVisible = false;
@@ -306,9 +369,9 @@ public static partial class CliMain {
 		return $"{(int) length.TotalHours:D2}:{length.Minutes:D2}:{length.Seconds:D2}.{length.Milliseconds:D3}";
 	}
 	
-	static (string, Color?) drawTextField(string? text, Color? col = null) {
+	static (string, AnsiColor?) drawTextField(string? text, AnsiColor? col = null) {
 		if ((text ?? "") == "") {
-			return ("<none>", new(ansiCode: 32));
+			return ("<none>", AnsiColor.Green);
 		}
 		else {
 			return (text!, col);

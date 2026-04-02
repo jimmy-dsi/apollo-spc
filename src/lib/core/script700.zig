@@ -115,7 +115,7 @@ pub const Script700 = struct {
         }
     }
 
-    pub const Load = error { bytecode_too_large };
+    pub const Load = error { bytecode_too_large, data_too_large, malformed_file };
 
     pub fn load_bytecode(self: *Script700, script_bytecode: []const u32) Load! void {
         if (script_bytecode.len > 0x1000_0000) {

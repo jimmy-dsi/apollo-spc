@@ -4,6 +4,8 @@ using System.Diagnostics;
 
 using Apollo;
 using Jimbl;
+using Jimbl.Graphics;
+using Jimbl.JMath;
 
 public static partial class CliMain {
 	static void showDSPViewer1(EmuDataBuffer buffer) {
@@ -19,7 +21,7 @@ public static partial class CliMain {
 			x = 27 * (v % 4);
 			y = yBase + 10 * (v / 4);
 			
-			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			Display.WriteBox([
 				"left volume:",
@@ -31,7 +33,7 @@ public static partial class CliMain {
 				"gain:",
 				"envx:",
 				"outx:",
-			], x + 4, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], x + 4, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 		
 			var xhm = x;
 		
@@ -61,13 +63,21 @@ public static partial class CliMain {
 				$"{buffer.DSP_Voice![v].Gain:X2}",
 				$"{buffer.DSP_Voice![v].ENVX:X2}",
 				$"{buffer.DSP_RegisterMem![v << 4 | 9]:X2}",
-			], xhm + 18, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], xhm + 18, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 		}
 		
 		showColorCoding();
 	}
 	
+	static AnsiColor? eqInsideColor = null;
+	
 	static void showDSPViewer2(EmuDataBuffer buffer) {
+		if (eqInsideColor is null) {
+			eqInsideColor = heatMapColor(BusSize.Bit8, false, 1, 0);
+		}
+		
+		var eqInsideRGB = eqInsideColor.BackgroundRGB!.Multiply(5.0 / 7);
+		
 		showDSPMem(buffer);
 		var baseY = Display.Y + 1;
 		
@@ -92,9 +102,15 @@ public static partial class CliMain {
 			Display.Write("  ", xo1, y + 2, col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeLeft ));
 			Display.Write("  ", xo1, y + 3, col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeRight));
 			
-			Display.Write("  ", xo1, y + 5, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalPModEn ));
-			Display.Write("  ", xo1, y + 6, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalNoiseEn));
-			Display.Write("  ", xo1, y + 7, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalEchoEn ));
+			var pFlags = drawHeatMapFlags(BusSize.Bit8,  globalPModEn);
+			var nFlags = drawHeatMapFlags(BusSize.Bit8, globalNoiseEn);
+			var eFlags = drawHeatMapFlags(BusSize.Bit8,  globalEchoEn);
+			
+			for (var i = 0; i < 4; i++) {
+				Display.Write(new(pFlags[i].Char, 1), xo1 - 2 + i, y + 5, col: pFlags[i].Color);
+				Display.Write(new(nFlags[i].Char, 1), xo1 - 2 + i, y + 6, col: nFlags[i].Color);
+				Display.Write(new(eFlags[i].Char, 1), xo1 - 2 + i, y + 7, col: eFlags[i].Color);
+			}
 			
 			Display.Write("  ", xo1, y + 9,  col: heatMapColor(BusSize.Bit8, signed: false, scale: 8,   buffer.DSP_State!.NoiseClock));
 			Display.Write("  ", xo1, y + 10, col: heatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.ReadonlyEcho ? 1 : 0));
@@ -175,13 +191,23 @@ public static partial class CliMain {
 		var specX = firX + 37;
 		var specY = Display.Y - 6;
 		
-		Color? darkBlue = null; //heatMapColor(BusSize.Bit8, false, 1, 12);
-		Color? boxColor = null;
+		AnsiColor? darkBlue    = null; //heatMapColor(BusSize.Bit8, false, 1, 12);
+		AnsiColor? boxColor    = null;
+		
+		AnsiColor  darkLine = new(AnsiColor.Code.DarkGrey, eqInsideRGB);
+		AnsiColor lightLine = new(AnsiColor.Code.    Grey, eqInsideRGB);
+		
+		AnsiColor eqInsideColor2 = new(eqInsideRGB, isBG: true);
 		
 		Display.ClearBox(20, 8, specX + 1, specY + 1);
-		Display.Write(new('_', 21), specX, specY + 2, col: Color.DarkGrey);
-		Display.Write(new('_', 21), specX, specY + 4, col: Color.Grey);
-		Display.Write(new('_', 21), specX, specY + 6, col: Color.DarkGrey);
+		Display.Write(new(' ', 21), specX, specY + 1, col: eqInsideColor2);
+		Display.Write(new('_', 21), specX, specY + 2, col: darkLine);
+		Display.Write(new(' ', 21), specX, specY + 3, col: eqInsideColor2);
+		Display.Write(new('_', 21), specX, specY + 4, col: lightLine);
+		Display.Write(new(' ', 21), specX, specY + 5, col: eqInsideColor2);
+		Display.Write(new('_', 21), specX, specY + 6, col: darkLine);
+		Display.Write(new(' ', 21), specX, specY + 7, col: eqInsideColor2);
+		Display.Write(new(' ', 21), specX, specY + 8, col: eqInsideColor2);
 		
 		var firFFT = JMath.FFT_Gain(buffer.DSP_State!.FIR.Select(x => (int) x).ToArray(), 0x80);
 		const double MaxDB = 16;
@@ -196,9 +222,9 @@ public static partial class CliMain {
 		}
 		
 		Display.DrawOutline(specX - 1, specY, 23, 10, col: boxColor);
-		Display.Write(new(' ', 23), specX -  1, specY);
-		Display.Write(new(' ', 21), specX,      specY,     col: darkBlue);
-		Display.Write(new(' ', 23), specX -  1, specY + 9);
+		Display.Write(new(' ', 23), specX -  1, specY, col: eqInsideColor2);
+		Display.Write(new(' ', 21), specX,      specY, col: darkBlue);
+		Display.Write(new(' ', 23), specX -  1, specY + 9, col: eqInsideColor2);
 		Display.Write(" ",          specX -  1, specY, col: boxColor);
 		Display.Write(" ",          specX + 21, specY, col: boxColor);
 		
@@ -226,9 +252,15 @@ public static partial class CliMain {
 		xhm = x + xo2;
 		
 		if (heatMapEnabled) {
-			Display.Write("  ", x + xo2, y    , col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalKeyOn ));
-			Display.Write("  ", x + xo2, y + 1, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalKeyOff));
-			Display.Write("  ", x + xo2, y + 2, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, globalEndx  ));
+			var konFlags  = drawHeatMapFlags(BusSize.Bit8,  globalKeyOn);
+			var koffFlags = drawHeatMapFlags(BusSize.Bit8, globalKeyOff);
+			var endxFlags = drawHeatMapFlags(BusSize.Bit8,   globalEndx);
+			
+			for (var i = 0; i < 4; i++) {
+				Display.Write(new( konFlags[i].Char, 1), x + xo2 - 2 + i, y    , col:  konFlags[i].Color);
+				Display.Write(new(koffFlags[i].Char, 1), x + xo2 - 2 + i, y + 1, col: koffFlags[i].Color);
+				Display.Write(new(endxFlags[i].Char, 1), x + xo2 - 2 + i, y + 2, col: endxFlags[i].Color);
+			}
 			Display.Write("  ", x + xo2, y + 3, col: heatMapColor(BusSize.Bit8, signed:  true, scale: 1, buffer.DSP_State!.EchoFeedback));
 			
 			Display.Write("  ", x + xo2, y + 5, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1,  buffer.DSP_State!.EchoStartPage));
@@ -282,7 +314,7 @@ public static partial class CliMain {
 			x = 28 * (v % 4);
 			y = yBase + 15 * (v / 4);
 			
-			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			Display.Write($"V{v + 1}", x, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			Display.WriteBox([
 				"buff. offset:",
@@ -295,7 +327,7 @@ public static partial class CliMain {
 				"env. mode:",
 				"env. level:",
 				"decode buffer:",
-			], x + 4, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], x + 4, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			var envName = buffer.DSP_DebugState!.Voice[v].EnvMode switch {
 				DSP.EnvelopeMode.Attack  => "att.",
@@ -315,7 +347,7 @@ public static partial class CliMain {
 				$"{ buffer.DSP_DebugState!.Voice[v]    .PitchModOn   } ",
 				$"{ envName } ",
 				$"{(buffer.DSP_DebugState!.Voice[v].EnvLevel >> 4):X2}.{(buffer.DSP_DebugState!.Voice[v].EnvLevel & 0xF):X1}",
-			], x + 21, y, col: voiceOnStates[v] ? null : Color.DarkGrey);
+			], x + 21, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 			
 			var nextY   = Display.Y;
 			var colMult = voiceOnStates[v] ? 1.0 : 0.125;
@@ -348,7 +380,7 @@ public static partial class CliMain {
 			for (var by = 0; by < 3; by++) {
 				for (var bx = 0; bx < 4; bx++) {
 					var val = (UInt16) buffer.DSP_DebugState!.Voice[v].Buffer[4 * by + bx];
-					Display.Write($"{val:X4} ", x + 6 + 5 * bx, col: heatMapEnabled ? heatMapColor(BusSize.Bit16, signed: true, scale: colMult, val) : voiceOnStates[v] ? null : Color.DarkGrey);
+					Display.Write($"{val:X4} ", x + 6 + 5 * bx, col: heatMapEnabled ? heatMapColor(BusSize.Bit16, signed: true, scale: colMult, val) : voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 				}
 				Display.Y++;
 			}
@@ -358,8 +390,8 @@ public static partial class CliMain {
 	}
 		
 	static void showDSPMem(EmuDataBuffer buffer) {
-		var coloring = new Color?[0x80];
-		var color    = Color.DarkGrey;
+		var coloring = new AnsiColor?[0x80];
+		var color    = AnsiColor.DarkGrey;
 		
 		for (var c = 0; c < 8; c++) {
 			coloring[c * 0x10 + 0xA] = color;
@@ -377,7 +409,9 @@ public static partial class CliMain {
 			}
 		}
 		
-		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, coloring, useHeatMap: heatMapEnabled);
+		var dspLogs = getDspMemLogs(buffer);
+		
+		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, coloring, memLogs: dspLogs, useHeatMap: heatMapEnabled);
 	}
 	
 	static byte vFlagsToByte(bool[] flags) {
@@ -386,5 +420,50 @@ public static partial class CliMain {
 			result |= (byte) ((flags[v] ? 1 : 0) << v);
 		}
 		return result;
+	}
+	
+	static SMP.MemAccessLog[] getDspMemLogs(EmuDataBuffer buffer) {
+		var dspAddr = buffer.SMP_State!.DSPAddress;
+		
+		var logs = logsSinceLastExec(buffer, filtered: false, inclExec: true)
+		           .Where(x => x.Address is 0x00F2 or 0x00F3);
+		
+		List<SMP.MemAccessLog> dspLogs = new();
+		
+		foreach (var log in logs.Reverse()) {
+			if (log.Type == SMP.MemAccessLog.LogType.Write) {
+				if (log.Address == 0x00F2) {
+					dspAddr = log.PreData!.Value;
+				}
+				else if (log.Address == 0x00F3 && dspAddr < 0x80) {
+					SMP.MemAccessLog dspLog = new() {
+						Type      = log.Type,
+						DSPCycle  = log.DSPCycle,
+						Address   = dspAddr,
+						ReadData  = log.ReadData,
+						PreData   = log.PreData,
+						WriteData = log.WriteData,
+						PostData  = log.PostData
+					};
+					
+					dspLogs.Add(dspLog);
+				}
+			}
+			else if (log.Address == 0x00F3) {
+				SMP.MemAccessLog dspLog = new() {
+					Type      = log.Type,
+					DSPCycle  = log.DSPCycle,
+					Address   = (UInt16) (dspAddr & 0x7F),
+					ReadData  = log.ReadData,
+					PreData   = log.PreData,
+					WriteData = log.WriteData,
+					PostData  = log.PostData
+				};
+					
+				dspLogs.Add(dspLog);
+			}
+		}
+		
+		return ((IEnumerable<SMP.MemAccessLog>) dspLogs).Reverse().ToArray();
 	}
 }

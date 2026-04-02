@@ -44,12 +44,13 @@ pub fn load_spc(emu: *Emu, spc_file_data: []const u8) SPCLoadError! SongMetadata
 
     // Load CPU registers
     const cpu_regs = spc_file_data[0x25..0x2C];
-    emu.s_smp.spc.state.pc  = read_u16_le(cpu_regs, 0);
-    emu.s_smp.spc.state.a   = cpu_regs[2];
-    emu.s_smp.spc.state.x   = cpu_regs[3];
-    emu.s_smp.spc.state.y   = cpu_regs[4];
-    emu.s_smp.spc.state.psw = cpu_regs[5];
-    emu.s_smp.spc.state.sp  = cpu_regs[6];
+    emu.s_smp.spc.state.pc                   = read_u16_le(cpu_regs, 0);
+    emu.s_smp.spc.state.a                    = cpu_regs[2];
+    emu.s_smp.spc.state.x                    = cpu_regs[3];
+    emu.s_smp.spc.state.y                    = cpu_regs[4];
+    emu.s_smp.spc.state.psw                  = cpu_regs[5];
+    emu.s_smp.spc.state.sp                   = cpu_regs[6];
+    emu.s_smp.spc.state.instruction_start_pc = emu.s_smp.spc.state.pc;
 
     // Load ARAM
     const aram = spc_file_data[0x00100..0x10100];
