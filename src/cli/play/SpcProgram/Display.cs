@@ -33,7 +33,7 @@ public static class Display {
 	static List<      char[]>  charBuffer = namedBuffers[currentBufferId].CharBuffer;
 	static List<AnsiColor?[]> colorBuffer = namedBuffers[currentBufferId].ColorBuffer;
 	
-	public static List<      char[]>  CharBuffer =>  charBuffer;
+	public static List<      char[]> CharBuffer  =>  charBuffer;
 	public static List<AnsiColor?[]> ColorBuffer => colorBuffer;
 	
 	public static bool UseBufferBlending { get; set; } = true;
