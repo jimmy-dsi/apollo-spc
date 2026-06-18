@@ -344,17 +344,17 @@ public static partial class CliMain {
 		Seconds, MS, Timer2s
 	}
 	
-	static string formatTime(int input, TimeUnit unit) {
+	static string formatTime(long input, TimeUnit unit) {
 		TimeSpan length = new();
 		
 		switch (unit) {
 			case TimeUnit.Seconds: {
-				length = new(hours: 0, minutes: 0, seconds: input);
+				length = new(hours: 0, minutes: 0, seconds: (int) input);
 				break;
 			}
 				
 			case TimeUnit.MS: {
-				length = new(days: 0, hours: 0, minutes: 0, seconds: 0, milliseconds: input);
+				length = new(days: 0, hours: 0, minutes: 0, seconds: 0, milliseconds: (int) input);
 				break;
 			}
 				
