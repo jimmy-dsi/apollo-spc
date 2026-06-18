@@ -1,6 +1,6 @@
-using Jimbl;
-
 namespace SpcProgram;
+
+using Jimbl;
 
 public static partial class CliMain {
 	static void showScript700Viewer(EmuDataBuffer buffer) {
@@ -96,7 +96,7 @@ public static partial class CliMain {
 			y++;
 			
 			if (s700.WaitUntil > 0) {
-				displayHeatMap64((uint) s700.WaitUntil.SafeSigned(), x, y);
+				displayHeatMap64((ulong) s700.WaitUntil.SafeSigned(), x, y);
 			}
 			y++;
 			
@@ -109,9 +109,9 @@ public static partial class CliMain {
 			Display.Highlight(2, x + 27, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.SPTop).BackgroundRGB);
 			y++;
 			
-			displayHeatMap64((uint) s700.CurCycle.  SafeSigned(), x, y); y++;
-			displayHeatMap64((uint) s700.BeginCycle.SafeSigned(), x, y); y++;
-			displayHeatMap64((uint) s700.SyncPoint .SafeSigned(), x, y); y++;
+			displayHeatMap64((ulong) s700.CurCycle.  SafeSigned(), x, y); y++;
+			displayHeatMap64((ulong) s700.BeginCycle.SafeSigned(), x, y); y++;
+			displayHeatMap64((ulong) s700.SyncPoint .SafeSigned(), x, y); y++;
 		}
 		
 		showColorCoding();
