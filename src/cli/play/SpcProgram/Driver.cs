@@ -43,7 +43,7 @@ public static class Driver {
 		uiCallback(null);
 
 		SDL.SDL_AudioSpec want = new();
-		want.freq     = 32000;
+		want.freq     = 96000;
 		want.format   = SDL.AUDIO_S16; // 16-bit signed
 		want.channels = 2;             // Stereo
 		want.samples  = 512;           // Buffer size in samples
@@ -71,6 +71,8 @@ public static class Driver {
 	static Random rng = new();
 	static int cycleSpillOver = 0;
 	
+	static List<Int16> leftOverSamps = [];
+	
 	static bool    paused = false;
 	static long    instrStep = 0;
 	static UInt16? breakPC = null;
@@ -84,6 +86,9 @@ public static class Driver {
 	static void Callback(IntPtr userdata, IntPtr stream, int len) {
 		var numShorts = len / sizeof(Int16);
 		Int16[] buffer = new Int16[numShorts];
+		
+		var leftOverCopy = leftOverSamps.ToArray();
+		leftOverSamps.Clear();
 		
 		lock (CliMain.EmuRestoreLock) {
 			try {
@@ -107,30 +112,63 @@ public static class Driver {
 				breakPC = null;
 				paused = false;
 				
-				var samples = numShorts / 2;
-		
-				var approxCycles = (samples - 1) * 64 - cycleSpillOver;
+				var samplesNative = (numShorts - leftOverCopy.Length) / 2;
+				var reqSamplesDSP = (int) Math.Ceiling(samplesNative / 3.0);
+				
+				var approxCycles = (reqSamplesDSP - 1) * 64 /*- cycleSpillOver*/;
+				
 				if (!StepCycles(approxCycles)) {
 					return;
 				}
 				
-				if (!StepCycles(() => emu.SamplesQueued < samples)) {
+				if (!StepCycles(() => emu.SamplesQueued < reqSamplesDSP * 3)) {
 					return;
 				}
 			
 				// Run a random extra number of cycles, between 0 and 63
 				// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
-				cycleSpillOver = rng.Next(0, 64);
-			
-				if (!StepCycles(cycleSpillOver)) {
-					return;
-				}
+				//cycleSpillOver = rng.Next(0, 64);
+				//
+				//if (!StepCycles(cycleSpillOver)) {
+				//	return;
+				//}
 		
 				buffer = emu.GetBufferedSamples();
 			}
 			finally {
+				// Copy leftover array into unmanaged buffer if non-empty
+				if (leftOverCopy.Length > 0) {
+					try {
+						Marshal.Copy(leftOverCopy, 0, stream, leftOverCopy.Length);
+					}
+					catch (ArgumentOutOfRangeException) {
+						Console.WriteLine("Leftover is problem");
+						throw;
+					}
+					numShorts -= leftOverCopy.Length;
+					stream    += leftOverCopy.Length * sizeof(Int16);
+				}
+				
 				// Copy managed array into unmanaged buffer
-				Marshal.Copy(buffer, 0, stream, numShorts);
+				try {
+					Marshal.Copy(buffer, 0, stream, numShorts); 
+				}
+				catch (ArgumentOutOfRangeException) {
+					Console.WriteLine("Main is problem");
+					Console.WriteLine($"Leftover length: {leftOverCopy.Length}");
+					Console.WriteLine($"Buffer length:   {buffer.Length}");
+					Console.WriteLine($"Num Shorts:      {numShorts}");
+					throw;
+				}
+				
+				// Roll over into leftover array if any remaining
+				leftOverSamps.Clear();
+				
+				if (numShorts < buffer.Length) {
+					for (var i = numShorts; i < buffer.Length; i++) {
+						leftOverSamps.Add(buffer[i]);
+					}
+				}
 				
 				Transfer.SendEmuData(instrStep, breakPC);
 				advanceFrame();

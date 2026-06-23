@@ -27,6 +27,8 @@ pub const Emu = struct {
         dac_buffer_offset: u32 = 0,
         dac_offset_prev:   u32 = 0,
 
+        lowpass_enabled: bool = true,
+
         master_debug_mode: DebugMode = DebugMode.none,
         cur_debug_mode:    DebugMode = DebugMode.none,
 
@@ -361,6 +363,14 @@ pub const Emu = struct {
     pub fn set_default_vector(self: *Emu, vector: u16) void {
         self.default_interrupt_vector = vector;
         self.s_smp.update_interrupt_vector(vector);
+    }
+
+    pub inline fn lowpass_enabled(self: *const Emu) bool {
+        if (self.singleton) |s| {
+            return s.lowpass_enabled;
+        }
+
+        return false;
     }
 
     pub inline fn queue_dac_sample(self: *Emu, left: i17, right: i17) void {

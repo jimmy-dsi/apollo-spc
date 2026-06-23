@@ -40,6 +40,29 @@ pub const SDSP = struct {
         main
     };
 
+    // Filter coefficients for SNES DAC low pass
+    // Analog circuit uses 3rd order Sallen-Key filter, apparently
+    //
+    // Generated from transfer function output using this online tool:
+    //    http://sim.okawa-denshi.jp/en/Sallen3tool.php
+    //
+    // Input:
+    //    R1 = 22000 ohm    C1 = 1.E-9  F
+    //    R2 = 22000 ohm    C2 = 1.8E-9 F
+    //    R3 = 22000 ohm    C3 = 1.E-10 F
+    //
+    // Resulting transfer function coefficients pre-computed using scipy.signal.bilinear(...)
+    //    B, A = signal.bilinear(b, a, fs=96000)
+    //
+    // The above uses a rate of 96,000 instead of 32,000. The output stream is oversampled during processing for perceived accuracy.
+    // Because the LPF that the DAC uses isn't perfect, there is in theory some minor audible noise produced above the 16kHz cutoff.
+    //const A: [4]f64 = .{ 1.0, 0.49806559, 0.35262699, -0.05011368 };
+    //const B: [4]f64 = .{ 0.22507236, 0.67521709, 0.67521709, 0.22507236, };
+    const A: [4]f64 = .{ 1.0,       -1.40431614, 0.93896182, -0.26841016 };
+    const B: [4]f64 = .{ 0.03327944, 0.09983832, 0.09983832,  0.03327944 };
+    //const A: [4]f64 = .{ 1.0,       -0.74981876, 0.53021373, -0.17068556 };
+    //const B: [4]f64 = .{ 0.07621368, 0.22864103, 0.22864103,  0.07621368 };
+
     emu: *Emu,
 
     audio_ram: [0x1_0000] u8 = undefined,
@@ -54,6 +77,12 @@ pub const SDSP = struct {
     clock_counter: u64 = 0,
 
     paused: bool = false,
+
+    prev_dac_left_in:  [3] i17 = .{ 0, 0, 0 },
+    prev_dac_right_in: [3] i17 = .{ 0, 0, 0 },
+
+    prev_dac_left_out:  [3] i17 = .{ 0, 0, 0 },
+    prev_dac_right_out: [3] i17 = .{ 0, 0, 0 },
 
     pub fn new(emu: *Emu) SDSP {
         var s_dsp = SDSP {
@@ -1002,7 +1031,7 @@ pub const SDSP = struct {
             p.output();
 
             // Multiplex output from S-DSP DAC or Pipeline 2
-            const left: i17, const right: i17 =
+            var left: i17, var right: i17 =
                 sw: switch (p.enabled) {
                     false => .{ s.int()._dac_left, s.int()._dac_right },
                     true  => {
@@ -1011,11 +1040,33 @@ pub const SDSP = struct {
                     }
                 };
 
-            // Send to emulator's audio buffer
-            s.emu.queue_dac_sample(
-                @intCast(left),
-                @intCast(right),
-            );
+            const left_in: i17, const right_in: i17 = .{ left, right };
+
+            // Do this part multiple times when oversampling and LPF is enabled
+            // This mimics the zero-order hold of the pre-filtered output. Better perceived accuracy to HW output
+            for (0..3) |_| {
+                // Perform lowpass, if enabled
+                if (s.emu.lowpass_enabled()) {
+                    const left_lp  = do_lowpass(left_in,  s.prev_dac_left_in,  s.prev_dac_left_out);
+                    const right_lp = do_lowpass(right_in, s.prev_dac_right_in, s.prev_dac_right_out);
+
+                    left  = left_lp;
+                    right = right_lp;
+                }
+
+                // Send to emulator's audio buffer
+                s.emu.queue_dac_sample(
+                    @intCast(left),
+                    @intCast(right),
+                );
+
+                // Shift DAC prev buffers
+                shift_buffer(left_in,  &s.prev_dac_left_in);
+                shift_buffer(right_in, &s.prev_dac_right_in);
+
+                shift_buffer(left,  &s.prev_dac_left_out);
+                shift_buffer(right, &s.prev_dac_right_out);
+            }
         }
 
         // Clear output for next sample
@@ -1056,5 +1107,54 @@ pub const SDSP = struct {
     {
         s.int().voice_step_d(0, aram_data_0, v0_voll);
         s.int().voice_step_a(v2_srcn);
+    }
+
+    // DAC analog lowpass
+    inline fn do_lowpass(c: i17, x: [3]i17, y: [3]i17) i17 {
+        const cf = le16_to_f64(c);
+
+        const xf: [3]f64 = .{
+            le16_to_f64(x[0]),
+            le16_to_f64(x[1]),
+            le16_to_f64(x[2]),
+        };
+
+        const yf: [3]f64 = .{
+            le16_to_f64(y[0]),
+            le16_to_f64(y[1]),
+            le16_to_f64(y[2]),
+        };
+
+        var yy = B[0] * cf + B[1] * xf[0] + B[2] * xf[1] + B[3] * xf[2]
+                           - A[1] * yf[0] - A[2] * yf[1] - A[3] * yf[2];
+        yy /= A[0];
+
+        return f64_to_le16(yy);
+    }
+
+    inline fn le16_to_f64(s: i17) f64 {
+        var sf: f64 = @floatFromInt(s);
+        sf /= 0x8000;
+        return sf;
+    }
+
+    inline fn f64_to_le16(s: f64) i17 {
+        const sf: f64 = s * 0x8000;
+        var   si: i17 = @intFromFloat(sf);
+
+        if (si > 0x7FFF) {
+            si = 0x7FFF;
+        }
+        else if (si < -0x8000) {
+            si = -0x8000;
+        }
+
+        return si;
+    }
+
+    inline fn shift_buffer(c: i17, p: []i17) void {
+        p[2] = p[1];
+        p[1] = p[0];
+        p[0] = c;
     }
 };
