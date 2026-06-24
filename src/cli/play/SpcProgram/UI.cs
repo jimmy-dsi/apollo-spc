@@ -34,6 +34,8 @@ public static partial class CliMain {
 		ChannelX_Enabled,  MainChannelX_Enabled,  EchoChannelX_Enabled,
 		ChannelX_Disabled, MainChannelX_Disabled, EchoChannelX_Disabled,
 		
+		LPF_Enabled, LPF_Disabled,
+		
 		AllChannelsEnabled,  AllMainChannelsEnabled,  AllEchoChannelsEnabled,
 		AllChannelsDisabled, AllMainChannelsDisabled, AllEchoChannelsDisabled,
 		
@@ -713,6 +715,11 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.ToggleLPF: {
+				toggleLPF();
+				break;
+			}
+			
 			case KeyBindings.Action.ScrollRowUp: {
 				if (currentView == View.MemoryViewer) {
 					if (StartAddr >= 0x10) {
@@ -1045,6 +1052,20 @@ public static partial class CliMain {
 		setTempStatusMsg(newOnState ? StatusMSG.EchoChannelX_Enabled : StatusMSG.EchoChannelX_Disabled);
 	}
 	
+	static void toggleLPF() {
+		var newLpfEnabled = !PrimaryEmu.LowpassEnabled;
+		PrimaryEmu.LowpassEnabled = newLpfEnabled;
+		
+		if (newLpfEnabled) {
+			Driver.ChangeSampleRate(96000);
+		}
+		else {
+			Driver.ChangeSampleRate(32000);
+		}
+		
+		setTempStatusMsg(newLpfEnabled ? StatusMSG.LPF_Enabled : StatusMSG.LPF_Disabled);
+	}
+	
 	static void seek(int offsetInSeconds) {
 		var targetCycle = Math.Max(0, curCycle + offsetInSeconds * 2048000);
 		var targetSnapshotIndex = getSnapshotIndex(targetCycle);
@@ -1214,6 +1235,8 @@ public static partial class CliMain {
 			StatusMSG.MainChannelX_Enabled  => $"Main channel {channelToToggle} enabled  {showActiveChannels()}",
 			StatusMSG.EchoChannelX_Disabled => $"Echo channel {channelToToggle} disabled {showActiveChannels()}",
 			StatusMSG.EchoChannelX_Enabled  => $"Echo channel {channelToToggle} enabled  {showActiveChannels()}",
+			StatusMSG.LPF_Disabled          => $"SNES Low-Pass Filter disabled",
+			StatusMSG.LPF_Enabled           => $"SNES Low-Pass Filter enabled",
 			StatusMSG.AllChannelsEnabled    => $"All channels enabled    {showActiveChannels()}",
 			StatusMSG.SeekFwd               => $"Seek +5 seconds",
 			StatusMSG.SeekBack              => $"Seek -5 seconds",

@@ -286,6 +286,14 @@ pub const Emu = struct {
         pub fn disable_echo_voice(self: *Singleton, index: u3) void {
             self.pipeline_2.disable_echo_voice(index);
         }
+
+        pub inline fn enable_lowpass(self: *Singleton) void {
+            self.lowpass_enabled = true;
+        }
+
+        pub inline fn disable_lowpass(self: *Singleton) void {
+            self.lowpass_enabled = false;
+        }
     };
 
     const StepTimeout = 100;
@@ -371,6 +379,18 @@ pub const Emu = struct {
         }
 
         return false;
+    }
+
+    pub inline fn enable_lowpass(self: *Emu) void {
+        if (self.singleton) |s| {
+            s.enable_lowpass();
+        }
+    }
+
+    pub inline fn disable_lowpass(self: *Emu) void {
+        if (self.singleton) |s| {
+            s.disable_lowpass();
+        }
     }
 
     pub inline fn queue_dac_sample(self: *Emu, left: i17, right: i17) void {

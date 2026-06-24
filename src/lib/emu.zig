@@ -231,6 +231,20 @@ pub inline fn consume_breakpoint(emu_ptr: ?*Emu) !bool {
     return ep.?.break_check(true);
 }
 
+pub inline fn enable_lowpass(emu_ptr: ?*Emu) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.enable_lowpass();
+}
+
+pub inline fn disable_lowpass(emu_ptr: ?*Emu) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.disable_lowpass();
+}
+
 pub inline fn copy(dest_emu_ptr: ?*Emu, src_emu_ptr: ?*const Emu) !void {
     var ep = get_ptr(dest_emu_ptr);
     try main.validate_ptr(Emu, ep);

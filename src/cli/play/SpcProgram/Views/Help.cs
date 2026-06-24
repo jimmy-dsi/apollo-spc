@@ -46,9 +46,9 @@ public static partial class CliMain {
 		Display.Write("Pause / Resume",                 1, y); Display.Write("Space",               x, y); y++;
 		Display.Write("Break execution / Resume",       1, y); Display.Write("F5",                  x, y); y++;
 		Display.Write("Step SPC700 instruction",        1, y); Display.Write("F6",                  x, y); y++;
-		y++;
-		
 		Display.Write("Toggle all breakpoints",         1, y); Display.Write("Ctrl+B",              x, y); y++;
+		
+		Display.Write($"{(PrimaryEmu.LowpassEnabled ? "Disable" : "Enable")} SNES Low-Pass filter ", 1, y); Display.Write("Ctrl+P", x, y); y++;
 		
 		//Display.DrawOutline(0, 0, Display.Width, y + 1, removeSides: true); y++;
 	}

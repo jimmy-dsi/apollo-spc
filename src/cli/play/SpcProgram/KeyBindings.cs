@@ -148,6 +148,7 @@ public static class KeyBindings {
 		ToggleEchoChannel_6,
 		ToggleEchoChannel_7,
 		ToggleEchoChannel_8,
+		ToggleLPF,
 		ScrollRowUp,
 		ScrollRowDown,
 		ScrollPageUp,

@@ -145,6 +145,7 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.F2,         KeyBindings.Action.ToggleEchoChannel_2);
 			KeyBindings.Register(KeyBindings.Key.F3,         KeyBindings.Action.ToggleEchoChannel_3);
 			KeyBindings.Register(KeyBindings.Key.F4,         KeyBindings.Action.ToggleEchoChannel_4);
+			KeyBindings.Register(KeyBindings.Key.Char('P'),  KeyBindings.Action.ToggleLPF, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.ScrollRowUp);
 			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.ScrollRowDown);
 			KeyBindings.Register(KeyBindings.Key.PageUp,     KeyBindings.Action.ScrollPageUp);

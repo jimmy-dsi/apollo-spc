@@ -1,10 +1,9 @@
-using System.Diagnostics;
-using Jimbl;
-
 namespace SpcProgram;
 
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+using Jimbl;
 using Apollo;
 using SDL2;
 
@@ -13,6 +12,13 @@ public static class Driver {
 	
 	static long   frame = 0;
 	static object frameLock = new();
+	
+	const  int DspSampleRate    = 32000;
+	static int nativeSampleRate = 96000;
+	
+	static double rateMultiplier => nativeSampleRate / DspSampleRate;
+	
+	static uint device = (uint) IntPtr.Zero;
 	
 	public static long Frame {
 		get {
@@ -43,7 +49,7 @@ public static class Driver {
 		uiCallback(null);
 
 		SDL.SDL_AudioSpec want = new();
-		want.freq     = 96000;
+		want.freq     = nativeSampleRate;
 		want.format   = SDL.AUDIO_S16; // 16-bit signed
 		want.channels = 2;             // Stereo
 		want.samples  = 512;           // Buffer size in samples
@@ -51,7 +57,7 @@ public static class Driver {
 
 		SDL.SDL_SetHint(SDL.SDL_HINT_AUDIO_RESAMPLING_MODE, "3"); // Use highest possible quality resampling if available
 
-		var device = SDL.SDL_OpenAudioDevice(null, 0, ref want, out SDL.SDL_AudioSpec have, 0);
+		device = SDL.SDL_OpenAudioDevice(null, 0, ref want, out _, 0);
 		if (device == IntPtr.Zero) {
 			Console.WriteLine("Failed to open audio: " + SDL.SDL_GetError());
 			SDL.SDL_Quit();
@@ -63,8 +69,36 @@ public static class Driver {
 			CliMain.MainLoop(uiCallback);
 		}
 		finally {
-			SDL.SDL_CloseAudioDevice(device);
-			SDL.SDL_Quit();
+			if (device != IntPtr.Zero) {
+				SDL.SDL_CloseAudioDevice(device);
+				SDL.SDL_Quit();
+			}
+		}
+	}
+	
+	public static void ChangeSampleRate(int newRate) {
+		lock (CliMain.EmuRestoreLock) {
+			nativeSampleRate = newRate;
+			
+			if (device != IntPtr.Zero) {
+				SDL.SDL_CloseAudioDevice(device);
+
+				SDL.SDL_AudioSpec want = new();
+				want.freq     = nativeSampleRate;
+				want.format   = SDL.AUDIO_S16; // 16-bit signed
+				want.channels = 2;             // Stereo
+				want.samples  = 512;           // Buffer size in samples
+				want.callback = Callback;
+
+				device = SDL.SDL_OpenAudioDevice(null, 0, ref want, out _, 0);
+			}
+			
+			if (device == IntPtr.Zero) {
+				SDL.SDL_Quit();
+				throw new Exception("Failed to open audio: " + SDL.SDL_GetError());
+			}
+			
+			SDL.SDL_PauseAudioDevice(device, 0); // Start playback
 		}
 	}
 	
@@ -113,53 +147,39 @@ public static class Driver {
 				paused = false;
 				
 				var samplesNative = (numShorts - leftOverCopy.Length) / 2;
-				var reqSamplesDSP = (int) Math.Ceiling(samplesNative / 3.0);
+				var reqSamplesDSP = (int) Math.Ceiling(samplesNative / rateMultiplier);
 				
-				var approxCycles = (reqSamplesDSP - 1) * 64 /*- cycleSpillOver*/;
+				var approxCycles = (reqSamplesDSP - 1) * 64 - cycleSpillOver;
 				
 				if (!StepCycles(approxCycles)) {
 					return;
 				}
 				
-				if (!StepCycles(() => emu.SamplesQueued < reqSamplesDSP * 3)) {
+				if (!StepCycles(() => emu.SamplesQueued < reqSamplesDSP * rateMultiplier)) {
 					return;
 				}
 			
 				// Run a random extra number of cycles, between 0 and 63
 				// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
-				//cycleSpillOver = rng.Next(0, 64);
-				//
-				//if (!StepCycles(cycleSpillOver)) {
-				//	return;
-				//}
+				cycleSpillOver = rng.Next(0, 64);
+				
+				if (!StepCycles(cycleSpillOver)) {
+					return;
+				}
 		
 				buffer = emu.GetBufferedSamples();
 			}
 			finally {
 				// Copy leftover array into unmanaged buffer if non-empty
 				if (leftOverCopy.Length > 0) {
-					try {
-						Marshal.Copy(leftOverCopy, 0, stream, leftOverCopy.Length);
-					}
-					catch (ArgumentOutOfRangeException) {
-						Console.WriteLine("Leftover is problem");
-						throw;
-					}
+					Marshal.Copy(leftOverCopy, 0, stream, leftOverCopy.Length);
+					
 					numShorts -= leftOverCopy.Length;
 					stream    += leftOverCopy.Length * sizeof(Int16);
 				}
 				
 				// Copy managed array into unmanaged buffer
-				try {
-					Marshal.Copy(buffer, 0, stream, numShorts); 
-				}
-				catch (ArgumentOutOfRangeException) {
-					Console.WriteLine("Main is problem");
-					Console.WriteLine($"Leftover length: {leftOverCopy.Length}");
-					Console.WriteLine($"Buffer length:   {buffer.Length}");
-					Console.WriteLine($"Num Shorts:      {numShorts}");
-					throw;
-				}
+				Marshal.Copy(buffer, 0, stream, numShorts);
 				
 				// Roll over into leftover array if any remaining
 				leftOverSamps.Clear();

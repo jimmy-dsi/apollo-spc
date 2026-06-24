@@ -1039,12 +1039,27 @@ pub const SDSP = struct {
                         break :sw .{ @intCast(ll), @intCast(rr) };
                     }
                 };
+            
+            // Clip to 16-bit signed if overflow
+            const lu17: u17 = @bitCast(left);
+            const ru17: u17 = @bitCast(right);
+            //
+            const lu16: u16 = @intCast(lu17 & 0xFFFF);
+            const ru16: u16 = @intCast(ru17 & 0xFFFF);
+            //
+            const ls16: i16 = @bitCast(lu16);
+            const rs16: i16 = @bitCast(ru16);
 
-            const left_in: i17, const right_in: i17 = .{ left, right };
+            const left_in: i17, const right_in: i17 = .{
+                @intCast(ls16),
+                @intCast(rs16)
+            };
+
+            const iters: usize = if (s.emu.lowpass_enabled()) 3 else 1;
 
             // Do this part multiple times when oversampling and LPF is enabled
             // This mimics the zero-order hold of the pre-filtered output. Better perceived accuracy to HW output
-            for (0..3) |_| {
+            for (0..iters) |_| {
                 // Perform lowpass, if enabled
                 if (s.emu.lowpass_enabled()) {
                     const left_lp  = do_lowpass(left_in,  s.prev_dac_left_in,  s.prev_dac_left_out);

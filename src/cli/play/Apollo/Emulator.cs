@@ -211,6 +211,43 @@ public class Emulator {
 		}
 	}
 	
+	static bool lowpassEnabled = true;
+	static object lowpassLock = new();
+	
+	public bool LowpassEnabled {
+		get {
+			lock (lowpassLock) {
+				return lowpassEnabled;
+			}
+		}
+		set {
+			lock (lowpassLock) {
+				lowpassEnabled = value;
+			}
+			
+			MaybeAcquireLock();
+			
+			try {
+				bool result;
+				
+				if (lowpassEnabled) {
+					result = DLL.EmuEnableLowpass(handle);
+				}
+				else {
+					result = DLL.EmuDisableLowpass(handle);
+				}
+				
+				if (!result) {
+					var errorCode = DLL.EmuGetLastError(handle);
+					Error.Throw(errorCode);
+				}
+			}
+			finally {
+				MaybeReleaseLock();
+			}
+		}
+	}
+	
 	public UInt32 LastResultCode => DLL.EmuGetLastResult(handle); // Get the last result code, regardless of whether it has succeeded or failed
 	public UInt32 LastErrorCode  => DLL.EmuGetLastError(handle);  // Get the last result code of the previous operation which resulted in an error
 	

@@ -148,6 +148,16 @@ pub export fn emu_consume_breakpoint(emu_ptr: ?[*]Emu) bool {
     return emu.consume_breakpoint(@ptrCast(emu_ptr)) catch |e| return emu.ferr(e, @ptrCast(emu_ptr));
 }
 
+pub export fn emu_enable_lowpass(emu_ptr: ?[*]Emu) bool {
+    emu.enable_lowpass(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_disable_lowpass(emu_ptr: ?[*]Emu) bool {
+    emu.disable_lowpass(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
 pub export fn emu_copy(dest_emu_ptr: ?[*]Emu, src_emu_ptr: ?[*]Emu) bool {
     emu.copy(@ptrCast(dest_emu_ptr), @ptrCast(src_emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(dest_emu_ptr)); };
     return true;
