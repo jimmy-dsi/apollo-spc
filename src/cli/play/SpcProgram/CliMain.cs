@@ -179,7 +179,7 @@ public static partial class CliMain {
 			
 			// Create RAM memory view buffer and Trace logger view buffer
 			Display.CurrentBufferId = "aram";
-			Display.ResetWindowBuffer(91, 0x1000, 0, 0, 91, ScrollAreaRows);
+			Display.ResetWindowBuffer(110, 0x1000, 0, 0, 110, ScrollAreaRows);
 			Display.CurrentBufferId = "trace";
 			Display.ResetWindowBuffer(Display.Width, ScrollAreaRows, 0, 0, Display.Width, ScrollAreaRows);
 			Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
@@ -327,12 +327,19 @@ public static partial class CliMain {
 		}
 	}
 	
-	static int getSnapshotIndex(long cycle) {
+	public static int GetSnapshotIndex(long cycle) {
 		return (int) (cycle / (2048000 / SnapsPerSecond));
 	}
 	
+	public static Emulator GetSnapshot(long cycle) {
+		var snapshotIndex = GetSnapshotIndex(cycle);
+		lock (seekBarLock) {
+			return seekBarSnapshots[snapshotIndex];
+		}
+	}
+	
 	static void seekBarSnapshot(long cycle, Emulator runAheadEmu) {
-		var snapshotIndex = getSnapshotIndex(cycle);
+		var snapshotIndex = GetSnapshotIndex(cycle);
 		
 		lock (seekBarLock) {
 			if (ReferenceEquals(runAheadEmu, RunAheadEmu) && !seekBarSnapshots.ContainsKey(snapshotIndex)) {

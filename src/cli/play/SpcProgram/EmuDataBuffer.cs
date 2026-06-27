@@ -248,10 +248,11 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
-	public long    Step      { get; private set; }
-	public long    DSPCycle  { get; private set; }
-	public long    InstrStep { get; private set; }
-	public UInt16? BreakPC   { get; private set; }
+	public long     Step           { get; private set; }
+	public long     DSPCycle       { get; private set; }
+	public long     InstrStep      { get; private set; }
+	public UInt16?  BreakPC        { get; private set; }
+	public Emulator RecentSnapshot { get; private set; }
 	
 	public byte[]?             ARAM_Data             { get; private set; }
 	public byte[]?             SMP_BusData           { get; private set; }
@@ -268,10 +269,12 @@ public class EmuDataBuffer: ICloneable {
 	static long nextStep = 0;
 	
 	public EmuDataBuffer(long dspCycle, long instrStep, UInt16? breakPC) {
-		DSPCycle = dspCycle;
-		Step = nextStep;
-		InstrStep = instrStep;
-		BreakPC = breakPC;
+		DSPCycle       = dspCycle;
+		Step           = nextStep;
+		InstrStep      = instrStep;
+		BreakPC        = breakPC;
+		RecentSnapshot = CliMain.GetSnapshot(dspCycle);
+		
 		nextStep++;
 	}
 	

@@ -259,7 +259,7 @@ public static partial class CliMain {
 							if (DisableScript700) {
 								lock (seekBarLock) {
 									var indexes  = seekBarSnapshots.Select(x => x.Key).ToArray();
-									var curIndex = getSnapshotIndex(curCycle);
+									var curIndex = GetSnapshotIndex(curCycle);
 				
 									foreach (var idx in indexes) {
 										if (idx > 0 && idx >= curIndex) {
@@ -287,7 +287,7 @@ public static partial class CliMain {
 							if (!DisableScript700) {
 								lock (seekBarLock) {
 									var indexes  = seekBarSnapshots.Select(x => x.Key).ToArray();
-									var curIndex = getSnapshotIndex(curCycle);
+									var curIndex = GetSnapshotIndex(curCycle);
 				
 									foreach (var idx in indexes) {
 										if (idx > 0 && idx >= curIndex) {
@@ -1068,7 +1068,7 @@ public static partial class CliMain {
 	
 	static void seek(int offsetInSeconds) {
 		var targetCycle = Math.Max(0, curCycle + offsetInSeconds * 2048000);
-		var targetSnapshotIndex = getSnapshotIndex(targetCycle);
+		var targetSnapshotIndex = GetSnapshotIndex(targetCycle);
 		
 		if (offsetInSeconds >= 0 && targetCycle > 2048000L * (60 * 12 + offsetInSeconds - 1)) {
 			return;
@@ -1087,7 +1087,7 @@ public static partial class CliMain {
 		songtimeRatio = Math.Clamp(songtimeRatio, 0, 1);
 		
 		var targetCycle         = Math.Max(0, (long) (songtimeRatio * 2048000 * (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12)));
-		var targetSnapshotIndex = getSnapshotIndex(targetCycle);
+		var targetSnapshotIndex = GetSnapshotIndex(targetCycle);
 		
 		loadSnapshot(targetSnapshotIndex);
 	}
@@ -1141,9 +1141,13 @@ public static partial class CliMain {
 			
 			case View.MemoryViewer: {
 				resetStatusMsg();
-				requestEmuData(Transfer.Requests.SMP_Bus | Transfer.Requests.SPC_Regs | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
+				requestEmuData(Transfer.Requests.SMP_Bus
+				               | Transfer.Requests.DSP_2
+				               | Transfer.Requests.SPC_Regs
+				               | Transfer.Requests.MemLogs
+				               | Transfer.Requests.SMP_State);
 				Display.CurrentBufferId = "aram";
-				Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
+				Display.SetWindowProps(0, 0, 110, ScrollAreaRows);
 				Display.EnableWindow();
 				break;
 			}
