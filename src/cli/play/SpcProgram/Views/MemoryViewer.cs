@@ -1,6 +1,6 @@
-using Jimbl.Graphics;
-
 namespace SpcProgram;
+
+using Jimbl.Graphics;
 
 using Apollo;
 using Jimbl;
@@ -141,23 +141,23 @@ public static partial class CliMain {
 				
 				if (r == sampStartRow || r == sampLoopRow) {
 					var addr = r == sampStartRow ? sampInfo.Start : sampInfo.Loop;
-					var endAddr = addr;
-					
-					while (endAddr <= 0xFFF7) {
-						if ((buffer.RecentSnapshot.DSP.ARAM[endAddr] & 1) != 0) {
-							break;
-						}
-						
-						endAddr += 9;
-					}
-					
-					endAddr += 8;
+					//var endAddr = addr;
+					//
+					//while (endAddr <= 0xFFF7) {
+					//	if ((buffer.RecentSnapshot.DSP.ARAM[endAddr] & 1) != 0) {
+					//		break;
+					//	}
+					//	
+					//	endAddr += 9;
+					//}
+					//
+					//endAddr += 8;
 				
 					if (!heatMapEnabled) {
 						Display.Write("                                  ", 74, r, col: readRegColor2, writeToScrollBuf: true);
 					}
 					
-					Display.Write(heatMapEnabled ? $" Sample {rowSamp.Value:X2} [{addr:X4}] " : $" Sample {rowSamp.Value:X2} [{addr:X4} - {endAddr:X4}] ",
+					Display.Write($" Sample {rowSamp.Value:X2} [{addr:X4}] ",
 					              heatMapEnabled ? 90 : 74, r,
 					              col: readRegColor2,
 					              writeToScrollBuf: true);

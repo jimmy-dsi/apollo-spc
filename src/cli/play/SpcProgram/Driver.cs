@@ -170,6 +170,9 @@ public static class Driver {
 				buffer = emu.GetBufferedSamples();
 			}
 			finally {
+				// Perform burst process - custom routine that needs to run periodically but not at any specific rate
+				emu.BurstProcess(Emulator.BurstAction);
+				
 				// Copy leftover array into unmanaged buffer if non-empty
 				if (leftOverCopy.Length > 0) {
 					Marshal.Copy(leftOverCopy, 0, stream, leftOverCopy.Length);

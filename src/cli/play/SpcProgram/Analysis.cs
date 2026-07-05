@@ -7,6 +7,52 @@ using SampleRef   = (byte SampleID, UInt16 Address, UInt16 Length, bool Looped);
 using SampleEntry = (UInt16 Start,  UInt16 Loop);
 
 public static class Analysis {
+	public class Container: ICloneable {
+		public SampleEntry[] SampleEntries = new SampleEntry[0x100];
+		
+		public Container Clone() {
+			Container c = new();
+			c.SampleEntries = (SampleEntry[]) SampleEntries.Clone();
+			return c;
+		}
+		
+		object ICloneable.Clone() => Clone();
+	}
+	
+	public static void TrackSampleUsage(this Emulator emu) {
+		var container = emu.AdditionalState as Container;
+		var prevSampleDir = container?.SampleEntries;
+		
+		var newSampleDir = new SampleEntry[256];
+		var sampleBank   = emu.DSP.Register[0x5D];
+		
+		for (var i = 0; i < 256; i++) {
+			var entryAddr   = (sampleBank << 8) + i * 4 & 0xFFFF;
+			
+			var startAddrLo = emu.DSP.ARAM[entryAddr];
+			var startAddrHi = emu.DSP.ARAM[entryAddr + 1];
+			var loopAddrLo  = emu.DSP.ARAM[entryAddr + 2];
+			var loopAddrHi  = emu.DSP.ARAM[entryAddr + 3];
+			
+			var startAddr = startAddrLo | startAddrHi << 8;
+			var loopAddr  =  loopAddrLo |  loopAddrHi << 8;
+			
+			newSampleDir[i].Start = (UInt16) startAddr;
+			newSampleDir[i].Loop  = (UInt16) loopAddr;
+		}
+		
+		if (prevSampleDir is not null) {
+			for (var i = 0; i < 256; i++) {
+				// Reset sample usage flag if either the start or loop address had been changed from before
+				if (newSampleDir[i].Start != prevSampleDir[i].Start || newSampleDir[i].Loop != prevSampleDir[i].Loop) {
+					emu.DSP.ResetSampleUsage((byte) i);
+				}
+			}
+		}
+		
+		//prevSampleDir = newSampleDir;
+	}
+	
 	public static byte?[] CheckForSampleData(this Emulator snapshot, UInt16 startAddr, UInt16 length, byte maxSamples = 0xFF) {
 		var sampleDirectory = snapshot.extractSampleEntries();
 		
@@ -16,7 +62,8 @@ public static class Analysis {
 		var aramSlice = snapshot.DSP.ARAM[startAddr .. (endAddr + 1)];
 		
 		var inSampleArr = aramSlice.Select(_ => (byte?) null).ToArray();
-		var candidates  = identify(sampleDirectory, startAddr, (UInt16) aramSlice.Length);
+		var candidates  = snapshot.identify(sampleDirectory, startAddr, (UInt16) aramSlice.Length);
+		    //candidates  = snapshot.filter(candidates);
 		    candidates  = snapshot.partialLengths(candidates, startAddr, length).OrderBy(x => -x.Address).ToArray();
 		
 		// Process exact address matches first
@@ -94,13 +141,19 @@ public static class Analysis {
 		return entries;
 	}
 	
-	static SampleRef[] identify(SampleEntry[] sampleDirectory, UInt16 startAddr, UInt16 length) {
+	static SampleRef[] identify(this Emulator snapshot, SampleEntry[] sampleDirectory, UInt16 startAddr, UInt16 length) {
+		var used = snapshot.DSP.SampleUsageFlags;
+		
 		var refBins = new SampleRef?[9];
 		List<SampleRef> additionalRefs = [];
 		
 		var endAddr = (startAddr + length - 1) & 0xFFFF;
 		
 		foreach (var (id, (start, loop)) in sampleDirectory.Enum()) {
+			if (!used[id]) {
+				continue;
+			}
+			
 			var isLoop = false;
 			
 			var addr = start;

@@ -596,6 +596,33 @@ public class DSP {
 			}
 		}
 	}
+		
+	public bool[] SampleUsageFlags {
+		get {
+			Emulator.MaybeAcquireLock();
+			try {
+				unsafe {
+					var rawFlags = DLL.DspGetSampleUsageFlags(Emulator.handle);
+					if (rawFlags.Flags == IntPtr.Zero) {
+						var errorCode = DLL.EmuGetLastError(Emulator.handle);
+						Error.Throw(errorCode);
+					}
+					
+					var flags = new bool[256];
+					
+					for (var i = 0; i < 256; i++) {
+						var u8 = *((byte*) rawFlags.Flags + i);
+						flags[i] = u8 != 0;
+					}
+					
+					return flags;
+				}
+			}
+			finally {
+				Emulator.MaybeReleaseLock();
+			}
+		}
+	}
 	
 	internal DSP(Emulator emulator) {
 		unsafe {
@@ -645,6 +672,20 @@ public class DSP {
 			}
 			
 			State = new(emulator, globalState, voiceStates.ToArray(), debugVoiceStates.ToArray());
+		}
+	}
+	
+	public void ResetSampleUsage(byte sampleId) {
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.DspResetSampleUsage(sampleId, Emulator.handle);
+			if (!result) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
+		}
+		finally {
+			Emulator.MaybeReleaseLock();
 		}
 	}
 }

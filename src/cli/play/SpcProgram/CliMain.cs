@@ -108,6 +108,8 @@ public static partial class CliMain {
 				PrimaryEmu.Script700.LoadBinaryFile(File.ReadAllBytes(scriptBinary));
 			}
 			
+			Emulator.BurstAction = Analysis.TrackSampleUsage;
+			
 			RunAheadEmu = PrimaryEmu.SaveState();
 			seekBarSnapshot(0, RunAheadEmu);
 			
@@ -292,6 +294,8 @@ public static partial class CliMain {
 			else {
 				runAheadEmu.StepNCyclesFast(cycles);
 			}
+			
+			runAheadEmu.BurstProcess(Emulator.BurstAction);
 			
 			long playCycle;
 			lock (barCycleLock) {

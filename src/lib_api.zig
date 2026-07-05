@@ -206,6 +206,15 @@ pub export fn dsp_get_voice_debug_state(voice_idx: u8, emu_ptr: ?[*]Emu) dsp.Deb
     return dsp.get_voice_debug_state(@intCast(voice_idx & 7), @ptrCast(emu_ptr)) catch |e| emu.derr(dsp.DebugVoiceState, e, @ptrCast(emu_ptr));
 }
 
+pub export fn dsp_get_sample_usage_flags(emu_ptr: ?[*]Emu) dsp.SampleUsageFlags {
+    return dsp.get_sample_usage_flags(@ptrCast(emu_ptr)) catch |e| emu.derr(dsp.SampleUsageFlags, e, @ptrCast(emu_ptr));
+}
+
+pub export fn dsp_reset_sample_usage(sample_id: u8, emu_ptr: ?[*]Emu) bool {
+    dsp.reset_sample_usage(sample_id ,@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
 // SMP
 pub export fn smp_read_byte(address: u16, emu_ptr: ?[*]Emu) u8 {
     return smp.read_byte(address, @ptrCast(emu_ptr)) catch |e| emu.zerr(u8, e, @ptrCast(emu_ptr));

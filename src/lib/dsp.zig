@@ -74,6 +74,10 @@ pub const DebugVoiceState = extern struct {
     looped:          ?[*]const u8  = null,
 };
 
+pub const SampleUsageFlags = extern struct {
+    flags: ?[*]const u8 = null,
+};
+
 pub inline fn get_aram_ptr(emu_ptr: ?*Emu) !?[]u8 {
     var ep = emu.get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);
@@ -178,4 +182,24 @@ pub inline fn get_voice_debug_state(voice_idx: u3, emu_ptr: ?*Emu) !DebugVoiceSt
         .end             = @ptrCast(&voice.__end),
         .looped          = @ptrCast(&voice.__looped),
     };
+}
+
+pub inline fn get_sample_usage_flags(emu_ptr: ?*Emu) !SampleUsageFlags {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const dsp = &ep.?.s_dsp;
+
+    return .{
+        .flags = @ptrCast(&dsp.sample_usage_flags)
+    };
+}
+
+pub inline fn reset_sample_usage(sample_id: u8, emu_ptr: ?*Emu) !void {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const dsp = &ep.?.s_dsp;
+
+    dsp.reset_sample_usage(sample_id);
 }

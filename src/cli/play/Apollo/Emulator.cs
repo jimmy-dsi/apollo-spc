@@ -60,6 +60,40 @@ public class Emulator {
 		}
 	}
 	
+	public struct Event {
+		public EventType     Type      { get; set; }
+		public object?       Info      { get; set; } = null;
+		public Action<Event> Action    { get; set; }
+		public bool          Important { get; set; } = true; // If set to false, the event can be safely "skipped" if missed
+		
+		public Event(EventType type, Action<Event> action) {
+			Type   = type;
+			Action = action;
+		}
+		
+		public Event(EventType type, object info, Action<Event> action) {
+			Type   = type;
+			Info   = info;
+			Action = action;
+		}
+		
+		public Event(EventType type, object? info, bool important, Action<Event> action) {
+			Type      = type;
+			Info      = info;
+			Action    = action;
+			Important = important;
+		}
+	}
+	
+	public enum EventType {
+		EveryNthCycleStart,
+		EveryNthCycleEnd,
+		EveryNthCycleStart_Precise,
+		EveryNthCycleEnd_Precise,
+	}
+	
+	List<Event> events = new();
+	
 	uint lastRenderPosition = 0;
 	bool makeShared         = false;
 	
@@ -248,6 +282,8 @@ public class Emulator {
 		}
 	}
 	
+	public ICloneable? AdditionalState { get; internal set; } = null;
+	
 	public UInt32 LastResultCode => DLL.EmuGetLastResult(handle); // Get the last result code, regardless of whether it has succeeded or failed
 	public UInt32 LastErrorCode  => DLL.EmuGetLastError(handle);  // Get the last result code of the previous operation which resulted in an error
 	
@@ -423,6 +459,40 @@ public class Emulator {
 		finally {
 			MaybeReleaseLock();
 		}
+	}
+	
+	public void Register(Event event_) {
+		events.Add(event_);
+	}
+	
+	static Action<Emulator>? burstAction;
+	static object burstLock = new();
+	
+	public static Action<Emulator> BurstAction {
+		get {
+			lock (burstLock) {
+				return burstAction!;
+			}
+		}
+		set {
+			lock (burstLock) {
+				burstAction = value;
+			}
+		}
+	}
+	
+	public long ClocksSinceLastBurst { get; private set; } = 0;
+	long prevBurstDspClock = 0;
+	
+	public void BurstProcess(Action<Emulator> action) {
+		var clocks = DSP.CurrentCycle - prevBurstDspClock;
+		if (clocks == 0) {
+			return;
+		}
+		
+		ClocksSinceLastBurst = clocks;
+		action(this);
+		prevBurstDspClock = DSP.CurrentCycle;
 	}
 	
 	internal void CheckForError() {
@@ -702,6 +772,10 @@ public class Emulator {
 		other.MaybeAcquireLock();
 		
 		try {
+			if (other.AdditionalState is not null) {
+				AdditionalState = (ICloneable) other.AdditionalState.Clone();
+			}
+			
 			var result = DLL.EmuCopy(handle, other.handle);
 			if (!result) {
 				var errorCode = DLL.EmuGetLastError(handle);

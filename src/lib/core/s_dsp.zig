@@ -84,6 +84,8 @@ pub const SDSP = struct {
     prev_dac_left_out:  [3] i17 = .{ 0, 0, 0 },
     prev_dac_right_out: [3] i17 = .{ 0, 0, 0 },
 
+    sample_usage_flags: [256] bool = [_]bool {false} ** 256,
+
     pub fn new(emu: *Emu) SDSP {
         var s_dsp = SDSP {
             .emu = emu,
@@ -105,7 +107,15 @@ pub const SDSP = struct {
         self.last_processed_cycle = other.last_processed_cycle;
         self.clock_counter        = other.clock_counter;
 
+        self.prev_dac_left_in  = other.prev_dac_left_in;
+        self.prev_dac_right_in = other.prev_dac_right_in;
+
+        self.prev_dac_left_out  = other.prev_dac_left_out;
+        self.prev_dac_right_out = other.prev_dac_right_out;
+
         self.paused = false;
+
+        self.sample_usage_flags = other.sample_usage_flags;
     }
 
     pub fn power_on(self: *SDSP) void {
@@ -178,6 +188,10 @@ pub const SDSP = struct {
 
     pub fn unpause(self: *SDSP) void {
         self.paused = false;
+    }
+
+    pub inline fn reset_sample_usage(self: *SDSP, sample_id: u8) void {
+        self.sample_usage_flags[sample_id] = false;
     }
 
     pub fn proc(self: *SDSP, substate: u32) !void {
@@ -751,6 +765,8 @@ pub const SDSP = struct {
         s.int().voice_step_g(endx, v0_envx);
         s.int().voice_step_d(1, aram_data_0, v1_voll);
         s.int().voice_step_a(v3_srcn);
+
+        s.mark_sample_used(v3_srcn);
     }
 
     inline fn proc_t3(s: *SDSP,
@@ -786,6 +802,8 @@ pub const SDSP = struct {
         s.int().voice_step_g(endx, v1_envx);
         s.int().voice_step_d(2, aram_data_0, v2_voll);
         s.int().voice_step_a(v4_srcn);
+
+        s.mark_sample_used(v4_srcn);
     }
 
     inline fn proc_t6(s: *SDSP,
@@ -821,6 +839,8 @@ pub const SDSP = struct {
         s.int().voice_step_g(endx, v2_envx);
         s.int().voice_step_d(3, aram_data_0, v3_voll);
         s.int().voice_step_a(v5_srcn);
+
+        s.mark_sample_used(v5_srcn);
     }
 
     inline fn proc_t9(s: *SDSP,
@@ -856,6 +876,8 @@ pub const SDSP = struct {
         s.int().voice_step_g(endx, v3_envx);
         s.int().voice_step_d(4, aram_data_0, v4_voll);
         s.int().voice_step_a(v6_srcn);
+
+        s.mark_sample_used(v6_srcn);
     }
 
     inline fn proc_t12(s: *SDSP,
@@ -891,6 +913,8 @@ pub const SDSP = struct {
         s.int().voice_step_g(endx, v4_envx);
         s.int().voice_step_d(5, aram_data_0, v5_voll);
         s.int().voice_step_a(v7_srcn);
+
+        s.mark_sample_used(v7_srcn);
     }
 
     inline fn proc_t15(s: *SDSP,
@@ -926,6 +950,8 @@ pub const SDSP = struct {
         s.int().voice_step_a(v0_srcn);
         s.int().voice_step_g(endx, v5_envx);
         s.int().voice_step_d(6, aram_data_0, v6_voll);
+
+        s.mark_sample_used(v0_srcn);
     }
 
     inline fn proc_t18(s: *SDSP,
@@ -961,6 +987,8 @@ pub const SDSP = struct {
         s.int().voice_step_a(v1_srcn);
         s.int().voice_step_g(endx, v6_envx);
         s.int().voice_step_d(7, aram_data_0, v7_voll);
+
+        s.mark_sample_used(v1_srcn);
     }
 
     inline fn proc_t21(s: *SDSP,
@@ -1122,6 +1150,8 @@ pub const SDSP = struct {
     {
         s.int().voice_step_d(0, aram_data_0, v0_voll);
         s.int().voice_step_a(v2_srcn);
+
+        s.mark_sample_used(v2_srcn);
     }
 
     // DAC analog lowpass
@@ -1171,5 +1201,9 @@ pub const SDSP = struct {
         p[2] = p[1];
         p[1] = p[0];
         p[0] = c;
+    }
+
+    inline fn mark_sample_used(s: *SDSP, srcn: u8) void {
+        s.sample_usage_flags[srcn] = true;
     }
 };

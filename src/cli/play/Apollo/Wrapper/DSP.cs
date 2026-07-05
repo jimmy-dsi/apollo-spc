@@ -21,6 +21,13 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "dsp_get_voice_debug_state")]
 	public static partial DspDebugVoiceState DspGetVoiceDebugState(Byte voiceIdx, Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "dsp_get_sample_usage_flags")]
+	public static partial DspSampleUsageFlags DspGetSampleUsageFlags(Emulator.Handle? emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "dsp_reset_sample_usage")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool DspResetSampleUsage(byte sampleId, Emulator.Handle emuPtr);
+	
 	[StructLayout(LayoutKind.Sequential)]
 	internal struct DspGlobalState {
 		public IntPtr EchoFeedback;
@@ -86,5 +93,10 @@ internal partial class DLL {
 		public IntPtr EchoOn;
 		public IntPtr End;
 		public IntPtr Looped;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct DspSampleUsageFlags {
+		public IntPtr Flags;
 	}
 }
