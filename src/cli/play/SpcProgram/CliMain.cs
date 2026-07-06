@@ -116,6 +116,7 @@ public static partial class CliMain {
 			// Register Key Bindings
 			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
 			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
+			//KeyBindings.Register(KeyBindings.Key.Char('G'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowRight, KeyBindings.Action.NavNextView);
 			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.NavPrevView);
 			KeyBindings.Register(KeyBindings.Key.Char('0'),  KeyBindings.Action.EnableAllChannels);

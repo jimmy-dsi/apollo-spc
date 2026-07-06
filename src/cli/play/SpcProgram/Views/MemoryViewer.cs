@@ -16,12 +16,75 @@ public static partial class CliMain {
 		var startRow = Display.ScrollTop;
 		var endRow   = startRow + 0x2F;
 		
+		// Region locations
+		var echoStartAddr = buffer.DSP_State!.EchoStartPage << 8;
+		var echoStartRow  = echoStartAddr >> 4;
+		
+		var echoDelaySize = buffer.DSP_State!.EchoDelay * 0x800;
+		var echoDelayRows = echoDelaySize >> 4;
+		
+		var echoEndRow = (echoStartRow + echoDelayRows - 1) & 0xFFF;
+		if (echoEndRow < echoStartRow) {
+			echoEndRow = echoStartRow;
+		}
+		
+		var dirStartAddr = buffer.DSP_State!.SourceStartPage << 8;
+		var dirStartRow  = dirStartAddr >> 4;
+		
+		var dirEndRow = (dirStartRow + 0x3F) & 0xFFF;
+		
+		var regionSamples = buffer.RecentSnapshot.CheckForSampleData((UInt16) (startRow << 4), 0x300);
+		var rowSamples    = new byte?[0x30];
+		
+		// Determine which rows are samples
+		for (var i = 0; i < regionSamples.Length; i++) {
+			var r = i / 16;
+			if (regionSamples[i] is not null) {
+				rowSamples[r] = regionSamples[i];
+			}
+		}
+		
+		MemCellProperties[]? properties = null;
+		
+		if (heatMapEnabled && heatMapMemMode == HeatMapMode.TypeAware) {
+			properties = new MemCellProperties[buffer.SMP_BusData!.Length];
+			
+			for (var r = startRow; r <= endRow; r++) {
+				var s = r - startRow;
+				
+				if (r >= echoStartRow && r <= echoEndRow) {
+					for (var c = 0; c < (echoStartRow == echoEndRow ? 4 : 16); c++) {
+						var idx = (r - startRow) * 16 + c;
+						
+						if (idx < properties.Length) {
+							properties[idx].DataSize = BusSize.Bit16;
+							properties[idx].Signed   = true;
+						}
+					}
+				}
+				else if (rowSamples[s] is not null) {
+					// Do nothing, already 8-bit unsigned by default
+				}
+				else if (r >= dirStartRow && r <= dirEndRow) {
+					for (var c = 0; c < 16; c++) {
+						var idx = (r - startRow) * 16 + c;
+						
+						if (idx < properties.Length) {
+							properties[idx].DataSize = BusSize.Bit16;
+							properties[idx].Signed   = false;
+						}
+					}
+				}
+			}
+		}
+		
 		// Display memory cells + ASCII/Heat map
 		memDisplayRows(
 			BusSize.Bit16,
 			startRow,
 			endRow,
 			buffer.SMP_BusData!,
+			memCellProperties: properties,
 			memLogs: logsSinceLastExec(buffer, filtered: false, inclExec: true),
 			bootRomEnabled: buffer.SMP_State!.UseBootROM,
 			readDisabled: buffer.SMP_State!.RAMDisable,
@@ -33,29 +96,6 @@ public static partial class CliMain {
 		);
 		
 		// Display S-DSP region markers
-		var echoStartAddr = buffer.DSP_State!.EchoStartPage << 8;
-		var echoStartRow  = echoStartAddr >> 4;
-		
-		var echoDelaySize = buffer.DSP_State!.EchoDelay * 0x800;
-		var echoDelayRows = echoDelaySize >> 4;
-		
-		var echoEndRow = (echoStartRow + echoDelayRows - 1) & 0xFFF;
-		
-		var dirStartAddr = buffer.DSP_State!.SourceStartPage << 8;
-		var dirStartRow  = dirStartAddr >> 4;
-		
-		var dirEndRow = (dirStartRow + 0x3F) & 0xFFF;
-		
-		var regionSamples = buffer.RecentSnapshot.CheckForSampleData((UInt16) (startRow << 4), 0x300);
-		var rowSamples    = new byte?[0x30];
-		
-		for (var i = 0; i < regionSamples.Length; i++) {
-			var r = i / 16;
-			if (regionSamples[i] is not null) {
-				rowSamples[r] = regionSamples[i];
-			}
-		}
-		
 		byte? prevRowSamp = null;
 		
 		for (var r = startRow; r <= endRow; r++) {
@@ -71,6 +111,17 @@ public static partial class CliMain {
 				Display.Write("                                  ", 74, r, col: null, writeToScrollBuf: true);
 			}
 			
+			if (r >= dirStartRow && r <= dirEndRow) {
+				if (heatMapEnabled) {
+					Display.Write("▒▒▒▒▒▒", 96, r, col: AnsiColor.Blue, writeToScrollBuf: true);
+				}
+				else {
+					Display.Write("▒▒▒▒▒▒▒▒▒▒", 88, r, col: AnsiColor.Blue, writeToScrollBuf: true);
+				}
+				Display.Highlight(4, 0, r, col: AnsiColor.Code.Blue, writeToScrollBuf: true);
+				Display.Write("▒", 4, r, col: AnsiColor.Blue, writeToScrollBuf: true);
+			}
+			
 			if (rowSamp is not null) {
 				if (heatMapEnabled) {
 					Display.Write("▒▒▒▒▒▒", 102, r, col: new(readRegColor2.BackgroundRGB!), writeToScrollBuf: true);
@@ -81,17 +132,6 @@ public static partial class CliMain {
 				
 				Display.Highlight(4, 0, r, col: readRegColor2.BackgroundRGB, writeToScrollBuf: true);
 				Display.Write("▒", 4, r, col: new(readRegColor2.BackgroundRGB!), writeToScrollBuf: true);
-			}
-			
-			if (r >= dirStartRow && r <= dirEndRow) {
-				if (heatMapEnabled) {
-					Display.Write("▒▒▒▒▒▒", 96, r, col: AnsiColor.Blue, writeToScrollBuf: true);
-				}
-				else {
-					Display.Write("▒▒▒▒▒▒▒▒▒▒", 88, r, col: AnsiColor.Blue, writeToScrollBuf: true);
-				}
-				Display.Highlight(4, 0, r, col: AnsiColor.Code.Blue, writeToScrollBuf: true);
-				Display.Write("▒", 4, r, col: AnsiColor.Blue, writeToScrollBuf: true);
 			}
 			
 			if (r >= echoStartRow && r <= echoEndRow) {

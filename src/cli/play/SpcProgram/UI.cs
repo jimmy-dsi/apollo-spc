@@ -46,6 +46,10 @@ public static partial class CliMain {
 		Script700_Error, Continue
 	}
 	
+	enum HeatMapMode {
+		TypeAware, Unsigned
+	}
+	
 	static State  uiState          = State.Init;
 	static State  realUiState      = State.Init;
 	static bool   disableScript700 = false;
@@ -61,11 +65,12 @@ public static partial class CliMain {
 	static bool       menuBarError   = false;
 	static Stopwatch? tempMsgTime    = null;
 	
-	static int     channelToToggle    = 0;
-	static int     seekPosition       = 1;
-	static long    stepCycles         = 0;
-	static UInt16  execBreakpointAddr = 0;
-	static BusSize heatMapDataSize    = BusSize.Bit32;
+	static int         channelToToggle    = 0;
+	static int         seekPosition       = 1;
+	static long        stepCycles         = 0;
+	static UInt16      execBreakpointAddr = 0;
+	static BusSize     heatMapDataSize    = BusSize.Bit32;
+	static HeatMapMode heatMapMemMode     = HeatMapMode.TypeAware;
 	
 	static int viewIndex = 0;
 	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
@@ -1304,10 +1309,31 @@ public static partial class CliMain {
 	static AnsiColor readErrColor  = new(AnsiColor.Code.Red,     isBG: true);
 	static AnsiColor readRomColor  = new(AnsiColor.Code.Grey,    isBG: true);
 	
+	public struct MemCellProperties {
+		int? scale;
+		
+		public BusSize DataSize = BusSize.Bit8;
+		public bool    Signed   = false;
+		
+		public int Scale {
+			get => scale ?? 1;
+			set => scale = value;
+		}
+		
+		public MemCellProperties() { }
+		
+		public MemCellProperties(BusSize dataSize, bool signed, int scale = 1) {
+			DataSize = dataSize;
+			Signed   = signed;
+			Scale    = scale;
+		}
+	}
+	
 	static void memDisplayRows(BusSize addrBusSize,
 	                           int startRow,
 	                           int endRow,
 	                           byte[] data,
+	                           MemCellProperties[]? memCellProperties = null,
 	                           AnsiColor?[]? colorData = null,
 	                           SMP.MemAccessLog[]? memLogs = null,
 	                           bool readDisabled   = false,
@@ -1416,8 +1442,26 @@ public static partial class CliMain {
 					var idx = (i - startRow) * 16 + c;
 					
 					if (idx >= 0 && idx < data.Length) {
-						var val = data[idx];
-						var col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
+						int val = data[idx];
+						AnsiColor col;
+						
+						if (memCellProperties is null) {
+							col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
+						}
+						else {
+							var prop = memCellProperties[idx];
+							
+							if (prop.DataSize == BusSize.Bit16) {
+								var idxLo =  idx & ~1;
+								var idxHi = (idx & ~1) + 1;
+								
+								val = data[idxLo] | data[idxHi] << 8;
+							}
+							
+							val *= prop.Scale;
+							col = heatMapColor(prop.DataSize, prop.Signed, scale: 1.0, val);
+						}
+						
 						Display.Write("  ", col: col, writeToScrollBuf: writeToScrollBuf);
 					}
 				}

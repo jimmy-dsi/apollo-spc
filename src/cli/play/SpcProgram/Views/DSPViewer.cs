@@ -411,7 +411,45 @@ public static partial class CliMain {
 		
 		var dspLogs = getDspMemLogs(buffer);
 		
-		memDisplayRows(BusSize.Bit8, 0, 7, buffer.DSP_RegisterMem!, coloring, memLogs: dspLogs, useHeatMap: heatMapEnabled);
+		MemCellProperties[]? properties = null;
+		
+		if (heatMapEnabled && heatMapMemMode == HeatMapMode.TypeAware) {
+			properties = new MemCellProperties[0x80];
+			
+			var chanProps = new MemCellProperties[] {
+				new(BusSize.Bit8,  signed:  true), new(BusSize.Bit8, signed:  true), 
+				new(BusSize.Bit16, signed: false, scale: 4), new(BusSize.Bit8, signed: false, scale: 4), 
+				new(), new(), new(), new(),
+				new(BusSize.Bit8, signed: false, scale: 2), new(BusSize.Bit8, signed: true), 
+				new(), new(), new(), new(), new(),
+				new(BusSize.Bit8,  signed:  true)
+			};
+			
+			for (var c = 0; c < 8; c++) {
+				for (var i = 0; i < chanProps.Length; i++) {
+					properties[c * 0x10 + i] = chanProps[i];
+				}
+			}
+			
+			properties[0x0C] = new(BusSize.Bit8, signed: true);
+			properties[0x1C] = new(BusSize.Bit8, signed: true);
+			
+			properties[0x2C] = new(BusSize.Bit8, signed: true);
+			properties[0x3C] = new(BusSize.Bit8, signed: true);
+			
+			properties[0x0D] = new(BusSize.Bit8, signed: true);
+		}
+		
+		memDisplayRows(
+			BusSize.Bit8,
+			0,
+			7,
+			buffer.DSP_RegisterMem!,
+			memCellProperties: properties,
+			colorData: coloring,
+			memLogs: dspLogs,
+			useHeatMap: heatMapEnabled
+		);
 	}
 	
 	static byte vFlagsToByte(bool[] flags) {

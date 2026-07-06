@@ -107,7 +107,6 @@ public static class Driver {
 	
 	static List<Int16> leftOverSamps = [];
 	
-	static bool    paused = false;
 	static long    instrStep = 0;
 	static UInt16? breakPC = null;
 	
@@ -144,7 +143,6 @@ public static class Driver {
 				}
 					
 				breakPC = null;
-				paused = false;
 				
 				var samplesNative = (numShorts - leftOverCopy.Length) / 2;
 				var reqSamplesDSP = (int) Math.Ceiling(samplesNative / rateMultiplier);
@@ -174,7 +172,7 @@ public static class Driver {
 				emu.BurstProcess(Emulator.BurstAction);
 				
 				// Copy leftover array into unmanaged buffer if non-empty
-				if (leftOverCopy.Length > 0) {
+				if (leftOverCopy.Length > 0 && leftOverCopy.Length < numShorts) {
 					Marshal.Copy(leftOverCopy, 0, stream, leftOverCopy.Length);
 					
 					numShorts -= leftOverCopy.Length;
@@ -187,7 +185,7 @@ public static class Driver {
 				// Roll over into leftover array if any remaining
 				leftOverSamps.Clear();
 				
-				if (numShorts < buffer.Length) {
+				if (numShorts < buffer.Length && numShorts > buffer.Length - 12) {
 					for (var i = numShorts; i < buffer.Length; i++) {
 						leftOverSamps.Add(buffer[i]);
 					}
