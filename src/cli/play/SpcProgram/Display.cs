@@ -37,6 +37,7 @@ public static class Display {
 	public static List<AnsiColor?[]> ColorBuffer => colorBuffer;
 	
 	public static bool UseBufferBlending { get; set; } = true;
+	public static bool UseBlending       { get; set; } = true;
 	
 	// Previous scrollable display color buffers
 	static List<      char[]>[] prevCharBuffers  = new List<      char[]>[]{};
@@ -633,7 +634,7 @@ public static class Display {
 				}
 				else if (cl is not null && cl.IsBG || isMulti) {
 					if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
-						if (UseBufferBlending) {
+						if (UseBufferBlending && UseBlending) {
 							var (wx, wy) = WindowCoords(x, y).AsTuple;
 						
 							cl = blendColors(
@@ -646,7 +647,7 @@ public static class Display {
 						}
 					}
 					else if (x < Width - 32 && y >= 0 && y < Height) {
-						if (isMulti) {
+						if (isMulti && UseBlending) {
 							isMultiBlended = true;
 							
 							cl = blendDualColors(
@@ -657,7 +658,7 @@ public static class Display {
 								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
 							);
 						}
-						else {
+						else if (UseBlending) {
 							cl = blendColors(
 								cl,
 								prevColorGrids[0][y][x],
@@ -668,7 +669,7 @@ public static class Display {
 						}
 					}
 					else {
-						if (isMulti) {
+						if (isMulti && UseBlending) {
 							isMultiBlended = true;
 							
 							cl = blendDualColors(
@@ -679,7 +680,7 @@ public static class Display {
 								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
 							);
 						}
-						else {
+						else if (UseBlending) {
 							cl = blendColors(
 								cl,
 								prevColorGrids[0][y][x],

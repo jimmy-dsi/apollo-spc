@@ -40,15 +40,15 @@ public static partial class CliMain {
 			if (heatMapEnabled) {
 				var colMult = voiceOnStates[v] ? 1.0 : 0.125;
 				
-				Display.Write("  ", x + 18, y    , col: heatMapColor(BusSize.Bit8,  signed: true,  scale: 1 * colMult, buffer.DSP_Voice![v].VolumeLeft));
-				Display.Write("  ", x + 18, y + 1, col: heatMapColor(BusSize.Bit8,  signed: true,  scale: 1 * colMult, buffer.DSP_Voice![v].VolumeRight));
-				Display.Write("  ", x + 18, y + 2, col: heatMapColor(BusSize.Bit16, signed: false, scale: 4 * colMult, buffer.DSP_Voice![v].Pitch));
-				Display.Write("  ", x + 18, y + 3, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].Source));
-				Display.Write("  ", x + 18, y + 4, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].ADSR0));
-				Display.Write("  ", x + 18, y + 5, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].ADSR1));
-				Display.Write("  ", x + 18, y + 6, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].Gain));
-				Display.Write("  ", x + 18, y + 7, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 2 * colMult, buffer.DSP_Voice![v].ENVX));
-				Display.Write("  ", x + 18, y + 8, col: heatMapColor(BusSize.Bit8,  signed: true,  scale: 1 * colMult, buffer.DSP_RegisterMem![v << 4 | 9]));
+				Display.Write("  ", x + 18, y    , col: HeatMapColor(BusSize.Bit8,  signed: true,  scale: 1 * colMult, buffer.DSP_Voice![v].VolumeLeft));
+				Display.Write("  ", x + 18, y + 1, col: HeatMapColor(BusSize.Bit8,  signed: true,  scale: 1 * colMult, buffer.DSP_Voice![v].VolumeRight));
+				Display.Write("  ", x + 18, y + 2, col: HeatMapColor(BusSize.Bit16, signed: false, scale: 4 * colMult, buffer.DSP_Voice![v].Pitch));
+				Display.Write("  ", x + 18, y + 3, col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].Source));
+				Display.Write("  ", x + 18, y + 4, col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].ADSR0));
+				Display.Write("  ", x + 18, y + 5, col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].ADSR1));
+				Display.Write("  ", x + 18, y + 6, col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 1 * colMult, buffer.DSP_Voice![v].Gain));
+				Display.Write("  ", x + 18, y + 7, col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 2 * colMult, buffer.DSP_Voice![v].ENVX));
+				Display.Write("  ", x + 18, y + 8, col: HeatMapColor(BusSize.Bit8,  signed: true,  scale: 1 * colMult, buffer.DSP_RegisterMem![v << 4 | 9]));
 			}
 			
 			xhm += 3;
@@ -69,14 +69,14 @@ public static partial class CliMain {
 		showColorCoding();
 	}
 	
-	static AnsiColor? eqInsideColor = null;
+	public static AnsiColor? EQInsideColor = null;
 	
 	static void showDSPViewer2(EmuDataBuffer buffer) {
-		if (eqInsideColor is null) {
-			eqInsideColor = heatMapColor(BusSize.Bit8, false, 1, 0);
+		if (EQInsideColor is null) {
+			EQInsideColor = HeatMapColor(BusSize.Bit8, false, 1, 0);
 		}
 		
-		var eqInsideRGB = eqInsideColor.BackgroundRGB!.Multiply(5.0 / 7);
+		var eqInsideRGB = EQInsideColor.BackgroundRGB!.Multiply(5.0 / 7);
 		
 		showDSPMem(buffer);
 		var baseY = Display.Y + 1;
@@ -97,10 +97,10 @@ public static partial class CliMain {
 		var xhm = xo1;
 		
 		if (heatMapEnabled) {
-			Display.Write("  ", xo1, y    , col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.MainVolumeLeft ));
-			Display.Write("  ", xo1, y + 1, col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.MainVolumeRight));
-			Display.Write("  ", xo1, y + 2, col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeLeft ));
-			Display.Write("  ", xo1, y + 3, col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeRight));
+			Display.Write("  ", xo1, y    , col: HeatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.MainVolumeLeft ));
+			Display.Write("  ", xo1, y + 1, col: HeatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.MainVolumeRight));
+			Display.Write("  ", xo1, y + 2, col: HeatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeLeft ));
+			Display.Write("  ", xo1, y + 3, col: HeatMapColor(BusSize.Bit8, signed: true, scale: 1, buffer.DSP_State!.EchoVolumeRight));
 			
 			var pFlags = drawHeatMapFlags(BusSize.Bit8,  globalPModEn);
 			var nFlags = drawHeatMapFlags(BusSize.Bit8, globalNoiseEn);
@@ -112,10 +112,10 @@ public static partial class CliMain {
 				Display.Write(new(eFlags[i].Char, 1), xo1 - 2 + i, y + 7, col: eFlags[i].Color);
 			}
 			
-			Display.Write("  ", xo1, y + 9,  col: heatMapColor(BusSize.Bit8, signed: false, scale: 8,   buffer.DSP_State!.NoiseClock));
-			Display.Write("  ", xo1, y + 10, col: heatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.ReadonlyEcho ? 1 : 0));
-			Display.Write("  ", xo1, y + 11, col: heatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.Mute         ? 1 : 0));
-			Display.Write("  ", xo1, y + 12, col: heatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.Reset        ? 1 : 0));
+			Display.Write("  ", xo1, y + 9,  col: HeatMapColor(BusSize.Bit8, signed: false, scale: 8,   buffer.DSP_State!.NoiseClock));
+			Display.Write("  ", xo1, y + 10, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.ReadonlyEcho ? 1 : 0));
+			Display.Write("  ", xo1, y + 11, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.Mute         ? 1 : 0));
+			Display.Write("  ", xo1, y + 12, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 255, buffer.DSP_State!.Reset        ? 1 : 0));
 		}
 			
 		xhm += 3;
@@ -176,7 +176,7 @@ public static partial class CliMain {
 		
 		if (heatMapEnabled) {
 			foreach (var val in buffer.DSP_State!.FIR) {
-				Display.Write($"   ", col: heatMapColor(BusSize.Bit8, signed: true, scale: 1, val));
+				Display.Write($"   ", col: HeatMapColor(BusSize.Bit8, signed: true, scale: 1, val));
 			}
 		}
 		
@@ -261,11 +261,11 @@ public static partial class CliMain {
 				Display.Write(new(koffFlags[i].Char, 1), x + xo2 - 2 + i, y + 1, col: koffFlags[i].Color);
 				Display.Write(new(endxFlags[i].Char, 1), x + xo2 - 2 + i, y + 2, col: endxFlags[i].Color);
 			}
-			Display.Write("  ", x + xo2, y + 3, col: heatMapColor(BusSize.Bit8, signed:  true, scale: 1, buffer.DSP_State!.EchoFeedback));
+			Display.Write("  ", x + xo2, y + 3, col: HeatMapColor(BusSize.Bit8, signed:  true, scale: 1, buffer.DSP_State!.EchoFeedback));
 			
-			Display.Write("  ", x + xo2, y + 5, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1,  buffer.DSP_State!.EchoStartPage));
-			Display.Write("  ", x + xo2, y + 6, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1,  buffer.DSP_State!.SourceStartPage));
-			Display.Write("  ", x + xo2, y + 7, col: heatMapColor(BusSize.Bit8, signed: false, scale: 16, buffer.DSP_State!.EchoDelay));
+			Display.Write("  ", x + xo2, y + 5, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1,  buffer.DSP_State!.EchoStartPage));
+			Display.Write("  ", x + xo2, y + 6, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1,  buffer.DSP_State!.SourceStartPage));
+			Display.Write("  ", x + xo2, y + 7, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 16, buffer.DSP_State!.EchoDelay));
 		}
 		
 		xhm += 3;
@@ -364,15 +364,15 @@ public static partial class CliMain {
 					_ => throw new UnreachableException()
 				};
 				
-				Display.Write("  ", xx, y    , col: heatMapColor(BusSize.Bit8,  signed: false, scale: 256.0 / 12 * colMult, buffer.DSP_DebugState!.Voice[v].BufferOffset));
-				Display.Write("  ", xx, y + 1, col: heatMapColor(BusSize.Bit16, signed: false, scale:          2 * colMult, buffer.DSP_DebugState!.Voice[v].GaussianOffset));
-				Display.Write("  ", xx, y + 2, col: heatMapColor(BusSize.Bit16, signed: false, scale:          1 * colMult, buffer.DSP_DebugState!.Voice[v].BRRAddress));
-				Display.Write("  ", xx, y + 3, col: heatMapColor(BusSize.Bit8,  signed: false, scale:         32 * colMult, buffer.DSP_DebugState!.Voice[v].BRROffset));
-				Display.Write("  ", xx, y + 4, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 256.0 /  5 * colMult, buffer.DSP_DebugState!.Voice[v].KeyOnDelay));
-				Display.Write("  ", xx, y + 5, col: heatMapColor(BusSize.Bit8,  signed: false, scale:        255 * colMult, buffer.DSP_DebugState!.Voice[v].NoiseOn ? 1 : 0));
-				Display.Write("  ", xx, y + 6, col: heatMapColor(BusSize.Bit8,  signed: false, scale:        255 * colMult, buffer.DSP_DebugState!.Voice[v].PitchModOn ? 1 : 0));
-				Display.Write("  ", xx, y + 7, col: heatMapColor(BusSize.Bit8,  signed:  true, scale:          1 * colMult, envModeS));
-				Display.Write("  ", xx, y + 8, col: heatMapColor(BusSize.Bit16, signed: false, scale:         32 * colMult, buffer.DSP_DebugState!.Voice[v].EnvLevel));
+				Display.Write("  ", xx, y    , col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 256.0 / 12 * colMult, buffer.DSP_DebugState!.Voice[v].BufferOffset));
+				Display.Write("  ", xx, y + 1, col: HeatMapColor(BusSize.Bit16, signed: false, scale:          2 * colMult, buffer.DSP_DebugState!.Voice[v].GaussianOffset));
+				Display.Write("  ", xx, y + 2, col: HeatMapColor(BusSize.Bit16, signed: false, scale:          1 * colMult, buffer.DSP_DebugState!.Voice[v].BRRAddress));
+				Display.Write("  ", xx, y + 3, col: HeatMapColor(BusSize.Bit8,  signed: false, scale:         32 * colMult, buffer.DSP_DebugState!.Voice[v].BRROffset));
+				Display.Write("  ", xx, y + 4, col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 256.0 /  5 * colMult, buffer.DSP_DebugState!.Voice[v].KeyOnDelay));
+				Display.Write("  ", xx, y + 5, col: HeatMapColor(BusSize.Bit8,  signed: false, scale:        255 * colMult, buffer.DSP_DebugState!.Voice[v].NoiseOn ? 1 : 0));
+				Display.Write("  ", xx, y + 6, col: HeatMapColor(BusSize.Bit8,  signed: false, scale:        255 * colMult, buffer.DSP_DebugState!.Voice[v].PitchModOn ? 1 : 0));
+				Display.Write("  ", xx, y + 7, col: HeatMapColor(BusSize.Bit8,  signed:  true, scale:          1 * colMult, envModeS));
+				Display.Write("  ", xx, y + 8, col: HeatMapColor(BusSize.Bit16, signed: false, scale:         32 * colMult, buffer.DSP_DebugState!.Voice[v].EnvLevel));
 			}
 			
 			Display.Y = nextY + 1;
@@ -380,7 +380,7 @@ public static partial class CliMain {
 			for (var by = 0; by < 3; by++) {
 				for (var bx = 0; bx < 4; bx++) {
 					var val = (UInt16) buffer.DSP_DebugState!.Voice[v].Buffer[4 * by + bx];
-					Display.Write($"{val:X4} ", x + 6 + 5 * bx, col: heatMapEnabled ? heatMapColor(BusSize.Bit16, signed: true, scale: colMult, val) : voiceOnStates[v] ? null : AnsiColor.DarkGrey);
+					Display.Write($"{val:X4} ", x + 6 + 5 * bx, col: heatMapEnabled ? HeatMapColor(BusSize.Bit16, signed: true, scale: colMult, val) : voiceOnStates[v] ? null : AnsiColor.DarkGrey);
 				}
 				Display.Y++;
 			}
@@ -438,6 +438,7 @@ public static partial class CliMain {
 			properties[0x3C] = new(BusSize.Bit8, signed: true);
 			
 			properties[0x0D] = new(BusSize.Bit8, signed: true);
+			properties[0x7D] = new(BusSize.Bit8, signed: false, scale: 16);
 		}
 		
 		memDisplayRows(

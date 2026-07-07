@@ -41,6 +41,31 @@ public static class JMath {
 	}
 	
 	/// <summary>
+	/// Floor function, automatically converts to int
+	/// </summary>
+	/// <param name="n">Any arbitrary number</param>
+	/// <returns>The floored integer value</returns>
+	public static int Floor(double n) {
+		return (int) Math.Floor(n);
+	}
+	
+	/// <summary>
+	/// Symmetrical rounding function, with 0.0 as the pivot
+	/// When positive, equivalent to  floor(n + 0.5)
+	/// When negative, equivalent to -floor(abs(n) + 0.5)
+	/// </summary>
+	/// <param name="n">Any arbitrary number</param>
+	/// <returns>The rounded integer value</returns>
+	public static int Round(double n) {
+		if (n >= 0) {
+			return Floor(n + 0.5);
+		}
+		else {
+			return -Floor(-n + 0.5);
+		}
+	}
+	
+	/// <summary>
 	/// A Fast-Fourier-Transform method using an implementation of the Cooley-Tukey algorithm
 	/// </summary>
 	/// <param name="input">Time-domain array of complex number values</param>

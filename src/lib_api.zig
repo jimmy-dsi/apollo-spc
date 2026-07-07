@@ -198,6 +198,10 @@ pub export fn dsp_get_global_state(emu_ptr: ?[*]Emu) dsp.GlobalState {
     return dsp.get_global_state(@ptrCast(emu_ptr)) catch |e| emu.derr(dsp.GlobalState, e, @ptrCast(emu_ptr));
 }
 
+pub export fn dsp_get_global_debug_state(emu_ptr: ?[*]Emu) dsp.DebugGlobalState {
+    return dsp.get_global_debug_state(@ptrCast(emu_ptr)) catch |e| emu.derr(dsp.DebugGlobalState, e, @ptrCast(emu_ptr));
+}
+
 pub export fn dsp_get_voice_state(voice_idx: u8, emu_ptr: ?[*]Emu) dsp.VoiceState {
     return dsp.get_voice_state(@intCast(voice_idx & 7), @ptrCast(emu_ptr)) catch |e| emu.derr(dsp.VoiceState, e, @ptrCast(emu_ptr));
 }

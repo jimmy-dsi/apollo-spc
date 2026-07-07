@@ -42,6 +42,7 @@ public class DSP {
 			
 			Emulator emu;
 			DLL.DspGlobalState state;
+			DLL.DspDebugGlobalState debugState;
 			
 			public sbyte Feedback {
 				get {
@@ -122,10 +123,25 @@ public class DSP {
 					finally { emu.MaybeReleaseLock(); }
 				}
 			}
+			
+			public UInt16 Offset {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) debugState.EchoOffset); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((UInt16*) debugState.EchoOffset) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
 				
-			internal EchoProps(Emulator emu, DLL.DspGlobalState state) {
-				this.emu   = emu;
-				this.state = state;
+			internal EchoProps(Emulator emu, DLL.DspGlobalState state, DLL.DspDebugGlobalState debugState) {
+				this.emu        = emu;
+				this.state      = state;
+				this.debugState = debugState;
+				
 				FIR = new(emu, state);
 			}
 		}
@@ -553,11 +569,16 @@ public class DSP {
 		public VoiceProps[]      Voice      { get; }
 		public DebugVoiceProps[] VoiceDebug { get; }
 		
-		internal Properties(Emulator emu, DLL.DspGlobalState state, DLL.DspVoiceState[] voiceStates, DLL.DspDebugVoiceState[] debugVoiceStates) {
+		internal Properties(Emulator emu,
+		                    DLL.DspGlobalState state,
+		                    DLL.DspDebugGlobalState debugState,
+		                    DLL.DspVoiceState[] voiceStates,
+		                    DLL.DspDebugVoiceState[] debugVoiceStates)
+		{
 			this.emu   = emu;
 			this.state = state;
 			
-			Echo       = new(emu, state);
+			Echo       = new(emu, state, debugState);
 			Voice      = new VoiceProps[8];
 			VoiceDebug = new DebugVoiceProps[8];
 			
@@ -649,6 +670,12 @@ public class DSP {
 				Error.Throw(errorCode);
 			}
 			
+			var debugGlobalState = DLL.DspGetGlobalDebugState(Emulator.handle);
+			if (debugGlobalState.EchoOffset == IntPtr.Zero) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
+			
 			List<DLL.DspVoiceState> voiceStates = new();
 			
 			for (var i = 0; i < 8; i++) {
@@ -671,7 +698,7 @@ public class DSP {
 				debugVoiceStates.Add(v);
 			}
 			
-			State = new(emulator, globalState, voiceStates.ToArray(), debugVoiceStates.ToArray());
+			State = new(emulator, globalState, debugGlobalState, voiceStates.ToArray(), debugVoiceStates.ToArray());
 		}
 	}
 	

@@ -1,5 +1,10 @@
 namespace SpcProgram;
 
+using System.Diagnostics;
+
+using Jimbl.Graphics;
+using Jimbl.JMath;
+
 using Apollo;
 using Jimbl;
 
@@ -117,6 +122,126 @@ public static class Analysis {
 		var loopAddr  =  loopLo |  loopHi << 8;
 		
 		return (Start: (UInt16) startAddr, Loop: (UInt16) loopAddr);
+	}
+	
+	public static (char, AnsiColor)?[][] DisplayWaveform(Int16[] input, int canvasWidth, int canvasHeight, double xscale = 1.0, int? cursorIndex = null) {
+		if (CliMain.WaveInsideColor is null) {
+			CliMain.WaveInsideColor = new(Color.FromLCh(10, 30, 280), isBG: true);
+		}
+		
+		var eqInsideRGB = CliMain.WaveInsideColor.BackgroundRGB!;
+		
+		int cellPrecision;
+		#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
+			cellPrecision = 8;
+		#else
+			cellPrecision = 2;
+		#endif
+		
+		var waveCanvasPos = new int[canvasWidth];
+		var waveCanvasNeg = new int[canvasWidth];
+		
+		var xratio = (double) canvasWidth  / input.Length;
+		var yratio = (double) canvasHeight * cellPrecision / 0x8000;
+		
+		int? cursorLine = null;
+		
+		if (cursorIndex is int ci) {
+			cursorLine = JMath.Floor(ci * xratio);
+		}
+		
+		foreach (var (x, y) in input.Enum()) {
+			var cx = JMath.Floor(xratio * x);
+			var cy = JMath.Round(yratio * y);
+			
+			if (cy > 0 && cy > waveCanvasPos[cx]) {
+				waveCanvasPos[cx] = cy;
+			}
+			else if (cy < 0 && cy < waveCanvasNeg[cx]) {
+				waveCanvasNeg[cx] = cy;
+			}
+		}
+		
+		(char, AnsiColor)?[][] canvas = new (char, AnsiColor)?[canvasHeight][];
+		for (var y = 0; y < canvas.Length; y++) {
+			canvas[y] = new (char, AnsiColor)?[canvasWidth];
+		}
+		
+		var yZero = canvasHeight / 2;
+		
+		for (var x = 0; x < canvasWidth; x++) {
+			if (cursorLine is int cl && cl == x) {
+				for (var y = 0; y < canvasHeight; y++) {
+					canvas[y][x] = (' ', AnsiColor.BGWhite);
+				}
+				
+				continue;
+			}
+			
+			var yMaxIn = yZero * cellPrecision - waveCanvasPos[x];
+			var yMinIn = yZero * cellPrecision - waveCanvasNeg[x];
+			
+			yMaxIn = Math.Max(yMaxIn, 0);
+			yMinIn = Math.Max(yMinIn, 0);
+			
+			var yMax = Math.Clamp(yMaxIn, 0, (canvasHeight - 1) * cellPrecision) / cellPrecision;
+			var yMin = Math.Clamp(yMinIn, 0, (canvasHeight - 1) * cellPrecision) / cellPrecision;
+			
+			var yMaxRem = yMaxIn % cellPrecision;
+			var yMinRem = yMinIn % cellPrecision;
+			
+			var col = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x40);
+			
+			for (var y = yMax + 1; y < yMin; y++) {
+				canvas[y][x] = (' ', col);
+			}
+			
+			var c = '▄';
+			
+			if (yMax < yMin) {
+				if (yMaxRem == 0) {
+					canvas[yMax][x] = (' ', col);
+				}
+				else {
+					if (cellPrecision == 8) {
+						c = yMaxRem switch {
+							1 => '▇',
+							2 => '▆',
+							3 => '▅',
+							4 => '▄',
+							5 => '▃',
+							6 => '▂',
+							7 => '▁',
+							_ => throw new UnreachableException($"max: {yMaxRem}")
+						};
+					}
+				
+					canvas[yMax][x] = (c, new(col.BackgroundRGB!, eqInsideRGB));
+				}
+			
+				if (yMinRem == 0) {
+					canvas[yMin][x] = (' ', new(eqInsideRGB, isBG: true));
+				}
+				else {
+					if (cellPrecision == 8) {
+						c = yMinRem switch {
+							1 => '▇',
+							2 => '▆',
+							3 => '▅',
+							4 => '▄',
+							5 => '▃',
+							6 => '▂',
+							7 => '▁',
+							_ => throw new UnreachableException($"min: {yMinRem}")
+						};
+					}
+				
+					canvas[yMin][x] = (c, new(eqInsideRGB, col.BackgroundRGB!));
+				}
+			}
+		}
+		
+		return canvas;
 	}
 	
 	static SampleEntry[] extractSampleEntries(this Emulator snapshot) {

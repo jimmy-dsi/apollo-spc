@@ -25,6 +25,8 @@ public static partial class CliMain {
 		DSPViewer2,
 		DSPViewer3,
 		Script700Viewer,
+		BRRViewer,
+		EchoViewer,
 	}
 	
 	enum StatusMSG {
@@ -73,7 +75,16 @@ public static partial class CliMain {
 	static HeatMapMode heatMapMemMode     = HeatMapMode.TypeAware;
 	
 	static int viewIndex = 0;
-	static View[] views = [View.Metadata, View.DSPViewer1, View.DSPViewer2, View.DSPViewer3, View.MemoryViewer, View.Script700Viewer, View.ASMViewer];
+	static View[] views = [
+		View.Metadata,
+		View.DSPViewer1,
+		View.DSPViewer2,
+		View.DSPViewer3,
+		View.MemoryViewer,
+		View.EchoViewer,
+		View.Script700Viewer,
+		View.ASMViewer
+	];
 	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
 	static bool heatMapEnabled     = false;
@@ -424,6 +435,11 @@ public static partial class CliMain {
 			
 			case View.Script700Viewer: {
 				showScript700Viewer(buffer!);
+				break;
+			}
+			
+			case View.EchoViewer: {
+				showEchoViewer(buffer!);
 				break;
 			}
 			
@@ -1136,6 +1152,7 @@ public static partial class CliMain {
 				Display.ScrollTop = Math.Max(0, InstructionsSinceTrace - ScrollAreaRows - ScrollOffset);
 				Display.SetWindowProps(0, 0, Display.Width, ScrollAreaRows);
 				Display.EnableWindow();
+				Display.UseBlending = true;
 				
 				if (UI_State != State.Paused) {
 					resetTraceLog();
@@ -1154,6 +1171,7 @@ public static partial class CliMain {
 				Display.CurrentBufferId = "aram";
 				Display.SetWindowProps(0, 0, 110, ScrollAreaRows);
 				Display.EnableWindow();
+				Display.UseBlending = true;
 				break;
 			}
 			
@@ -1161,6 +1179,7 @@ public static partial class CliMain {
 				resetStatusMsg();
 				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_1 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.HideWindow();
+				Display.UseBlending = true;
 				break;
 			}
 			
@@ -1168,6 +1187,7 @@ public static partial class CliMain {
 				resetStatusMsg();
 				requestEmuData(Transfer.Requests.DSP_RegisterMem | Transfer.Requests.DSP_2 | Transfer.Requests.MemLogs | Transfer.Requests.SMP_State);
 				Display.HideWindow();
+				Display.UseBlending = true;
 				break;
 			}
 			
@@ -1175,6 +1195,7 @@ public static partial class CliMain {
 				resetStatusMsg();
 				requestEmuData(Transfer.Requests.DSP_3);
 				Display.HideWindow();
+				Display.UseBlending = true;
 				break;
 			}
 			
@@ -1182,6 +1203,15 @@ public static partial class CliMain {
 				resetStatusMsg();
 				requestEmuData(Transfer.Requests.Script700 | Transfer.Requests.SMP_State);
 				Display.HideWindow();
+				Display.UseBlending = true;
+				break;
+			}
+			
+			case View.EchoViewer: {
+				resetStatusMsg();
+				requestEmuData(Transfer.Requests.ARAM | Transfer.Requests.DSP_2 | Transfer.Requests.DSP_3, 0, 0x1_0000);
+				Display.HideWindow();
+				Display.UseBlending = false;
 				break;
 			}
 			
@@ -1189,6 +1219,7 @@ public static partial class CliMain {
 				resetStatusMsg();
 				requestEmuData(Transfer.Requests.CycleCountOnly);
 				Display.HideWindow();
+				Display.UseBlending = true;
 				break;
 			}
 		}
@@ -1446,7 +1477,7 @@ public static partial class CliMain {
 						AnsiColor col;
 						
 						if (memCellProperties is null) {
-							col = heatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
+							col = HeatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
 						}
 						else {
 							var prop = memCellProperties[idx];
@@ -1459,7 +1490,7 @@ public static partial class CliMain {
 							}
 							
 							val *= prop.Scale;
-							col = heatMapColor(prop.DataSize, prop.Signed, scale: 1.0, val);
+							col = HeatMapColor(prop.DataSize, prop.Signed, scale: 1.0, val);
 						}
 						
 						Display.Write("  ", col: col, writeToScrollBuf: writeToScrollBuf);
@@ -1487,16 +1518,16 @@ public static partial class CliMain {
 	static byte[] heatValues = [0x48, 0x50, 0x5C, 0x68, 0x84, 0xA0, 0xC0, 0xE0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0];
 	
 	static void showBar(double value, int displayHeight, int x, int y) {
-		if (eqInsideColor is null) {
-			eqInsideColor = heatMapColor(BusSize.Bit8, false, 1, 0);
+		if (EQInsideColor is null) {
+			EQInsideColor = HeatMapColor(BusSize.Bit8, false, 1, 0);
 		}
 		
-		var eqInsideRGB = eqInsideColor.BackgroundRGB!.Multiply(5.0 / 7);
+		var eqInsideRGB = EQInsideColor.BackgroundRGB!.Multiply(5.0 / 7);
 		
 		var color  = AnsiColor.Red;
 		var height = (int) Math.Round(value * displayHeight * 8);
 		
-		var refColor = heatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF).BackgroundRGB!;
+		var refColor = HeatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF).BackgroundRGB!;
 		
 		x -= 1;
 		
@@ -1511,7 +1542,7 @@ public static partial class CliMain {
 					interp  = Math.Pow(interp,  2);
 					interp2 = Math.Pow(interp2, 2);
 					
-					var bgCol = heatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i * 2]).BackgroundRGB!;
+					var bgCol = HeatMapColor(BusSize.Bit8, signed: true,  scale: 1, heatValues[i * 2]).BackgroundRGB!;
 					var fgCol = refColor.Blend(bgCol, 1 - interp, Color.Space.LCh);
 					
 					midColor = refColor.Blend(bgCol, 1 - interp2, Color.Space.LCh);
@@ -1519,8 +1550,8 @@ public static partial class CliMain {
 					fgAnsi = new(fgCol, eqInsideRGB);
 				}
 				else {
-					var bgCol = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2    ]).BackgroundRGB!;
-					midColor  = heatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2 + 1]).BackgroundRGB!;
+					var bgCol = HeatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2    ]).BackgroundRGB!;
+					midColor  = HeatMapColor(BusSize.Bit8, signed: false, scale: 1, heatValues[i * 2 + 1]).BackgroundRGB!;
 					fgAnsi    = new(bgCol, eqInsideRGB);
 				}
 				
@@ -1586,9 +1617,9 @@ public static partial class CliMain {
 			for (var v = 2; v <= 0x102; v += 0x20) {
 				v = Math.Clamp(v, 0, 0x101);
 				
-				Display.Write("  ", legX + i * 2, legY,     col: heatMapColor(BusSize.Bit8, signed: false, scale: 1,  v   - 2));
-				Display.Write("  ", legX + i * 2, legY + 2, col: heatMapColor(BusSize.Bit8, signed:  true, scale: 1,  v/2 - 1));
-				Display.Write("  ", legX + i * 2, legY + 4, col: heatMapColor(BusSize.Bit8, signed:  true, scale: 1, -v/2 + 1));
+				Display.Write("  ", legX + i * 2, legY,     col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1,  v   - 2));
+				Display.Write("  ", legX + i * 2, legY + 2, col: HeatMapColor(BusSize.Bit8, signed:  true, scale: 1,  v/2 - 1));
+				Display.Write("  ", legX + i * 2, legY + 4, col: HeatMapColor(BusSize.Bit8, signed:  true, scale: 1, -v/2 + 1));
 				
 				i++;
 			}
@@ -1600,21 +1631,21 @@ public static partial class CliMain {
 			case BusSize.Bit8: {
 				for (var i = 1; i < 4; i++) {
 					Display.Highlight(
-						2, x + 2 * i - 2, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
+						2, x + 2 * i - 2, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
 					);
 				}
 				break;
 			}
 			
 			case BusSize.Bit16: {
-				Display.Highlight(2, x,     y, col: heatMapColor(BusSize.Bit8,  signed: false, scale: 1, (value & 0xFFFFFF) >> 16, isBG).BackgroundRGB);
-				Display.Highlight(4, x + 2, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value & 0xFFFF,           isBG).BackgroundRGB);
+				Display.Highlight(2, x,     y, col: HeatMapColor(BusSize.Bit8,  signed: false, scale: 1, (value & 0xFFFFFF) >> 16, isBG).BackgroundRGB);
+				Display.Highlight(4, x + 2, y, col: HeatMapColor(BusSize.Bit16, signed: false, scale: 1, value & 0xFFFF,           isBG).BackgroundRGB);
 				break;
 			}
 			
 			case BusSize.Bit32 or BusSize.Bit64: {
 				Display.Highlight(
-					6, x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value * 256, isBG).BackgroundRGB
+					6, x, y, col: HeatMapColor(BusSize.Bit32, signed: false, scale: 1, value * 256, isBG).BackgroundRGB
 				);
 				break;
 			}
@@ -1630,7 +1661,7 @@ public static partial class CliMain {
 			case BusSize.Bit8: {
 				for (var i = 0; i < 4; i++) {
 					Display.Highlight(
-						2, x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
+						2, x + 2 * i, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, value >> 24 - i * 8 & 0xFF, isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1639,7 +1670,7 @@ public static partial class CliMain {
 			case BusSize.Bit16: {
 				for (var i = 0; i < 2; i++) {
 					Display.Highlight(
-						4, x + 4 * i, y, col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, value >> 16 - i * 16 & 0xFFFF, isBG).BackgroundRGB
+						4, x + 4 * i, y, col: HeatMapColor(BusSize.Bit16, signed: false, scale: 1, value >> 16 - i * 16 & 0xFFFF, isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1647,7 +1678,7 @@ public static partial class CliMain {
 			
 			case BusSize.Bit32 or BusSize.Bit64: {
 				Display.Highlight(
-					8, x, y, col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, value, isBG).BackgroundRGB
+					8, x, y, col: HeatMapColor(BusSize.Bit32, signed: false, scale: 1, value, isBG).BackgroundRGB
 				);
 				break;
 			}
@@ -1663,7 +1694,7 @@ public static partial class CliMain {
 			case BusSize.Bit8: {
 				for (var i = 0; i < 8; i++) {
 					Display.Highlight(
-						2, x + 2 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, (long) (value >> 56 - i * 8 & 0xFF), isBG).BackgroundRGB
+						2, x + 2 * i, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, (long) (value >> 56 - i * 8 & 0xFF), isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1673,7 +1704,7 @@ public static partial class CliMain {
 				for (var i = 0; i < 4; i++) {
 					Display.Highlight(
 						4, x + 4 * i, y,
-						col: heatMapColor(BusSize.Bit16, signed: false, scale: 1, (long) (value >> 48 - i * 16 & 0xFFFF), isBG).BackgroundRGB
+						col: HeatMapColor(BusSize.Bit16, signed: false, scale: 1, (long) (value >> 48 - i * 16 & 0xFFFF), isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1683,7 +1714,7 @@ public static partial class CliMain {
 				for (var i = 0; i < 2; i++) {
 					Display.Highlight(
 						8, x + 8 * i, y,
-						col: heatMapColor(BusSize.Bit32, signed: false, scale: 1, (long) (value >> 32 - i * 32 & 0xFFFFFFFF), isBG).BackgroundRGB
+						col: HeatMapColor(BusSize.Bit32, signed: false, scale: 1, (long) (value >> 32 - i * 32 & 0xFFFFFFFF), isBG).BackgroundRGB
 					);
 				}
 				break;
@@ -1691,7 +1722,7 @@ public static partial class CliMain {
 			
 			case BusSize.Bit64: {
 				Display.Highlight(
-					16, x, y, col: heatMapColor(BusSize.Bit64, signed: false, scale: 1, (long) value, isBG).BackgroundRGB
+					16, x, y, col: HeatMapColor(BusSize.Bit64, signed: false, scale: 1, (long) value, isBG).BackgroundRGB
 				);
 				break;
 			}
@@ -1706,7 +1737,7 @@ public static partial class CliMain {
 		return Color.FromLCh(0.1, 70, 280);
 	}
 	
-	static AnsiColor heatMapColor(BusSize dataSize, bool signed, double scale, long value, bool isBG = true) {
+	public static AnsiColor HeatMapColor(BusSize dataSize, bool signed, double scale, long value, bool isBG = true) {
 		double interp;
 		
 		switch (dataSize) {
@@ -1815,8 +1846,8 @@ public static partial class CliMain {
 	}
 	
 	static (char Char, AnsiColor Color)[] drawHeatMapFlags(BusSize dataSize, ulong value) {
-		var zero = heatMapColor(BusSize.Bit8, signed: false, scale: 1, value:   0).BackgroundRGB!;
-		var one  = heatMapColor(BusSize.Bit8, signed: false, scale: 1, value: 255).BackgroundRGB!;
+		var zero = HeatMapColor(BusSize.Bit8, signed: false, scale: 1, value:   0).BackgroundRGB!;
+		var one  = HeatMapColor(BusSize.Bit8, signed: false, scale: 1, value: 255).BackgroundRGB!;
 		
 		bool[] flags;
 		int midIndex;

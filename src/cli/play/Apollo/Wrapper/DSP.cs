@@ -15,6 +15,9 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "dsp_get_global_state")]
 	public static partial DspGlobalState DspGetGlobalState(Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "dsp_get_global_debug_state")]
+	public static partial DspDebugGlobalState DspGetGlobalDebugState(Emulator.Handle? emuPtr);
+	
 	[LibraryImport("apollo", EntryPoint = "dsp_get_voice_state")]
 	public static partial DspVoiceState DspGetVoiceState(Byte voiceIdx, Emulator.Handle? emuPtr);
 	
@@ -48,6 +51,11 @@ internal partial class DLL {
 		public IntPtr MainVolRight;
 		
 		public IntPtr BrrBank;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct DspDebugGlobalState {
+		public IntPtr EchoOffset;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]

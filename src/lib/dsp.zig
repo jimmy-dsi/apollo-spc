@@ -50,7 +50,7 @@ pub const VoiceState = extern struct {
 };
 
 pub const DebugGlobalState = extern struct {
-
+    echo_offset: ?[*]u16 = null,
 };
 
 pub const DebugVoiceState = extern struct {
@@ -124,6 +124,17 @@ pub inline fn get_global_state(emu_ptr: ?*Emu) !GlobalState {
         .main_vol_right = @ptrCast(&state.main_vol_right),
 
         .brr_bank = @ptrCast(&state.brr_bank)
+    };
+}
+
+pub inline fn get_global_debug_state(emu_ptr: ?*Emu) !DebugGlobalState {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const state = &ep.?.s_dsp.state._internal;
+
+    return .{
+        .echo_offset = @ptrCast(&state._echo._offset),
     };
 }
 

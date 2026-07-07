@@ -57,20 +57,20 @@ public static partial class CliMain {
 			Display.Highlight(11, x, y, col: heatMapZero());
 			
 			for (var i = 0; i < 4; i++) {
-				Display.Highlight(2, x + 3 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.InputPorts[i]).BackgroundRGB);
+				Display.Highlight(2, x + 3 * i, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.InputPorts[i]).BackgroundRGB);
 			}
 			y++;
 			
 			Display.Highlight(11, x, y, col: heatMapZero());
 			
 			for (var i = 0; i < 4; i++) {
-				Display.Highlight(2, x + 3 * i, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.InputPorts[i]).BackgroundRGB);
+				Display.Highlight(2, x + 3 * i, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.InputPorts[i]).BackgroundRGB);
 			}
 			
 			Display.Highlight(11, x + 21, y, col: heatMapZero());
 			
 			for (var i = 0; i < 4; i++) {
-				Display.Highlight(2, x + 3 * i + 21, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.OutputPorts[i]).BackgroundRGB);
+				Display.Highlight(2, x + 3 * i + 21, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, smp.OutputPorts[i]).BackgroundRGB);
 			}
 			y++;
 			
@@ -105,8 +105,8 @@ public static partial class CliMain {
 			displayHeatMap24((uint) s700.DataLength, x,      y);
 			displayHeatMap24(       s700.PC,         x + 11, y);
 			
-			Display.Highlight(2, x + 21, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.SP   ).BackgroundRGB);
-			Display.Highlight(2, x + 27, y, col: heatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.SPTop).BackgroundRGB);
+			Display.Highlight(2, x + 21, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.SP   ).BackgroundRGB);
+			Display.Highlight(2, x + 27, y, col: HeatMapColor(BusSize.Bit8, signed: false, scale: 1, s700.SPTop).BackgroundRGB);
 			y++;
 			
 			displayHeatMap64((ulong) s700.CurCycle.  SafeSigned(), x, y); y++;
