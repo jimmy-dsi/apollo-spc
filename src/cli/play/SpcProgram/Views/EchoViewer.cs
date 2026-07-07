@@ -6,11 +6,17 @@ using Apollo;
 using Jimbl;
 
 public static partial class CliMain {
+	enum EchoView {
+		All, LeftOnly, RightOnly, Mixed
+	}
+	
+	static EchoView currentEchoView = EchoView.All;
+	
 	static void showEchoViewer(EmuDataBuffer buffer) {
 		Display.UseBlending = false;
 		
-		var echoStart    = buffer.DSP_State!.EchoStartPage << 8;
-		var bufferLength = buffer.DSP_State!.EchoDelay * 0x800 / 4;
+		var echoStart    = buffer.DSP_DebugState!.EchoPage << 8;
+		var bufferLength = buffer.DSP_DebugState!.EchoLength / 4;
 		
 		if (bufferLength == 0) {
 			bufferLength = 1;
@@ -35,15 +41,53 @@ public static partial class CliMain {
 			rightBuf.Add(right);
 		}
 		
+		var width = 131;
+		
+		var echoEnd = (UInt16) (echoStart + bufferLength * 4 - 1);
+		
 		var cursorPos = buffer.DSP_DebugState!.EchoOffset / 4;
+		
+		switch (currentEchoView) {
+			case EchoView.All: {
+				Display.Write("Echo left",  0, 0);
+				Display.Write("Echo right", 0, 13);
 			
-		displayWaveform(leftBuf.ToArray(),  1, 1,  130, 12, cursorPos);
-		displayWaveform(rightBuf.ToArray(), 1, 14, 130, 12, cursorPos);
+				displayWaveform(leftBuf.ToArray(),  0, 1,  width, 12, cursorPos);
+				displayWaveform(rightBuf.ToArray(), 0, 14, width, 12, cursorPos);
+				
+				break;
+			}
+			
+			case EchoView.LeftOnly: {
+				Display.Write("Echo left", 0, 0);
+				displayWaveform(leftBuf.ToArray(), 0, 1, width, 25, cursorPos);
+				break;
+			}
+			
+			case EchoView.RightOnly: {
+				Display.Write("Echo right", 0, 0);
+				displayWaveform(rightBuf.ToArray(), 0, 1, width, 25, cursorPos);
+				break;
+			}
+			
+			case EchoView.Mixed: {
+				Display.Write("Echo left/right mixed", 0, 0);
+				displayWaveform(leftBuf.ToArray(), rightBuf.ToArray(), 0, 1, width, 25, cursorPos);
+				break;
+			}
+		}
+		
+		Display.Write($"{echoStart:X4}", 0,   26);
+		Display.Write($"{echoEnd  :X4}", 126, 26);
 	}
 	
 	public static AnsiColor? WaveInsideColor = null;
 	
-	static void displayWaveform(Int16[] input, int x, int y, int width, int height, int cursor, bool writeToScrollBuf = false) {
+	static void displayWaveform(Int16[] buf, int x, int y, int width, int height, int cursorPos) {
+		displayWaveform(buf, null, x, y, width, height, cursorPos);
+	}
+	
+	static void displayWaveform(Int16[] input, Int16[]? input_2, int x, int y, int width, int height, int cursor, bool writeToScrollBuf = false) {
 		if (WaveInsideColor is null) {
 			WaveInsideColor = new(Color.FromLCh(10, 30, 280), isBG: true);
 		}
@@ -54,7 +98,7 @@ public static partial class CliMain {
 			Display.ClearLine(yy, new(eqInsideRGB, isBG: true), writeToScrollBuf);
 		}
 		
-		var waveCanvas = Analysis.DisplayWaveform(input, width, height, cursorIndex: cursor);
+		var waveCanvas = Analysis.DisplayWaveform(input, input_2, width, height, cursorIndex: cursor);
 		for (var yy = 0; yy < height; yy++) {
 			for (var xx = 0; xx < width; xx++) {
 				var c = waveCanvas[yy][xx];

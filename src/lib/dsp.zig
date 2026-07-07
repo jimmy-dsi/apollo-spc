@@ -51,6 +51,8 @@ pub const VoiceState = extern struct {
 
 pub const DebugGlobalState = extern struct {
     echo_offset: ?[*]u16 = null,
+    echo_page:   ?[*]u8  = null,
+    echo_length: ?[*]u16 = null,
 };
 
 pub const DebugVoiceState = extern struct {
@@ -135,6 +137,8 @@ pub inline fn get_global_debug_state(emu_ptr: ?*Emu) !DebugGlobalState {
 
     return .{
         .echo_offset = @ptrCast(&state._echo._offset),
+        .echo_page   = @ptrCast(&state._echo._esa_page),
+        .echo_length = @ptrCast(&state._echo._length),
     };
 }
 

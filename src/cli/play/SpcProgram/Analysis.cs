@@ -124,12 +124,19 @@ public static class Analysis {
 		return (Start: (UInt16) startAddr, Loop: (UInt16) loopAddr);
 	}
 	
-	public static (char, AnsiColor)?[][] DisplayWaveform(Int16[] input, int canvasWidth, int canvasHeight, double xscale = 1.0, int? cursorIndex = null) {
+	public static (char, AnsiColor)?[][] DisplayWaveform(Int16[] input,
+	                                                     Int16[]? input_2,
+	                                                     int canvasWidth,
+	                                                     int canvasHeight,
+	                                                     double xscale = 1.0,
+	                                                     int? cursorIndex = null)
+	{
 		if (CliMain.WaveInsideColor is null) {
 			CliMain.WaveInsideColor = new(Color.FromLCh(10, 30, 280), isBG: true);
 		}
 		
 		var eqInsideRGB = CliMain.WaveInsideColor.BackgroundRGB!;
+		AnsiColor shadowColor = new(Color.FromLCh(30, 30, 280), isBG: true);
 		
 		int cellPrecision;
 		#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
@@ -141,6 +148,9 @@ public static class Analysis {
 		var waveCanvasPos = new int[canvasWidth];
 		var waveCanvasNeg = new int[canvasWidth];
 		
+		var waveCanvasPosMax = new int[canvasWidth];
+		var waveCanvasNegMax = new int[canvasWidth];
+		
 		var xratio = (double) canvasWidth  / input.Length;
 		var yratio = (double) canvasHeight * cellPrecision / 0x8000;
 		
@@ -150,15 +160,39 @@ public static class Analysis {
 			cursorLine = JMath.Floor(ci * xratio);
 		}
 		
+		var zeroDelay = input.Length == 1;
+		
 		foreach (var (x, y) in input.Enum()) {
-			var cx = JMath.Floor(xratio * x);
-			var cy = JMath.Round(yratio * y);
+			var cx  = JMath.Floor(xratio * x);
+			var cy  = JMath.Round(yratio * y);
+			var cy2 = input_2 is null ? 0 : JMath.Round(yratio * input_2[x]);
 			
 			if (cy > 0 && cy > waveCanvasPos[cx]) {
 				waveCanvasPos[cx] = cy;
+				if (input_2 is not null) {
+					waveCanvasPos[cx] += cy2;
+					waveCanvasPos[cx] /= 2;
+					
+					waveCanvasPosMax[cx] = Math.Max(cy, cy2);
+				}
 			}
 			else if (cy < 0 && cy < waveCanvasNeg[cx]) {
 				waveCanvasNeg[cx] = cy;
+				if (input_2 is not null) {
+					waveCanvasNeg[cx] += cy2;
+					waveCanvasNeg[cx] /= 2;
+					
+					waveCanvasNegMax[cx] = Math.Min(cy, cy2);
+				}
+			}
+		}
+		
+		if (zeroDelay) {
+			for (var i = 1; i < 4; i++) {
+				waveCanvasPos[i] = waveCanvasPos[0];
+				waveCanvasNeg[i] = waveCanvasNeg[0];
+				waveCanvasPosMax[i] = waveCanvasPosMax[0];
+				waveCanvasNegMax[i] = waveCanvasNegMax[0];
 			}
 		}
 		
@@ -178,70 +212,147 @@ public static class Analysis {
 				continue;
 			}
 			
+			var col_0 = shadowColor;
+			var col   = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x2C);
+			var col_2 = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x44);
+			
+			int yMax_0 = 0, yMin_0 = 0;
+			int yMaxRem_0 = 0, yMinRem_0 = 0;
+			
+			// 0
+			if (input_2 is not null) {
+				var yMaxIn_0 = yZero * cellPrecision - waveCanvasPosMax[x];
+				var yMinIn_0 = yZero * cellPrecision - waveCanvasNegMax[x];
+			
+				yMaxIn_0 = Math.Clamp(yMaxIn_0, 0, (canvasHeight - 1) * cellPrecision);
+				yMinIn_0 = Math.Clamp(yMinIn_0, 0, (canvasHeight - 1) * cellPrecision);
+			
+				yMax_0 = yMaxIn_0 / cellPrecision;
+				yMin_0 = yMinIn_0 / cellPrecision;
+			
+				yMaxRem_0 = yMaxIn_0 % cellPrecision;
+				yMinRem_0 = yMinIn_0 % cellPrecision;
+			
+				colorWavePoint(canvas, eqInsideRGB, col_0, cellPrecision, x, yZero, yMin_0, yMax_0, yMinRem_0, yMaxRem_0);
+			}
+			
+			// 1
 			var yMaxIn = yZero * cellPrecision - waveCanvasPos[x];
 			var yMinIn = yZero * cellPrecision - waveCanvasNeg[x];
 			
-			yMaxIn = Math.Max(yMaxIn, 0);
-			yMinIn = Math.Max(yMinIn, 0);
+			yMaxIn = Math.Clamp(yMaxIn, 0, (canvasHeight - 1) * cellPrecision);
+			yMinIn = Math.Clamp(yMinIn, 0, (canvasHeight - 1) * cellPrecision);
 			
-			var yMax = Math.Clamp(yMaxIn, 0, (canvasHeight - 1) * cellPrecision) / cellPrecision;
-			var yMin = Math.Clamp(yMinIn, 0, (canvasHeight - 1) * cellPrecision) / cellPrecision;
+			var yMax = yMaxIn / cellPrecision;
+			var yMin = yMinIn / cellPrecision;
 			
 			var yMaxRem = yMaxIn % cellPrecision;
 			var yMinRem = yMinIn % cellPrecision;
 			
-			var col = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x40);
+			var displayShadow = true;
 			
-			for (var y = yMax + 1; y < yMin; y++) {
-				canvas[y][x] = (' ', col);
+			if (input_2 is not null) {
+				if (yMax == yMax_0 && yMin == yMin_0) {
+					if (Math.Abs(yMaxRem - yMaxRem_0) < cellPrecision / 2 && Math.Abs(yMinRem - yMinRem_0) < cellPrecision / 2) {
+						displayShadow = false;
+					}
+				}
 			}
 			
-			var c = '▄';
+			Color back = displayShadow ? col_0.BackgroundRGB! : eqInsideRGB;
 			
-			if (yMax < yMin) {
-				if (yMaxRem == 0) {
-					canvas[yMax][x] = (' ', col);
-				}
-				else {
-					if (cellPrecision == 8) {
-						c = yMaxRem switch {
-							1 => '▇',
-							2 => '▆',
-							3 => '▅',
-							4 => '▄',
-							5 => '▃',
-							6 => '▂',
-							7 => '▁',
-							_ => throw new UnreachableException($"max: {yMaxRem}")
-						};
-					}
-				
-					canvas[yMax][x] = (c, new(col.BackgroundRGB!, eqInsideRGB));
-				}
+			colorWavePoint(canvas, input_2 is null ? eqInsideRGB : back, col, cellPrecision, x, yZero, yMin, yMax, yMinRem, yMaxRem);
 			
-				if (yMinRem == 0) {
-					canvas[yMin][x] = (' ', new(eqInsideRGB, isBG: true));
-				}
-				else {
-					if (cellPrecision == 8) {
-						c = yMinRem switch {
-							1 => '▇',
-							2 => '▆',
-							3 => '▅',
-							4 => '▄',
-							5 => '▃',
-							6 => '▂',
-							7 => '▁',
-							_ => throw new UnreachableException($"min: {yMinRem}")
-						};
-					}
-				
-					canvas[yMin][x] = (c, new(eqInsideRGB, col.BackgroundRGB!));
-				}
+			// 2
+			var yMaxIn_2 = yZero * cellPrecision - waveCanvasPos[x] / 2;
+			var yMinIn_2 = yZero * cellPrecision - waveCanvasNeg[x] / 2;
+			
+			yMaxIn_2 = Math.Clamp(yMaxIn_2, 0, (canvasHeight - 1) * cellPrecision);
+			yMinIn_2 = Math.Clamp(yMinIn_2, 0, (canvasHeight - 1) * cellPrecision);
+			
+			var yMax_2 = yMaxIn_2 / cellPrecision;
+			var yMin_2 = yMinIn_2 / cellPrecision;
+			
+			var yMaxRem_2 = yMaxIn_2 % cellPrecision;
+			var yMinRem_2 = yMinIn_2 % cellPrecision;
+			
+			if (yMax_2 == yMax) {
+				yMax_2    = Math.Min(yZero, yMax + 1);
+				yMaxRem_2 = 0;
 			}
+			
+			if (yMin_2 == yMin) {
+				yMin_2 = Math.Max(yZero, yMin - 1);
+				yMinRem_2 = 0;
+			}
+			
+			colorWavePoint(canvas, col.BackgroundRGB!, col_2, cellPrecision, x, yZero, yMin_2, yMax_2, yMinRem_2, yMaxRem_2);
 		}
 		
 		return canvas;
+	}
+	
+	static void colorWavePoint((char, AnsiColor)?[][] canvas,
+	                           Color bgCol,
+	                           AnsiColor fgCol,
+	                           int cellPrecision,
+	                           int x,
+	                           int yZero,
+	                           int yMin,
+	                           int yMax,
+	                           int yMinRem,
+	                           int yMaxRem)
+	{
+		for (var y = yMax + 1; y < yZero; y++) {
+			canvas[y][x] = (' ', fgCol);
+		}
+		
+		for (var y = yZero; y <= yMin - 1; y++) {
+			canvas[y][x] = (' ', fgCol);
+		}
+			
+		var c = '▄';
+			
+		if (yMax <= yMin) {
+			if (yMaxRem == 0) {
+				if (yMax != yZero) {
+					canvas[yMax][x] = (' ', fgCol);
+				}
+			}
+			else {
+				if (cellPrecision == 8) {
+					c = yMaxRem switch {
+						1 => '▇',
+						2 => '▆',
+						3 => '▅',
+						4 => '▄',
+						5 => '▃',
+						6 => '▂',
+						7 => '▁',
+						_ => throw new UnreachableException($"max: {yMaxRem}")
+					};
+				}
+				
+				canvas[yMax][x] = (c, new(fgCol.BackgroundRGB!, bgCol));
+			}
+			
+			if (yMinRem > 0) {
+				if (cellPrecision == 8) {
+					c = yMinRem switch {
+						1 => '▇',
+						2 => '▆',
+						3 => '▅',
+						4 => '▄',
+						5 => '▃',
+						6 => '▂',
+						7 => '▁',
+						_ => throw new UnreachableException($"min: {yMinRem}")
+					};
+				}
+				
+				canvas[yMin][x] = (c, new(bgCol, fgCol.BackgroundRGB!));
+			}
+		}
 	}
 	
 	static SampleEntry[] extractSampleEntries(this Emulator snapshot) {

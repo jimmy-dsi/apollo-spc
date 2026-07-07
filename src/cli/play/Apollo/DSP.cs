@@ -136,6 +136,32 @@ public class DSP {
 					finally { emu.MaybeReleaseLock(); }
 				}
 			}
+			
+			public byte Page {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) debugState.EchoPage); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((byte*) debugState.EchoPage) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt16 Length {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) debugState.EchoLength); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+				set {
+					emu.MaybeAcquireLock();
+					try     { *((UInt16*) debugState.EchoLength) = value; }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
 				
 			internal EchoProps(Emulator emu, DLL.DspGlobalState state, DLL.DspDebugGlobalState debugState) {
 				this.emu        = emu;

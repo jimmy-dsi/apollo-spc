@@ -1209,7 +1209,7 @@ public static partial class CliMain {
 			
 			case View.EchoViewer: {
 				resetStatusMsg();
-				requestEmuData(Transfer.Requests.ARAM | Transfer.Requests.DSP_2 | Transfer.Requests.DSP_3, 0, 0x1_0000);
+				requestEmuData(Transfer.Requests.ARAM | Transfer.Requests.DSP_3, 0, 0x1_0000);
 				Display.HideWindow();
 				Display.UseBlending = false;
 				break;

@@ -56,6 +56,8 @@ internal partial class DLL {
 	[StructLayout(LayoutKind.Sequential)]
 	internal struct DspDebugGlobalState {
 		public IntPtr EchoOffset;
+		public IntPtr EchoPage;
+		public IntPtr EchoLength;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
