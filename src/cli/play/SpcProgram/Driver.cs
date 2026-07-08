@@ -210,7 +210,7 @@ public static class Driver {
 			return false;
 		}
 		
-		if (emu.Script700.IsRunning) {
+		if (emu.Script700.IsOrWasRunning) {
 			var bpEnabled = CliMain.BreakpointsEnabled;
 			var completed = emu.StepNCycles(cycles, breakpointsEnabled: bpEnabled);
 			
@@ -268,7 +268,7 @@ public static class Driver {
 			return false;
 		}
 		
-		if (emu.Script700.IsRunning) {
+		if (emu.Script700.IsOrWasRunning) {
 			var bpEnabled = CliMain.BreakpointsEnabled;
 			var success = emu.StepCyclesUntil(condition, out var steps, out var breakpoint, breakpointsEnabled: bpEnabled);
 			
@@ -316,7 +316,7 @@ public static class Driver {
 	}
 	
 	static bool StepInstruction() {
-		if (emu.Script700.IsRunning) {
+		if (emu.Script700.IsOrWasRunning) {
 			var success = true;
 			try { emu.StepInstruction(consumeBreakpoint: true); } catch (Script700Timeout) { success = false; }
 			

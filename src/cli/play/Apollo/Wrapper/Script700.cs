@@ -34,6 +34,10 @@ internal partial class DLL {
 	[return: MarshalAs(UnmanagedType.I1)]
 	public static partial bool Script700IsRunning(Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "script700_is_or_was_running")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool Script700IsOrWasRunning(Emulator.Handle? emuPtr);
+	
 	[LibraryImport("apollo", EntryPoint = "script700_get_wait_until_cycle")]
 	public static partial UInt64 Script700GetWaitUntilCycle(Emulator.Handle? emuPtr);
 	

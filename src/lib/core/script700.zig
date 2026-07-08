@@ -39,6 +39,7 @@ pub const Script700 = struct {
     _finished: bool = false,
 
     enabled: bool = false,
+    is_or_was_enabled: bool = false,
     compat_mode: bool = true, // Indicates whether timing operations should be consistent with spcplay Script700 behavior. `false` instead indicates cycle-level accuracy.
     initialized: bool = false,
 
@@ -74,6 +75,7 @@ pub const Script700 = struct {
         self._finished = other._finished;
 
         self.enabled = other.enabled;
+        self.is_or_was_enabled = other.is_or_was_enabled;
         self.compat_mode = other.compat_mode;
         self.initialized = other.initialized;
 
@@ -124,6 +126,7 @@ pub const Script700 = struct {
         }
 
         self.enabled = true;
+        self.is_or_was_enabled = true;
         self.script_bytecode = script_bytecode;
         self.initialized = false;
         self.state.reset();

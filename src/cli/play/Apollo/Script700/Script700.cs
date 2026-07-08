@@ -412,6 +412,21 @@ public partial class Script700 {
 		}
 	}
 	
+	public bool IsOrWasRunning {
+		get {
+			Emulator.MaybeAcquireLock();
+			try {
+				var isRunning = DLL.Script700IsOrWasRunning(Emulator.handle);
+				if (!isRunning) {
+					Emulator.CheckForError();
+				}
+				
+				return isRunning;
+			}
+			finally { Emulator.MaybeReleaseLock(); }
+		}
+	}
+	
 	public int ScriptLength {
 		get {
 			Emulator.MaybeAcquireLock();

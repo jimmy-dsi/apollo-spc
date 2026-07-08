@@ -353,6 +353,10 @@ pub export fn script700_is_running(emu_ptr: ?[*]Emu) bool {
     return script700.is_running(@ptrCast(emu_ptr)) catch |e| emu.ferr(e, @ptrCast(emu_ptr));
 }
 
+pub export fn script700_is_or_was_running(emu_ptr: ?[*]Emu) bool {
+    return script700.is_or_was_running(@ptrCast(emu_ptr)) catch |e| emu.ferr(e, @ptrCast(emu_ptr));
+}
+
 pub export fn script700_get_wait_until_cycle(emu_ptr: ?[*]Emu) u64 {
     return script700.get_wait_until_cycle(@ptrCast(emu_ptr)) catch |e| emu.zerr(?u64, e, @ptrCast(emu_ptr)) orelse 0;
 }
