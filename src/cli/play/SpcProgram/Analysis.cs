@@ -167,23 +167,30 @@ public static class Analysis {
 			var cy  = JMath.Round(yratio * y);
 			var cy2 = input_2 is null ? 0 : JMath.Round(yratio * input_2[x]);
 			
-			if (cy > 0 && cy > waveCanvasPos[cx]) {
-				waveCanvasPos[cx] = cy;
-				if (input_2 is not null) {
-					waveCanvasPos[cx] += cy2;
-					waveCanvasPos[cx] /= 2;
-					
-					waveCanvasPosMax[cx] = Math.Max(cy, cy2);
+			int val;
+			if (input_2 is not null) {
+				val = (cy + cy2) / 2;
+				
+				var max = Math.Max(cy, cy2);
+				var min = Math.Min(cy, cy2);
+				
+				if (max > 0 && max > waveCanvasPosMax[cx]) {
+					waveCanvasPosMax[cx] = max;
+				}
+				
+				if (min < 0 && min < waveCanvasNegMax[cx]) {
+					waveCanvasNegMax[cx] = min;
 				}
 			}
-			else if (cy < 0 && cy < waveCanvasNeg[cx]) {
-				waveCanvasNeg[cx] = cy;
-				if (input_2 is not null) {
-					waveCanvasNeg[cx] += cy2;
-					waveCanvasNeg[cx] /= 2;
-					
-					waveCanvasNegMax[cx] = Math.Min(cy, cy2);
-				}
+			else {
+				val = cy;
+			}
+			
+			if (val > 0 && val > waveCanvasPos[cx]) {
+				waveCanvasPos[cx] = val;
+			}
+			else if (val < 0 && val < waveCanvasNeg[cx]) {
+				waveCanvasNeg[cx] = val;
 			}
 		}
 		
@@ -216,8 +223,8 @@ public static class Analysis {
 				var yMaxIn_0 = yZero * cellPrecision - waveCanvasPosMax[x];
 				var yMinIn_0 = yZero * cellPrecision - waveCanvasNegMax[x];
 			
-				yMaxIn_0 = Math.Clamp(yMaxIn_0, 0, (canvasHeight - 1) * cellPrecision);
-				yMinIn_0 = Math.Clamp(yMinIn_0, 0, (canvasHeight - 1) * cellPrecision);
+				yMaxIn_0 = Math.Clamp(yMaxIn_0, 0, canvasHeight * cellPrecision);
+				yMinIn_0 = Math.Clamp(yMinIn_0, 0, canvasHeight * cellPrecision);
 			
 				yMax_0 = yMaxIn_0 / cellPrecision;
 				yMin_0 = yMinIn_0 / cellPrecision;
@@ -259,8 +266,8 @@ public static class Analysis {
 			var yMaxIn_2 = yZero * cellPrecision - waveCanvasPos[x] / 2;
 			var yMinIn_2 = yZero * cellPrecision - waveCanvasNeg[x] / 2;
 			
-			yMaxIn_2 = Math.Clamp(yMaxIn_2, 0, (canvasHeight - 1) * cellPrecision);
-			yMinIn_2 = Math.Clamp(yMinIn_2, 0, (canvasHeight - 1) * cellPrecision);
+			yMaxIn_2 = Math.Clamp(yMaxIn_2, 0, canvasHeight * cellPrecision);
+			yMinIn_2 = Math.Clamp(yMinIn_2, 0, canvasHeight * cellPrecision);
 			
 			var yMax_2 = yMaxIn_2 / cellPrecision;
 			var yMin_2 = yMinIn_2 / cellPrecision;

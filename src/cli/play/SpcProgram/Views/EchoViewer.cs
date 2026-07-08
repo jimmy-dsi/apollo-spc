@@ -92,7 +92,7 @@ public static partial class CliMain {
 		Display.Write($"{echoStart:X4}", x,             26);
 		Display.Write($"{echoEnd  :X4}", x + width - 4, 26);
 		
-		var tabX = 94;
+		var tabX = 87;
 		var tabY = 27;
 		
 		var fullLength = width * echoZoomLevel;
@@ -116,9 +116,9 @@ public static partial class CliMain {
 		
 		Display.Write($"Scale: {zoomText}", 2, 29);
 		
-		Display.Write($"              Addr  Left Right",                                                                 tabX, tabY);
-		Display.Write($"Last read:  [{ds.LastEchoReadAddr :X4}]  {ds.LastEchoReadLeft :X4}  {ds.LastEchoReadRight :X4}", tabX, tabY + 1);
-		Display.Write($"Last write: [{ds.LastEchoWriteAddr:X4}]  {ds.LastEchoWriteLeft:X4}  {ds.LastEchoWriteRight:X4}", tabX, tabY + 2);
+		Display.Write($"                     Addr  Left Right",                                                                 tabX, tabY);
+		Display.Write($"Last sample read:  [{ds.LastEchoReadAddr :X4}]  {ds.LastEchoReadLeft :X4}  {ds.LastEchoReadRight :X4}", tabX, tabY + 1);
+		Display.Write($"Last sample write: [{ds.LastEchoWriteAddr:X4}]  {ds.LastEchoWriteLeft:X4}  {ds.LastEchoWriteRight:X4}", tabX, tabY + 2);
 	}
 	
 	public static AnsiColor? WaveInsideColor = null;
