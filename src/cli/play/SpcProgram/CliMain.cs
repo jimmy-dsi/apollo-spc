@@ -179,6 +179,10 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.DecHeatMapDataSize, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.F9,         KeyBindings.Action.IncHeatMapDataSize);
 			KeyBindings.Register(KeyBindings.Key.F10,        KeyBindings.Action.DecHeatMapDataSize);
+			KeyBindings.Register(KeyBindings.Key.Char('B'),  KeyBindings.Action.ContextKey_B);
+			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ContextKey_L);
+			KeyBindings.Register(KeyBindings.Key.Char('M'),  KeyBindings.Action.ContextKey_M);
+			KeyBindings.Register(KeyBindings.Key.Char('R'),  KeyBindings.Action.ContextKey_R);
 			
 			// Create RAM memory view buffer and Trace logger view buffer
 			Display.CurrentBufferId = "aram";
@@ -336,10 +340,15 @@ public static partial class CliMain {
 		return (int) (cycle / (2048000 / SnapsPerSecond));
 	}
 	
-	public static Emulator GetSnapshot(long cycle) {
+	static Emulator? lastGottenSnapshot = null;
+	
+	public static Emulator? GetSnapshot(long cycle) {
 		var snapshotIndex = GetSnapshotIndex(cycle);
 		lock (seekBarLock) {
-			return seekBarSnapshots[snapshotIndex];
+			if (seekBarSnapshots.ContainsKey(snapshotIndex)) {
+				lastGottenSnapshot = seekBarSnapshots[snapshotIndex];
+			}
+			return lastGottenSnapshot;
 		}
 	}
 	

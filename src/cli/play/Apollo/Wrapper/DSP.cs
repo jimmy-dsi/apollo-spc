@@ -58,6 +58,16 @@ internal partial class DLL {
 		public IntPtr EchoOffset;
 		public IntPtr EchoPage;
 		public IntPtr EchoLength;
+		
+		public IntPtr LastEchoReadCycle;
+		public IntPtr LastEchoReadAddr;
+		public IntPtr LastEchoReadLeft;
+		public IntPtr LastEchoReadRight;
+		
+		public IntPtr LastEchoWriteCycle;
+		public IntPtr LastEchoWriteAddr;
+		public IntPtr LastEchoWriteLeft;
+		public IntPtr LastEchoWriteRight;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]

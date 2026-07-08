@@ -152,7 +152,7 @@ public static class Analysis {
 		var waveCanvasNegMax = new int[canvasWidth];
 		
 		var xratio = (double) canvasWidth  / input.Length;
-		var yratio = (double) canvasHeight * cellPrecision / 0x8000;
+		var yratio = (double) canvasHeight * cellPrecision / 0x10000;
 		
 		int? cursorLine = null;
 		
@@ -204,17 +204,9 @@ public static class Analysis {
 		var yZero = canvasHeight / 2;
 		
 		for (var x = 0; x < canvasWidth; x++) {
-			if (cursorLine is int cl && cl == x) {
-				for (var y = 0; y < canvasHeight; y++) {
-					canvas[y][x] = (' ', AnsiColor.BGWhite);
-				}
-				
-				continue;
-			}
-			
 			var col_0 = shadowColor;
 			var col   = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x2C);
-			var col_2 = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x44);
+			var col_2 = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x48);
 			
 			int yMax_0 = 0, yMin_0 = 0;
 			int yMaxRem_0 = 0, yMinRem_0 = 0;
@@ -240,8 +232,8 @@ public static class Analysis {
 			var yMaxIn = yZero * cellPrecision - waveCanvasPos[x];
 			var yMinIn = yZero * cellPrecision - waveCanvasNeg[x];
 			
-			yMaxIn = Math.Clamp(yMaxIn, 0, (canvasHeight - 1) * cellPrecision);
-			yMinIn = Math.Clamp(yMinIn, 0, (canvasHeight - 1) * cellPrecision);
+			yMaxIn = Math.Clamp(yMaxIn, 0, canvasHeight * cellPrecision);
+			yMinIn = Math.Clamp(yMinIn, 0, canvasHeight * cellPrecision);
 			
 			var yMax = yMaxIn / cellPrecision;
 			var yMin = yMinIn / cellPrecision;
@@ -287,6 +279,26 @@ public static class Analysis {
 			}
 			
 			colorWavePoint(canvas, col.BackgroundRGB!, col_2, cellPrecision, x, yZero, yMin_2, yMax_2, yMinRem_2, yMaxRem_2);
+			var white = Color.FromRGB(1.0, 1.0, 1.0);
+			
+			if (cursorLine is int cl && cl == x) {
+				for (var y = 0; y < canvasHeight; y++) {
+					canvas[y][x] ??= (' ', CliMain.WaveInsideColor);
+					
+					var cc = canvas[y][x]!.Value;
+					if (cc.Item2.IsFG) {
+						cc.Item2 = new(white - cc.Item2.ForegroundRGB!);
+					}
+					else if (cc.Item2.IsBG) {
+						cc.Item2 = new(white - cc.Item2.BackgroundRGB!, isBG: true);
+					}
+					else {
+						cc.Item2 = new(white - cc.Item2.ForegroundRGB!, white - cc.Item2.BackgroundRGB!);
+					}
+					
+					canvas[y][x] = cc;
+				}
+			}
 		}
 		
 		return canvas;

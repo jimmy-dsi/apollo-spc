@@ -177,6 +177,10 @@ public static class KeyBindings {
 		ToggleBreakpoints,
 		IncHeatMapDataSize,
 		DecHeatMapDataSize,
+		ContextKey_B,
+		ContextKey_L,
+		ContextKey_M,
+		ContextKey_R,
 	}
 		
 	static Key?      lastCtrlKey    = null;

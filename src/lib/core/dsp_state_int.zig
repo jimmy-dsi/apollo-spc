@@ -58,6 +58,29 @@ pub const DSPStateInternal = struct {
         _history_offset: u3  = 0,
 
         // Debug stuff
+        // Echo read
+        __last_read_cycle: u64 = 0,
+        __last_read_addr:  u16 = 0,
+
+        __last_read_left:  i16 = 0,
+        __last_read_right: i16 = 0,
+
+        __last_read_left_q:  i16 = 0,
+        __last_read_right_q: i16 = 0,
+
+        // Echo write
+        __write_triggered: bool = false,
+
+        __last_write_cycle: u64 = 0,
+        __last_write_addr:  u16 = 0,
+
+        __last_write_left:  i16 = 0,
+        __last_write_right: i16 = 0,
+
+        __last_write_left_q:  i16 = 0,
+        __last_write_right_q: i16 = 0,
+
+        // Other
         __fir_coefs_processed: u3 = 0,
 
         __calc_history_left:  [8]i17 = [_]i17{0x00} ** 8,

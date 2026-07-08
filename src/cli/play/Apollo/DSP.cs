@@ -162,6 +162,70 @@ public class DSP {
 					finally { emu.MaybeReleaseLock(); }
 				}
 			}
+			
+			public UInt64 LastReadCycle {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt64*) debugState.LastEchoReadCycle); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt16 LastReadAddr {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) debugState.LastEchoReadAddr); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public Int16 LastReadLeft {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((Int16*) debugState.LastEchoReadLeft); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public Int16 LastReadRight {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((Int16*) debugState.LastEchoReadRight); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt64 LastWriteCycle {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt64*) debugState.LastEchoWriteCycle); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt16 LastWriteAddr {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) debugState.LastEchoWriteAddr); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public Int16 LastWriteLeft {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((Int16*) debugState.LastEchoWriteLeft); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public Int16 LastWriteRight {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((Int16*) debugState.LastEchoWriteRight); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
 				
 			internal EchoProps(Emulator emu, DLL.DspGlobalState state, DLL.DspDebugGlobalState debugState) {
 				this.emu        = emu;

@@ -1019,6 +1019,34 @@ public static partial class CliMain {
 				setTempStatusMsg(StatusMSG.BusSizeChanged);
 				break;
 			}
+			
+			case KeyBindings.Action.ContextKey_B: {
+				if (currentView == View.EchoViewer) {
+					currentEchoView = EchoView.All;
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.ContextKey_L: {
+				if (currentView == View.EchoViewer) {
+					currentEchoView = EchoView.LeftOnly;
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.ContextKey_M: {
+				if (currentView == View.EchoViewer) {
+					currentEchoView = EchoView.Mixed;
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.ContextKey_R: {
+				if (currentView == View.EchoViewer) {
+					currentEchoView = EchoView.RightOnly;
+				}
+				break;
+			}
 		}
 	}
 	

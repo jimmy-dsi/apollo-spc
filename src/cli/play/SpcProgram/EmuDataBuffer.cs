@@ -47,9 +47,19 @@ public class EmuDataBuffer: ICloneable {
 	}
 	
 	public class DSP3State: ICloneable {
-		public UInt16      EchoOffset    { get; internal set; }
-		public byte        EchoPage      { get; internal set; }
-		public UInt16      EchoLength    { get; internal set; }
+		public UInt16      EchoOffset         { get; internal set; }
+		public byte        EchoPage           { get; internal set; }
+		public UInt16      EchoLength         { get; internal set; }
+		
+		public UInt64      LastEchoReadCycle  { get; internal set; }
+		public UInt16      LastEchoReadAddr   { get; internal set; }
+		public Int16       LastEchoReadLeft   { get; internal set; }
+		public Int16       LastEchoReadRight  { get; internal set; }
+		
+		public UInt64      LastEchoWriteCycle { get; internal set; }
+		public UInt16      LastEchoWriteAddr  { get; internal set; }
+		public Int16       LastEchoWriteLeft  { get; internal set; }
+		public Int16       LastEchoWriteRight { get; internal set; }
 		
 		public DSPVoice3[] Voice         { get; internal set; } = new DSPVoice3[8];
 		
@@ -277,7 +287,7 @@ public class EmuDataBuffer: ICloneable {
 		Step           = nextStep;
 		InstrStep      = instrStep;
 		BreakPC        = breakPC;
-		RecentSnapshot = CliMain.GetSnapshot(dspCycle);
+		RecentSnapshot = CliMain.GetSnapshot(dspCycle)!;
 		
 		nextStep++;
 	}
@@ -405,9 +415,17 @@ public class EmuDataBuffer: ICloneable {
 		
 		if ((requests & Transfer.Requests.DSP_3) != 0) {
 			DSP_DebugState = new() {
-				EchoOffset = emu.DSP.State.Echo.Offset,
-				EchoPage   = emu.DSP.State.Echo.Page,
-				EchoLength = emu.DSP.State.Echo.Length,
+				EchoOffset         = emu.DSP.State.Echo.Offset,
+				EchoPage           = emu.DSP.State.Echo.Page,
+				EchoLength         = emu.DSP.State.Echo.Length,
+				LastEchoReadCycle  = emu.DSP.State.Echo.LastReadCycle,
+				LastEchoReadAddr   = emu.DSP.State.Echo.LastReadAddr,
+				LastEchoReadLeft   = emu.DSP.State.Echo.LastReadLeft,
+				LastEchoReadRight  = emu.DSP.State.Echo.LastReadRight,
+				LastEchoWriteCycle = emu.DSP.State.Echo.LastWriteCycle,
+				LastEchoWriteAddr  = emu.DSP.State.Echo.LastWriteAddr,
+				LastEchoWriteLeft  = emu.DSP.State.Echo.LastWriteLeft,
+				LastEchoWriteRight = emu.DSP.State.Echo.LastWriteRight,
 			};
 			
 			for (var v = 0; v < 8; v++) {
