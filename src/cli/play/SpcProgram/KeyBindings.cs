@@ -100,7 +100,7 @@ public static class KeyBindings {
 		}
 		
 		public Key(char printable) {
-			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '<' or '>' or ' ') && !printable.IsAsciiLetterOrDigit()) {
+			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '<' or '>' or ' ' or '-' or '+' or '=') && !printable.IsAsciiLetterOrDigit()) {
 				throw new ArgumentException();
 			}
 			
@@ -181,6 +181,8 @@ public static class KeyBindings {
 		ContextKey_L,
 		ContextKey_M,
 		ContextKey_R,
+		ZoomIn,
+		ZoomOut,
 	}
 		
 	static Key?      lastCtrlKey    = null;

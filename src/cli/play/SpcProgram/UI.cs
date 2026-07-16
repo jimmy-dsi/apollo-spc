@@ -1,3 +1,5 @@
+using Jimbl.JMath;
+
 namespace SpcProgram;
 
 using System.Diagnostics;
@@ -45,7 +47,9 @@ public static partial class CliMain {
 		SteppedCycles, Paused, BreakExec, CycleDisplayChanged,
 		BreakpointHit, BreakpointsOff, BreakpointsOn,
 		
-		Script700_Error, Continue
+		Script700_Error, Continue,
+		
+		ZoomIn, ZoomOut
 	}
 	
 	enum HeatMapMode {
@@ -753,6 +757,17 @@ public static partial class CliMain {
 						ScrollOffset++;
 					}
 				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					
+					echoScrollOffset--;
+					if (echoScrollOffset < 0) {
+						echoScrollOffset = 0;
+					}
+					
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
+				}
 				
 				break;
 			}
@@ -769,6 +784,17 @@ public static partial class CliMain {
 					if (ScrollOffset > 0) {
 						ScrollOffset--;
 					}
+				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					
+					echoScrollOffset++;
+					if (echoScrollOffset + len > echoBufferLength) {
+						echoScrollOffset = echoBufferLength - len;
+					}
+					
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
 				}
 				
 				break;
@@ -794,6 +820,17 @@ public static partial class CliMain {
 						ScrollOffset = getScrollTopOffset();
 					}
 				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					
+					echoScrollOffset -= 64;
+					if (echoScrollOffset < 0) {
+						echoScrollOffset = 0;
+					}
+					
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
+				}
 				
 				break;
 			}
@@ -816,6 +853,17 @@ public static partial class CliMain {
 						ScrollOffset = 0;
 					}
 				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					
+					echoScrollOffset += 64;
+					if (echoScrollOffset + len > echoBufferLength) {
+						echoScrollOffset = echoBufferLength - len;
+					}
+					
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
+				}
 				
 				break;
 			}
@@ -830,6 +878,12 @@ public static partial class CliMain {
 				else if (currentView == View.ASMViewer) {
 					ScrollOffset = getScrollTopOffset();
 				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					echoScrollOffset    = 0;
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
+				}
 				
 				break;
 			}
@@ -843,6 +897,12 @@ public static partial class CliMain {
 				}
 				else if (currentView == View.ASMViewer) {
 					ScrollOffset = 0;
+				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					echoScrollOffset    = echoBufferLength - len;
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
 				}
 				
 				break;
@@ -1044,6 +1104,26 @@ public static partial class CliMain {
 			case KeyBindings.Action.ContextKey_R: {
 				if (currentView == View.EchoViewer) {
 					currentEchoView = EchoView.RightOnly;
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.ZoomIn: {
+				if (currentView == View.EchoViewer) {
+					if (echoZoomIndex > 0) {
+						echoZoomIndex--;
+						setTempStatusMsg(StatusMSG.ZoomIn);
+					}
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.ZoomOut: {
+				if (currentView == View.EchoViewer) {
+					if (echoZoomIndex < fitZoomIndex) {
+						echoZoomIndex++;
+						setTempStatusMsg(StatusMSG.ZoomOut);
+					}
 				}
 				break;
 			}
@@ -1322,8 +1402,37 @@ public static partial class CliMain {
 			StatusMSG.BreakpointsOff        => $"All breakpoints disabled",
 			StatusMSG.Script700_Error       => $"Script700 error occurred",
 			StatusMSG.Continue              => $"Resuming playback",
+			
+			StatusMSG.ZoomIn                => $"Zoom level increased {showZoomPercentage()}",
+			StatusMSG.ZoomOut               => $"Zoom level decreased {showZoomPercentage()}",
+			
 			_                               => throw new NotImplementedException()
 		};
+	}
+	
+	static string showZoomPercentage() {
+		string suffix = "", percentStr = "";
+		
+		var percentage = 100.0 / scaleTable[echoZoomIndex];
+		if (percentage <= 9.95) {
+			percentStr = $"{percentage:0.0}";
+		}
+		else {
+			percentStr = $"{JMath.Round(percentage)}";
+		}
+		
+		//if (percentStr.EndsWith(".0")) {
+		//	percentStr = percentStr[..^2];
+		//}
+		
+		if (echoZoomIndex == fitZoomIndex) {
+			suffix = "[Fit to window]";
+		}
+		else if (echoZoomIndex == 0) {
+			suffix = "[Max zoom]";
+		}
+		
+		return $"({percentStr}%) {suffix}";
 	}
 	
 	static string showActiveChannels() {

@@ -1,6 +1,7 @@
 namespace SpcProgram;
 
 using Jimbl.Graphics;
+using Jimbl.JMath;
 
 using Apollo;
 using Jimbl;
@@ -11,25 +12,118 @@ public static partial class CliMain {
 	}
 	
 	static EchoView currentEchoView = EchoView.All;
-	static int      echoZoomLevel   = 1;
+	
+	static double[] scaleTable = [
+		0.25, 0.5, 1,
+		2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+		18, 20, 22, 24, 26, 28, 30, 32,
+		36, 40, 44, 48, 52, 56, 60
+	];
+	
+	static int fitZoomIndex   = scaleTable.Length - 1;
+	static int echoZoomIndex  = fitZoomIndex;
+	static bool echoAtFitZoom = true;
+	
+	static int prevEdl = 0;
+	
+	static int echoScrollOffset = 0;
+	static int echoBufferLength = 0;
+	
+	static int prevEchoOffsetStart = 0;
+	static int prevEchoOffsetEnd   = 0;
 	
 	static void showEchoViewer(EmuDataBuffer buffer) {
 		Display.UseBlending = false;
-		
 		var ds = buffer.DSP_DebugState!;
 		
 		var echoStart    = ds.EchoPage << 8;
 		var bufferLength = ds.EchoLength / 4;
+		var edl          = ds.EchoLength / 2048;
+		
+		echoBufferLength = bufferLength;
+		
+		if (edl == 0) {
+			fitZoomIndex = 0;
+		}
+		else {
+			fitZoomIndex = scaleTable.IndexOf(edl * 4.0);
+		}
+		
+		if (echoZoomIndex > fitZoomIndex) {
+			echoZoomIndex = fitZoomIndex;
+			echoAtFitZoom = true;
+		}
+		else if (prevEdl != edl && echoAtFitZoom) {
+			echoZoomIndex = fitZoomIndex;
+		}
+		
+		echoAtFitZoom = echoZoomIndex == fitZoomIndex;
+		
+		prevEdl = edl;
+		
+		var echoSampRatio = scaleTable[echoZoomIndex];
+		var echoZoomLevel = bufferLength / (echoSampRatio * 128);
+		
+		var segmentLength = (int) (bufferLength / echoZoomLevel);
 		
 		if (bufferLength == 0) {
 			bufferLength = 1;
+			segmentLength = 1;
 		}
+		
+		var cursorAddr = ds.EchoAddress / 4 * 4;
+		
+		var prevSegmentLength = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+		
+		if (segmentLength < prevSegmentLength) {
+			var startAddr = cursorAddr - segmentLength * 4 / 2;
+			
+			var start = (startAddr - echoStart) / 4;
+			var end   = start + segmentLength - 1;
+			
+			if (start < prevEchoOffsetStart) {
+				start = prevEchoOffsetStart;
+				end   = start + segmentLength - 1;
+			}
+			else if (end > prevEchoOffsetEnd) {
+				end   = Math.Min(bufferLength - 1, prevEchoOffsetEnd);
+				start = end - segmentLength + 1;
+			}
+			
+			echoScrollOffset = start;
+		}
+		else if (segmentLength > prevSegmentLength) {
+			var prevCenter = prevEchoOffsetStart + prevSegmentLength / 2;
+			echoScrollOffset = prevCenter - segmentLength / 2;
+		}
+		
+		if (echoScrollOffset < 0) {
+			echoScrollOffset = 0;
+		}
+		else if (echoScrollOffset + segmentLength > bufferLength) {
+			echoScrollOffset = bufferLength - segmentLength;
+		}
+		
+		var segmentStart = echoStart + echoScrollOffset * 4;
+		var segmentEnd = (UInt16) (segmentStart + segmentLength * 4 - 1);
+		
+		prevEchoOffsetStart = (segmentStart - echoStart) / 4;
+		prevEchoOffsetEnd   = prevEchoOffsetStart + segmentLength - 1;
 		
 		List<Int16>  leftBuf = new();
 		List<Int16> rightBuf = new();
 		
-		for (var i = 0; i < bufferLength; i++) {
-			var addr = (UInt16) (echoStart + i * 4);
+		var snapStart = segmentStart;
+		if (echoSampRatio > 1) {
+			var er  = (int) echoSampRatio;
+			var off = echoScrollOffset / er * er;
+			snapStart = echoStart + off * 4;
+		}
+		
+		var cursorPos = (cursorAddr - snapStart) / 4;
+		
+		for (var i = 0; i < segmentLength; i++) {
+			var addr = (UInt16) (snapStart + i * 4);
 			
 			var leftLo  = buffer.ARAM_Data![addr];
 			var leftHi  = buffer.ARAM_Data![addr + 1];
@@ -46,10 +140,6 @@ public static partial class CliMain {
 		
 		var x = 1;
 		var width = 128;
-		
-		var echoEnd = (UInt16) (echoStart + bufferLength * 4 - 1);
-		
-		var cursorPos = ds.EchoOffset / 4;
 		
 		switch (currentEchoView) {
 			case EchoView.All: {
@@ -89,13 +179,23 @@ public static partial class CliMain {
 			}
 		}
 		
-		Display.Write($"{echoStart:X4}", x,             26);
-		Display.Write($"{echoEnd  :X4}", x + width - 4, 26);
+		var barWidth = JMath.Round(width * segmentLength / (double) bufferLength);
+		var barStart = width * echoScrollOffset / bufferLength;
+		
+		Display.Write(new string('▀', width),    1,            25, AnsiColor.DarkGrey);
+		Display.Write(new string('▀', barWidth), 1 + barStart, 25, AnsiColor.White);
+		
+		if (echoScrollOffset + segmentLength == bufferLength) {
+			Display.Write("▀", 1 + width - 1, 25, AnsiColor.White);
+		}
+		
+		Display.Write($"{segmentStart:X4}", x,             26);
+		Display.Write($"{segmentEnd  :X4}", x + width - 4, 26);
 		
 		var tabX = 87;
 		var tabY = 27;
 		
-		var fullLength = width * echoZoomLevel;
+		var    fullLength = (int) (width * echoZoomLevel);
 		string zoomText;
 		
 		if (bufferLength == 1) {
@@ -111,7 +211,6 @@ public static partial class CliMain {
 			zoomText = $" 1 sample  : {fullLength / bufferLength} cells";
 		}
 		
-		var cursorAddr = echoStart + ds.EchoOffset;
 		Display.Write($"Current addr: [{cursorAddr:X4}]", 8, 27);
 		
 		Display.Write($"Scale: {zoomText}", 2, 29);

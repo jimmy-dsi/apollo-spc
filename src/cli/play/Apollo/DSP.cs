@@ -137,6 +137,14 @@ public class DSP {
 				}
 			}
 			
+			public UInt16 Address {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) debugState.EchoAddress); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
 			public byte Page {
 				get {
 					emu.MaybeAcquireLock();
@@ -154,11 +162,6 @@ public class DSP {
 				get {
 					emu.MaybeAcquireLock();
 					try     { return *((UInt16*) debugState.EchoLength); }
-					finally { emu.MaybeReleaseLock(); }
-				}
-				set {
-					emu.MaybeAcquireLock();
-					try     { *((UInt16*) debugState.EchoLength) = value; }
 					finally { emu.MaybeReleaseLock(); }
 				}
 			}

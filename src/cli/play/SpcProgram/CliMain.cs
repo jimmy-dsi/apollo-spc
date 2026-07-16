@@ -183,6 +183,9 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ContextKey_L);
 			KeyBindings.Register(KeyBindings.Key.Char('M'),  KeyBindings.Action.ContextKey_M);
 			KeyBindings.Register(KeyBindings.Key.Char('R'),  KeyBindings.Action.ContextKey_R);
+			KeyBindings.Register(KeyBindings.Key.Char('+'),  KeyBindings.Action.ZoomIn);
+			KeyBindings.Register(KeyBindings.Key.Char('='),  KeyBindings.Action.ZoomIn);
+			KeyBindings.Register(KeyBindings.Key.Char('-'),  KeyBindings.Action.ZoomOut);
 			
 			// Create RAM memory view buffer and Trace logger view buffer
 			Display.CurrentBufferId = "aram";

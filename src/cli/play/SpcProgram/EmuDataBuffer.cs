@@ -48,6 +48,7 @@ public class EmuDataBuffer: ICloneable {
 	
 	public class DSP3State: ICloneable {
 		public UInt16      EchoOffset         { get; internal set; }
+		public UInt16      EchoAddress        { get; internal set; }
 		public byte        EchoPage           { get; internal set; }
 		public UInt16      EchoLength         { get; internal set; }
 		
@@ -416,6 +417,7 @@ public class EmuDataBuffer: ICloneable {
 		if ((requests & Transfer.Requests.DSP_3) != 0) {
 			DSP_DebugState = new() {
 				EchoOffset         = emu.DSP.State.Echo.Offset,
+				EchoAddress        = emu.DSP.State.Echo.Address,
 				EchoPage           = emu.DSP.State.Echo.Page,
 				EchoLength         = emu.DSP.State.Echo.Length,
 				LastEchoReadCycle  = emu.DSP.State.Echo.LastReadCycle,

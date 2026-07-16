@@ -50,9 +50,10 @@ pub const VoiceState = extern struct {
 };
 
 pub const DebugGlobalState = extern struct {
-    echo_offset: ?[*]u16 = null,
-    echo_page:   ?[*]u8  = null,
-    echo_length: ?[*]u16 = null,
+    echo_offset:  ?[*]u16 = null,
+    echo_address: ?[*]u16 = null,
+    echo_page:    ?[*]u8  = null,
+    echo_length:  ?[*]u16 = null,
 
     last_echo_read_cycle: ?[*]u64 = null,
     last_echo_read_addr:  ?[*]u16 = null,
@@ -146,9 +147,10 @@ pub inline fn get_global_debug_state(emu_ptr: ?*Emu) !DebugGlobalState {
     const state = &ep.?.s_dsp.state._internal;
 
     return .{
-        .echo_offset = @ptrCast(&state._echo._offset),
-        .echo_page   = @ptrCast(&state._echo._esa_page),
-        .echo_length = @ptrCast(&state._echo._length),
+        .echo_offset  = @ptrCast(&state._echo._offset),
+        .echo_address = @ptrCast(&state._echo._address),
+        .echo_page    = @ptrCast(&state._echo._esa_page),
+        .echo_length  = @ptrCast(&state._echo._length),
 
         .last_echo_read_cycle = @ptrCast(&state._echo.__last_read_cycle),
         .last_echo_read_addr  = @ptrCast(&state._echo.__last_read_addr),
