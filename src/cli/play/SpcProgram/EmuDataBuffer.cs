@@ -131,6 +131,11 @@ public class EmuDataBuffer: ICloneable {
 		public bool             End            { get; internal set; }
 		public bool             Looped         { get; internal set; }
 		
+		public byte             QueuedSRCN     { get; internal set; }
+		public byte             CurrentSRCN    { get; internal set; }
+		
+		public UInt16           TruePitch      { get; internal set; }
+		
 		public DSPVoice3 Clone() {
 			var clone = (DSPVoice3) MemberwiseClone();
 			clone.Buffer = Buffer.ToArray();
@@ -450,6 +455,11 @@ public class EmuDataBuffer: ICloneable {
 					EchoOn         = emu.DSP.State.VoiceDebug[v].EchoOn,
 					End            = emu.DSP.State.VoiceDebug[v].End,
 					Looped         = emu.DSP.State.VoiceDebug[v].Looped,
+					
+					QueuedSRCN     = emu.DSP.State.VoiceDebug[v].QueuedSRCN,
+					CurrentSRCN    = emu.DSP.State.VoiceDebug[v].CurrentSRCN,
+					
+					TruePitch      = emu.DSP.State.VoiceDebug[v].TruePitch,
 				};
 			}
 		}

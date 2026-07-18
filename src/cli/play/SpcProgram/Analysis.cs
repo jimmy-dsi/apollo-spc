@@ -129,14 +129,16 @@ public static class Analysis {
 	                                                     int canvasWidth,
 	                                                     int canvasHeight,
 	                                                     double xscale = 1.0,
-	                                                     int? cursorIndex = null)
+	                                                     int? cursorIndex = null,
+	                                                     int? loopIndex = null,
+	                                                     bool isMuted = false)
 	{
 		if (CliMain.WaveInsideColor is null) {
 			CliMain.WaveInsideColor = new(Color.FromLCh(10, 30, 280), isBG: true);
 		}
 		
-		var eqInsideRGB = CliMain.WaveInsideColor.BackgroundRGB!;
-		AnsiColor shadowColor = new(Color.FromLCh(30, 30, 280), isBG: true);
+		var eqInsideRGB = CliMain.WaveInsideColor.BackgroundRGB! * (isMuted ? 0.5 : 1.0);
+		AnsiColor shadowColor = new(Color.FromLCh(30, 30, 280) * (isMuted ? 0.5 : 1.0), isBG: true);
 		
 		int cellPrecision;
 		#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
@@ -158,6 +160,12 @@ public static class Analysis {
 		
 		if (cursorIndex is int ci) {
 			cursorLine = JMath.Floor(ci * xratio);
+		}
+		
+		int? loopLine = null;
+		
+		if (loopIndex is int li && li >= 0) {
+			loopLine = JMath.Floor(li * xratio);
 		}
 		
 		var zeroDelay = input.Length == 1;
@@ -214,6 +222,8 @@ public static class Analysis {
 			var col_0 = shadowColor;
 			var col   = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x2C);
 			var col_2 = CliMain.HeatMapColor(CliMain.BusSize.Bit8, true, 1.0, 0x48);
+			col   = new(col  .BackgroundRGB! * (isMuted ? 0.5 : 1.0), isBG: true);
+			col_2 = new(col_2.BackgroundRGB! * (isMuted ? 0.5 : 1.0), isBG: true);
 			
 			int yMax_0 = 0, yMin_0 = 0;
 			int yMaxRem_0 = 0, yMinRem_0 = 0;
@@ -286,21 +296,89 @@ public static class Analysis {
 			}
 			
 			colorWavePoint(canvas, col.BackgroundRGB!, col_2, cellPrecision, x, yZero, yMin_2, yMax_2, yMinRem_2, yMaxRem_2);
-			var white = Color.FromRGB(1.0, 1.0, 1.0);
+			var white    = Color.FromRGB(1.0, 1.0, 1.0);
+			var offWhite = Color.FromRGB(0.6, 0.6, 1.0);
+			var grey     = Color.FromRGB(0.5, 0.5, 0.5);
+			
+			var bright   = isMuted ? grey : white;
+			var bright_2 = isMuted ? grey : offWhite;
+			
+			var mul_1 = 0.75;
+			var mul_2 = 0.88;
+			
+			var mul_1_com = 1 - mul_1;
+			var mul_2_com = 1 - mul_2;
+			
+			var loopBGCol_1 = eqInsideRGB * mul_1 + bright_2 * mul_1_com;
+			var loopBGCol_2 = eqInsideRGB * mul_2 + bright_2 * mul_2_com;
+			
+			if (loopLine is int LL) {
+				if (x >= LL) {
+					for (var y = 0; y < canvasHeight; y++) {
+						canvas[y][x] ??= (' ', new(eqInsideRGB, isBG: true));
+					
+						var cc = canvas[y][x]!.Value;
+						if (cc.Item2.IsFG) {
+							cc.Item2 = x == LL ?
+								new(cc.Item2.ForegroundRGB! * mul_1 + bright_2 * mul_1_com)
+							:
+								new(cc.Item2.ForegroundRGB! * mul_2 + bright_2 * mul_2_com);
+						}
+						else if (cc.Item2.IsBG) {
+							cc.Item2 = x == LL ?
+								new(cc.Item2.BackgroundRGB! * mul_1 + bright_2 * mul_1_com, isBG: true)
+							:
+								new(cc.Item2.BackgroundRGB! * mul_2 + bright_2 * mul_2_com, isBG: true);
+						}
+						else {
+							var colFG = x == LL ?
+								cc.Item2.ForegroundRGB! * mul_1 + bright_2 * mul_1_com
+							:
+								cc.Item2.ForegroundRGB! * mul_2 + bright_2 * mul_2_com;
+							
+							var colBG = x == LL ?
+								cc.Item2.BackgroundRGB! * mul_1 + bright_2 * mul_1_com
+							:
+								cc.Item2.BackgroundRGB! * mul_2 + bright_2 * mul_2_com;
+						
+							cc.Item2 = new(colFG, colBG);
+						}
+					
+						canvas[y][x] = cc;
+					}
+				}
+			}
 			
 			if (cursorLine is int cl && cl == x) {
 				for (var y = 0; y < canvasHeight; y++) {
-					canvas[y][x] ??= (' ', CliMain.WaveInsideColor);
+					canvas[y][x] ??= (' ', new(eqInsideRGB, isBG: true));
 					
 					var cc = canvas[y][x]!.Value;
 					if (cc.Item2.IsFG) {
-						cc.Item2 = new(white - cc.Item2.ForegroundRGB!);
+						cc.Item2 = new(bright - cc.Item2.ForegroundRGB!);
 					}
 					else if (cc.Item2.IsBG) {
-						cc.Item2 = new(white - cc.Item2.BackgroundRGB!, isBG: true);
+						if (cc.Item2.BackgroundRGB! == eqInsideRGB || cc.Item2.BackgroundRGB! == loopBGCol_1 || cc.Item2.BackgroundRGB! == loopBGCol_2) {
+							cc.Item1 = '│';
+							cc.Item2 = new(bright - cc.Item2.BackgroundRGB!, cc.Item2.BackgroundRGB!);
+						}
+						else {
+							cc.Item2 = new(bright - cc.Item2.BackgroundRGB!, isBG: true);
+						}
 					}
 					else {
-						cc.Item2 = new(white - cc.Item2.ForegroundRGB!, white - cc.Item2.BackgroundRGB!);
+						var colFG = cc.Item2.ForegroundRGB!;
+						var colBG = cc.Item2.BackgroundRGB!;
+						
+						if (colFG != eqInsideRGB && colFG != loopBGCol_1 && colFG != loopBGCol_2) {
+							colFG = bright - colFG;
+						}
+						
+						if (colBG != eqInsideRGB && colBG != loopBGCol_1 && colBG != loopBGCol_2) {
+							colBG = bright - colBG;
+						}
+						
+						cc.Item2 = new(colFG, colBG);
 					}
 					
 					canvas[y][x] = cc;

@@ -3,7 +3,7 @@
 using System.Diagnostics;
 using Jimbl;
 
-const int WIDTH  = 130;
+const int WIDTH  = 132;
 const int HEIGHT = 34;
 
 var fwdArgs       = args.Where(x => x != "--force-no-resize").ToArray();

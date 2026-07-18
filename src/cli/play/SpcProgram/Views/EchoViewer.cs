@@ -138,7 +138,7 @@ public static partial class CliMain {
 			rightBuf.Add(right);
 		}
 		
-		var x = 1;
+		var x = 2;
 		var width = 128;
 		
 		switch (currentEchoView) {
@@ -182,38 +182,38 @@ public static partial class CliMain {
 		var barWidth = JMath.Round(width * segmentLength / (double) bufferLength);
 		var barStart = width * echoScrollOffset / bufferLength;
 		
-		Display.Write(new string('▀', width),    1,            25, AnsiColor.DarkGrey);
-		Display.Write(new string('▀', barWidth), 1 + barStart, 25, AnsiColor.White);
+		Display.Write(new string('▀', width),    2,            26, AnsiColor.DarkGrey);
+		Display.Write(new string('▀', barWidth), 2 + barStart, 26, AnsiColor.White);
 		
 		if (echoScrollOffset + segmentLength == bufferLength) {
-			Display.Write("▀", 1 + width - 1, 25, AnsiColor.White);
+			Display.Write("▀", 2 + width - 1, 26, AnsiColor.White);
 		}
 		
-		Display.Write($"{segmentStart:X4}", x,             26);
-		Display.Write($"{segmentEnd  :X4}", x + width - 4, 26);
+		Display.Write($"{segmentStart:X4}", x,             27);
+		Display.Write($"{segmentEnd  :X4}", x + width - 4, 27);
 		
-		var tabX = 87;
+		var tabX = 80;
 		var tabY = 27;
 		
 		var    fullLength = (int) (width * echoZoomLevel);
 		string zoomText;
 		
 		if (bufferLength == 1) {
-			zoomText = $" 1 sample  : 4 cells";
+			zoomText = $" 1 sample  : 4 chars";
 		}
 		else if (fullLength < bufferLength) {
-			zoomText = $"{bufferLength / fullLength,2} samples : 1 cell ";
+			zoomText = $"{bufferLength / fullLength,2} samples : 1 char ";
 		}
 		else if (fullLength == bufferLength) {
-			zoomText = $" 1 sample  : 1 cell ";
+			zoomText = $" 1 sample  : 1 char ";
 		}
 		else {
-			zoomText = $" 1 sample  : {fullLength / bufferLength} cells";
+			zoomText = $" 1 sample  : {fullLength / bufferLength} chars";
 		}
 		
-		Display.Write($"Current addr: [{cursorAddr:X4}]", 8, 27);
+		Display.Write($"Current addr: [{cursorAddr:X4}]", 48, 29);
 		
-		Display.Write($"Scale: {zoomText}", 2, 29);
+		Display.Write($"Scale: {zoomText}", 6, 29);
 		
 		Display.Write($"                     Addr  Left Right",                                                                 tabX, tabY);
 		Display.Write($"Last sample read:  [{ds.LastEchoReadAddr :X4}]  {ds.LastEchoReadLeft :X4}  {ds.LastEchoReadRight :X4}", tabX, tabY + 1);
@@ -222,20 +222,20 @@ public static partial class CliMain {
 	
 	public static AnsiColor? WaveInsideColor = null;
 	
-	static void displayWaveform(Int16[] buf, int x, int y, int width, int height, int cursorPos) {
-		displayWaveform(buf, null, x, y, width, height, cursorPos);
+	static void displayWaveform(Int16[] buf, int x, int y, int width, int height, int cursorPos, int loopPos = -1, bool isMuted = false) {
+		displayWaveform(buf, null, x, y, width, height, cursorPos, loopPos: loopPos, isMuted: isMuted);
 	}
 	
-	static void displayWaveform(Int16[] input, Int16[]? input_2, int x, int y, int width, int height, int cursor, bool writeToScrollBuf = false) {
+	static void displayWaveform(Int16[] input, Int16[]? input_2, int x, int y, int width, int height, int cursor, bool writeToScrollBuf = false, int loopPos = -1, bool isMuted = false) {
 		if (WaveInsideColor is null) {
 			WaveInsideColor = new(Color.FromLCh(10, 30, 280), isBG: true);
 		}
 		
-		var eqInsideRGB = WaveInsideColor.BackgroundRGB!;
+		var eqInsideRGB = WaveInsideColor.BackgroundRGB! * (isMuted ? 0.5 : 1.0);
 		
 		Display.ClearBox(width, height, x, y, new(eqInsideRGB, isBG: true), writeToScrollBuf);
 		
-		var waveCanvas = Analysis.DisplayWaveform(input, input_2, width, height, cursorIndex: cursor);
+		var waveCanvas = Analysis.DisplayWaveform(input, input_2, width, height, cursorIndex: cursor, loopIndex: loopPos, isMuted: isMuted);
 		for (var yy = 0; yy < height; yy++) {
 			for (var xx = 0; xx < width; xx++) {
 				var c = waveCanvas[yy][xx];

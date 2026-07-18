@@ -85,6 +85,7 @@ public static partial class CliMain {
 		View.DSPViewer2,
 		View.DSPViewer3,
 		View.MemoryViewer,
+		View.BRRViewer,
 		View.EchoViewer,
 		View.Script700Viewer,
 		View.ASMViewer
@@ -439,6 +440,11 @@ public static partial class CliMain {
 			
 			case View.Script700Viewer: {
 				showScript700Viewer(buffer!);
+				break;
+			}
+			
+			case View.BRRViewer: {
+				showBRRViewer(buffer!);
 				break;
 			}
 			
@@ -1312,6 +1318,14 @@ public static partial class CliMain {
 				requestEmuData(Transfer.Requests.Script700 | Transfer.Requests.SMP_State);
 				Display.HideWindow();
 				Display.UseBlending = true;
+				break;
+			}
+			
+			case View.BRRViewer: {
+				resetStatusMsg();
+				requestEmuData(Transfer.Requests.ARAM | Transfer.Requests.DSP_1 | Transfer.Requests.DSP_2 | Transfer.Requests.DSP_3, 0, 0x1_0000);
+				Display.HideWindow();
+				Display.UseBlending = false;
 				break;
 			}
 			

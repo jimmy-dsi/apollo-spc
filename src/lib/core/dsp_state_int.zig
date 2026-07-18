@@ -40,6 +40,12 @@ pub const DSPStateInternal = struct {
         __echo_on:      u1  = 0,
         __end:          u1  = 0,
         __looped:       u1  = 0,
+
+        // Misc. debug values
+        __queued_srcn:      u8 = 0x00,
+        __cur_playing_srcn: u8 = 0x00, // The source number of the current BRR address
+
+        __true_pitch: u15 = 0,
     };
 
     pub const Echo = struct {
@@ -185,9 +191,10 @@ pub const DSPStateInternal = struct {
         }
     }
 
-    pub fn voice_step_a(self: *DSPStateInternal, source: u8) void {
+    pub fn voice_step_a(self: *DSPStateInternal, v_idx: u3, source: u8) void {
         self._brr._cur_address = (@as(u16, self._brr._bank) << 8) +% (@as(u16, self._brr._cur_source) << 2);
         self._brr._cur_source = source;
+        self._voice[v_idx].__queued_srcn = source;
     }
 
     pub fn voice_step_b(self: *DSPStateInternal, v_idx: u3, aram_0: [*]u8, aram_1: [*]u8, pitch_lo: u8, adsr_0: u8) void {
@@ -264,6 +271,8 @@ pub const DSPStateInternal = struct {
                 v._brr_offset    = 1;
                 v._buffer_offset = 0;
 
+                v.__cur_playing_srcn = v.__queued_srcn;
+
                 self._brr._cur_block_header = 0; // I guess the first BRR block of a sample when keyed on is forced to header value 00 (Is that why most encoders zero out the first block?)
             }
 
@@ -282,6 +291,8 @@ pub const DSPStateInternal = struct {
             // Internal pitch latch is reset to zero during KON and does not advance gaussian offset
             self._pitch = 0;
         }
+
+        v.__true_pitch = self._pitch;
 
         const output: i16 =
             if (v.__noise_on == 0)
@@ -339,6 +350,7 @@ pub const DSPStateInternal = struct {
                     // It just sets envelope level to 0 instantly
                     v._brr_address = self._brr._next_address;
                     v.__looped = 1;
+                    v.__cur_playing_srcn = v.__queued_srcn;
                 }
                 v._brr_offset = 1;
             }

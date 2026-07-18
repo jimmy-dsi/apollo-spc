@@ -3,6 +3,7 @@ const std = @import("std");
 const Emu          = @import("core/emu.zig").Emu;
 const SPCLoadError = @import("core/spc_loader.zig").SPCLoadError;
 const Script700    = @import("core/script700.zig").Script700;
+const BRR          = @import("core/brr.zig");
 
 const emu = @import("emu.zig");
 
@@ -37,6 +38,7 @@ pub const Result = enum(u32) {
     emu_is_not_main         = 13,
 
     spc_not_loaded          = 14,
+    range_error             = 15,
 };
 
 pub const LogType = enum(u32) {
@@ -159,6 +161,8 @@ pub inline fn err(e: anyerror) anyerror {
 
             Script700.Runtime.fetch_range   => .script700_load_error,
             Script700.Runtime.out_of_memory => .script700_load_error,
+
+            BRR.Error.RangeError => .range_error,
 
             else => .unknown_error
         };

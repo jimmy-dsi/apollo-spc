@@ -219,6 +219,17 @@ pub export fn dsp_reset_sample_usage(sample_id: u8, emu_ptr: ?[*]Emu) bool {
     return true;
 }
 
+pub export fn dsp_decode_brr_from_buffer(input_buffer: ?[*]u8, input_len: u16, offset: u16, decode_buffer: ?[*]i16, buffer_len: u32, old_decoded: i16, older_decoded: i16) i32 {
+    const in_slice: []u8  = if (input_buffer)  |ptr| ptr[0..input_len]  else &.{};
+    const slice:    []i16 = if (decode_buffer) |ptr| ptr[0..buffer_len] else &.{};
+    return dsp.decode_brr_from_buffer(in_slice, offset, slice, old_decoded, older_decoded) catch |e| main.zerr(i32, e);
+}
+
+pub export fn dsp_decode_brr_at_address(addr: u16, decode_buffer: ?[*]i16, buffer_len: u32, old_decoded: i16, older_decoded: i16, emu_ptr: ?[*]Emu) i32 {
+    const slice: []i16 = if (decode_buffer) |ptr| ptr[0..buffer_len] else &.{};
+    return dsp.decode_brr_at_address(addr, slice, old_decoded, older_decoded, @ptrCast(emu_ptr)) catch |e| emu.zerr(i32, e, @ptrCast(emu_ptr));
+}
+
 // SMP
 pub export fn smp_read_byte(address: u16, emu_ptr: ?[*]Emu) u8 {
     return smp.read_byte(address, @ptrCast(emu_ptr)) catch |e| emu.zerr(u8, e, @ptrCast(emu_ptr));

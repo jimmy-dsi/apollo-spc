@@ -764,7 +764,7 @@ pub const SDSP = struct {
     {
         s.int().voice_step_g(endx, v0_envx);
         s.int().voice_step_d(1, aram_data_0, v1_voll);
-        s.int().voice_step_a(v3_srcn);
+        s.int().voice_step_a(3, v3_srcn);
 
         s.mark_sample_used(v3_srcn);
     }
@@ -801,7 +801,7 @@ pub const SDSP = struct {
     {
         s.int().voice_step_g(endx, v1_envx);
         s.int().voice_step_d(2, aram_data_0, v2_voll);
-        s.int().voice_step_a(v4_srcn);
+        s.int().voice_step_a(4, v4_srcn);
 
         s.mark_sample_used(v4_srcn);
     }
@@ -838,7 +838,7 @@ pub const SDSP = struct {
     {
         s.int().voice_step_g(endx, v2_envx);
         s.int().voice_step_d(3, aram_data_0, v3_voll);
-        s.int().voice_step_a(v5_srcn);
+        s.int().voice_step_a(5, v5_srcn);
 
         s.mark_sample_used(v5_srcn);
     }
@@ -875,7 +875,7 @@ pub const SDSP = struct {
     {
         s.int().voice_step_g(endx, v3_envx);
         s.int().voice_step_d(4, aram_data_0, v4_voll);
-        s.int().voice_step_a(v6_srcn);
+        s.int().voice_step_a(6, v6_srcn);
 
         s.mark_sample_used(v6_srcn);
     }
@@ -912,7 +912,7 @@ pub const SDSP = struct {
     {
         s.int().voice_step_g(endx, v4_envx);
         s.int().voice_step_d(5, aram_data_0, v5_voll);
-        s.int().voice_step_a(v7_srcn);
+        s.int().voice_step_a(7, v7_srcn);
 
         s.mark_sample_used(v7_srcn);
     }
@@ -947,7 +947,7 @@ pub const SDSP = struct {
                        v5_envx: u8, v6_voll: i8, v0_srcn: u8,
                        endx: *u8) void
     {
-        s.int().voice_step_a(v0_srcn);
+        s.int().voice_step_a(0, v0_srcn);
         s.int().voice_step_g(endx, v5_envx);
         s.int().voice_step_d(6, aram_data_0, v6_voll);
 
@@ -984,7 +984,7 @@ pub const SDSP = struct {
                        v6_envx: u8, v7_voll: i8, v1_srcn: u8,
                        endx: *u8) void
     {
-        s.int().voice_step_a(v1_srcn);
+        s.int().voice_step_a(1, v1_srcn);
         s.int().voice_step_g(endx, v6_envx);
         s.int().voice_step_d(7, aram_data_0, v7_voll);
 
@@ -1149,7 +1149,7 @@ pub const SDSP = struct {
                        v0_voll: i8, v2_srcn: u8) void
     {
         s.int().voice_step_d(0, aram_data_0, v0_voll);
-        s.int().voice_step_a(v2_srcn);
+        s.int().voice_step_a(2, v2_srcn);
 
         s.mark_sample_used(v2_srcn);
     }

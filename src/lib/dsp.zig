@@ -2,6 +2,7 @@ const std = @import("std");
 
 const Emu  = @import("core/emu.zig").Emu;
 const SDSP = @import("core/s_dsp.zig").SDSP;
+const BRR  = @import("core/brr.zig");
 
 const main = @import("main.zig");
 const emu  = @import("emu.zig");
@@ -85,6 +86,11 @@ pub const DebugVoiceState = extern struct {
     echo_on:         ?[*]const u8  = null,
     end:             ?[*]const u8  = null,
     looped:          ?[*]const u8  = null,
+
+    queued_srcn:     ?[*]const u8  = null,
+    current_srcn:    ?[*]const u8  = null,
+
+    true_pitch:      ?[*]const u16 = null,
 };
 
 pub const SampleUsageFlags = extern struct {
@@ -218,6 +224,11 @@ pub inline fn get_voice_debug_state(voice_idx: u3, emu_ptr: ?*Emu) !DebugVoiceSt
         .echo_on         = @ptrCast(&voice.__echo_on),
         .end             = @ptrCast(&voice.__end),
         .looped          = @ptrCast(&voice.__looped),
+
+        .queued_srcn     = @ptrCast(&voice.__queued_srcn),
+        .current_srcn    = @ptrCast(&voice.__cur_playing_srcn),
+
+        .true_pitch      = @ptrCast(&voice.__true_pitch),
     };
 }
 
@@ -239,4 +250,17 @@ pub inline fn reset_sample_usage(sample_id: u8, emu_ptr: ?*Emu) !void {
     const dsp = &ep.?.s_dsp;
 
     dsp.reset_sample_usage(sample_id);
+}
+
+pub inline fn decode_brr_from_buffer(input_buffer: []const u8, offset: u16, decode_buffer: []i16, old_decoded: i16, older_decoded: i16) !i32 {
+    return BRR.decode_from_buffer(input_buffer, offset, decode_buffer, old_decoded, older_decoded);
+}
+
+pub inline fn decode_brr_at_address(addr: u16, decode_buffer: []i16, old_decoded: i16, older_decoded: i16, emu_ptr: ?*Emu) !i32 {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const dsp = &ep.?.s_dsp;
+
+    return BRR.decode_from_address(dsp, addr, decode_buffer, old_decoded, older_decoded);
 }

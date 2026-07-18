@@ -571,6 +571,30 @@ public class DSP {
 				}
 			}
 			
+			public byte QueuedSRCN {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.QueuedSRCN); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public byte CurrentSRCN {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((byte*) state.CurrentSRCN); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
+			public UInt16 TruePitch {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) state.TruePitch); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
 			internal DebugVoiceProps(Emulator emu, DLL.DspDebugVoiceState state) {
 				this.emu   = emu;
 				this.state = state;
@@ -805,6 +829,67 @@ public class DSP {
 			}
 		}
 		finally {
+			Emulator.MaybeReleaseLock();
+		}
+	}
+	
+	public static (Int16[] Decoded, bool Looped) DecodeBrrFromBuffer(byte[] input, UInt16 offset, uint maxSize, Int16 oldDecoded = 0, Int16 olderDecoded = 0) {
+		var inPtr  = DLL.BufferCreate((uint) input.Length);
+		var resPtr = DLL.BufferCreate(maxSize * 2);
+		
+		try {
+			unsafe {
+				Span<byte> inSpan = new((byte*) inPtr, input.Length);
+				input.CopyTo(inSpan);
+				
+				var result = DLL.DspDecodeBrrFromBuffer(inPtr, (UInt16) input.Length, offset, resPtr, maxSize, oldDecoded, olderDecoded);
+				if (result == 0) {
+					var errorCode = DLL.GetLastError();
+					Error.Throw(errorCode);
+				}
+			
+				unsafe {
+					if (result > 0) {
+						Span<Int16> span = new((Int16*) resPtr, result);
+						return (span.ToArray(), false);
+					}
+					else {
+						Span<Int16> span = new((Int16*) resPtr, Math.Abs(result));
+						return (span.ToArray(), true);
+					}
+				}
+			}
+		}
+		finally {
+			DLL.BufferDestroy(resPtr, maxSize * 2);
+			DLL.BufferDestroy(inPtr,  (uint) input.Length);
+		}
+	}
+	
+	public (Int16[] Decoded, bool Looped) DecodeBrrAtAddr(UInt16 aramAddr, uint maxSize, Int16 oldDecoded = 0, Int16 olderDecoded = 0) {
+		var ptr = DLL.BufferCreate(maxSize * 2);
+		
+		Emulator.MaybeAcquireLock();
+		try {
+			var result = DLL.DspDecodeBrrAtAddress(aramAddr, ptr, maxSize, oldDecoded, olderDecoded, Emulator.handle);
+			if (result == 0) {
+				var errorCode = DLL.EmuGetLastError(Emulator.handle);
+				Error.Throw(errorCode);
+			}
+			
+			unsafe {
+				if (result > 0) {
+					Span<Int16> span = new((Int16*) ptr, result);
+					return (span.ToArray(), false);
+				}
+				else {
+					Span<Int16> span = new((Int16*) ptr, Math.Abs(result));
+					return (span.ToArray(), true);
+				}
+			}
+		}
+		finally {
+			DLL.BufferDestroy(ptr, maxSize * 2);
 			Emulator.MaybeReleaseLock();
 		}
 	}
