@@ -135,6 +135,7 @@ public class EmuDataBuffer: ICloneable {
 		public byte             CurrentSRCN    { get; internal set; }
 		
 		public UInt16           TruePitch      { get; internal set; }
+		public UInt16           BRRSubOffset   { get; internal set; }
 		
 		public DSPVoice3 Clone() {
 			var clone = (DSPVoice3) MemberwiseClone();
@@ -172,14 +173,14 @@ public class EmuDataBuffer: ICloneable {
 	
 	public class SMPState: ICloneable {
 		public struct TimerState {
-			bool Enabled;
+			public bool Enabled { get; internal set; }
 			
-			byte Stage0;
-			byte Stage1;
-			byte Stage2;
+			public byte Stage0  { get; internal set; }
+			public byte Stage1  { get; internal set; }
+			public byte Stage2  { get; internal set; }
 			
-			byte Divider;
-			byte Output;
+			public byte Divider { get; internal set; }
+			public byte Output  { get; internal set; }
 			
 			internal TimerState(SMP.Properties.TimerProps timerProps) {
 				Enabled = timerProps.Enabled;
@@ -460,6 +461,7 @@ public class EmuDataBuffer: ICloneable {
 					CurrentSRCN    = emu.DSP.State.VoiceDebug[v].CurrentSRCN,
 					
 					TruePitch      = emu.DSP.State.VoiceDebug[v].TruePitch,
+					BRRSubOffset   = emu.DSP.State.VoiceDebug[v].BRRSubOffset,
 				};
 			}
 		}

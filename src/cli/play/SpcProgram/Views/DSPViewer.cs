@@ -64,6 +64,12 @@ public static partial class CliMain {
 				$"{buffer.DSP_Voice![v].ENVX:X2}",
 				$"{buffer.DSP_RegisterMem![v << 4 | 9]:X2}",
 			], xhm + 18, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
+			
+			var smp = buffer.SMP_State!;
+			
+			// SMP Test debug
+			Display.Write($"{smp.GlobalTimerEnable} {smp.GlobalTimerDisable} {smp.IOWaitstates} {smp.RAMWaitstates} {smp.UseBootROM}", 1, 29);
+			Display.Write($"{smp.Timer[0].Enabled} {smp.Timer[0].Divider:X2} {smp.Timer[0].Stage0:X2} {smp.Timer[0].Stage1:X2} {smp.Timer[0].Stage2:X2} {smp.Timer[0].Output:X2}",       1, 30);
 		}
 		
 		showColorCoding();

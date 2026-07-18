@@ -136,6 +136,7 @@ internal partial class DLL {
 		public IntPtr CurrentSRCN;
 		
 		public IntPtr TruePitch;
+		public IntPtr BrrSubOffset;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]

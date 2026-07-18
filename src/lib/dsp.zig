@@ -91,6 +91,7 @@ pub const DebugVoiceState = extern struct {
     current_srcn:    ?[*]const u8  = null,
 
     true_pitch:      ?[*]const u16 = null,
+    brr_sub_offset:  ?[*]const u16 = null,
 };
 
 pub const SampleUsageFlags = extern struct {
@@ -229,6 +230,7 @@ pub inline fn get_voice_debug_state(voice_idx: u3, emu_ptr: ?*Emu) !DebugVoiceSt
         .current_srcn    = @ptrCast(&voice.__cur_playing_srcn),
 
         .true_pitch      = @ptrCast(&voice.__true_pitch),
+        .brr_sub_offset  = @ptrCast(&voice.__brr_sub_offset),
     };
 }
 

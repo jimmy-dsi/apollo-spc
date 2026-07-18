@@ -46,6 +46,8 @@ pub const DSPStateInternal = struct {
         __cur_playing_srcn: u8 = 0x00, // The source number of the current BRR address
 
         __true_pitch: u15 = 0,
+
+        __brr_sub_offset: u14 = 0,
     };
 
     pub const Echo = struct {
@@ -355,6 +357,8 @@ pub const DSPStateInternal = struct {
                 v._brr_offset = 1;
             }
         }
+
+        v.__brr_sub_offset = @intCast(v._gaussian_offset & 0x3FFF);
 
         // Advance sample offset by last written pitch (should match pitch of current voice when written)
         v._gaussian_offset = (v._gaussian_offset & 0x3FFF) + @as(u16, self._pitch);

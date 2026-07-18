@@ -38,6 +38,8 @@ public static partial class CliMain {
 			var brrOffset  = (v.BRRAddress - brrStart) / 9 * 16 + (v.BRROffset - 1) * 2;
 			var loopOffset = -1;
 			
+			brrOffset += v.BRRSubOffset / 0x1000;
+			
 			var (decoded, looped) = DSP.DecodeBrrFromBuffer(buffer.ARAM_Data!, brrStart, 0x10_0000);
 			if (looped) {
 				var lo = loopStart - brrStart;

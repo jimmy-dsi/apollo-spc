@@ -595,6 +595,14 @@ public class DSP {
 				}
 			}
 			
+			public UInt16 BRRSubOffset {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt16*) state.BrrSubOffset); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
 			internal DebugVoiceProps(Emulator emu, DLL.DspDebugVoiceState state) {
 				this.emu   = emu;
 				this.state = state;
