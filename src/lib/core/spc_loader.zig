@@ -72,6 +72,10 @@ pub fn load_spc(emu: *Emu, spc_file_data: []const u8) SPCLoadError! SongMetadata
         emu.s_dsp.debug_write(ii, dd);
     }
 
+    // Initialize internal DSP values
+    const dsp_int = emu.s_dsp.int();
+    dsp_int.init(&emu.s_dsp);
+
     // If no extra RAM section, then we're done
     if (spc_file_data.len < 0x10200) {
         return metadata;

@@ -468,7 +468,12 @@ public static partial class CliMain {
 			Display.ClearLine(Display.Height - 3);
 			Display.Write(formatTime(curCycle / 32, TimeUnit.Timer2s), 0, Display.Height - 3, AnsiColor.Cyan);
 			
-			var fullTimeInCycles = (long) (PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12)  * 2048000;
+			var seconds = PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12;
+			if (seconds == 0) {
+				seconds = 60 * 12;
+			}
+			
+			var fullTimeInCycles = (long) seconds  * 2048000;
 			var barLength        = Display.Width - 1 - 14;
 			
 			var cursorPos  = (int) ((double)      curCycle / fullTimeInCycles * barLength);

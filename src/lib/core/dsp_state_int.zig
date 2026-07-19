@@ -3,6 +3,7 @@ const envelope = @import("envelope.zig");
 const brr      = @import("brr.zig");
 
 const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
+const SDSP      = @import("s_dsp.zig").SDSP;
 
 pub const DSPStateInternal = struct {
     pub const EnvMode = enum(u8) {
@@ -127,6 +128,19 @@ pub const DSPStateInternal = struct {
     _outx:   i8  = 0x00,
     _pitch:  u15 = 0x0000,
     _output: i16 = 0x0000,
+
+    pub inline fn init(self: *DSPStateInternal, dsp: *const SDSP) void {
+        // Ensure internal state is sync'd with DSP register values upon loading an SPC file
+        const e = &self._echo;
+        const b = &self._brr;
+
+        e._esa_page = dsp.state.echo.esa_page;
+        e._readonly = dsp.state.echo.readonly;
+        e._address  = @as(u16, dsp.state.echo.esa_page) << 8;
+        e._length   = @as(u16, dsp.state.echo.delay) << 11;
+
+        b._bank = dsp.state.brr_bank;
+    }
 
     pub inline fn load_from(self: *DSPStateInternal, other: *const DSPStateInternal) void {
         // Copy all but Pipeline 2 reference
