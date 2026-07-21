@@ -279,7 +279,7 @@ public class SMP {
 		public byte DSPAddress {
 			get {
 				emu.MaybeAcquireLock();
-				try     { return *((byte*) state.DspAddress); }
+				try     { return (byte) (*((byte*) state.DspAddress) & 0x7F); }
 				finally { emu.MaybeReleaseLock(); }
 			}
 			set {

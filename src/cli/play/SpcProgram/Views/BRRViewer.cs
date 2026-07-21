@@ -35,7 +35,10 @@ public static partial class CliMain {
 			var brrStart   = (UInt16) (buffer.ARAM_Data![entryStart]     | buffer.ARAM_Data![entryStart + 1] << 8);
 			var loopStart  = (UInt16) (buffer.ARAM_Data![entryStart + 2] | buffer.ARAM_Data![entryStart + 3] << 8);
 			
-			var brrOffset  = (v.BRRAddress - brrStart) / 9 * 16 + (v.BRROffset - 1) * 2;
+			var brrOffset  = v.BRRAddress < brrStart ?
+					(v.BRRAddress + 0x1_0000 - brrStart) / 9 * 16 + (v.BRROffset - 1) * 2
+				: 
+					(v.BRRAddress - brrStart) / 9 * 16 + (v.BRROffset - 1) * 2;
 			var loopOffset = -1;
 			
 			brrOffset += v.BRRSubOffset / 0x1000;

@@ -55,6 +55,11 @@ pub inline fn decode_from_buffer(input: []const u8, offset: u16, result: []i16, 
     var looped    = false;
 
     while (!end_block) {
+        // Failsafe: prevent from writing beyond the end of the provided result buffer
+        if (counter >= result.len - 1) {
+            break;
+        }
+
         if (header & 1 != 0) {
             end_block = true;
 
@@ -95,7 +100,7 @@ pub inline fn decode_from_buffer(input: []const u8, offset: u16, result: []i16, 
         idx += 9;
         counter += 16;
 
-        header = input[addr + idx];
+        header = input[addr +% idx];
     }
 
     const r: i32 = @intCast(counter);
