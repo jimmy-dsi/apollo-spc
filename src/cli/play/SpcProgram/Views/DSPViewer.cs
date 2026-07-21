@@ -64,12 +64,6 @@ public static partial class CliMain {
 				$"{buffer.DSP_Voice![v].ENVX:X2}",
 				$"{buffer.DSP_RegisterMem![v << 4 | 9]:X2}",
 			], xhm + 18, y, col: voiceOnStates[v] ? null : AnsiColor.DarkGrey);
-			
-			var smp = buffer.SMP_State!;
-			
-			// SMP Test debug
-			Display.Write($"{smp.GlobalTimerEnable} {smp.GlobalTimerDisable} {smp.IOWaitstates} {smp.RAMWaitstates} {smp.UseBootROM}", 1, 29);
-			Display.Write($"{smp.Timer[0].Enabled} {smp.Timer[0].Divider:X2} {smp.Timer[0].Stage0:X2} {smp.Timer[0].Stage1:X2} {smp.Timer[0].Stage2:X2} {smp.Timer[0].Output:X2}",       1, 30);
 		}
 		
 		showColorCoding();
@@ -395,7 +389,7 @@ public static partial class CliMain {
 		showColorCoding();
 	}
 		
-	static void showDSPMem(EmuDataBuffer buffer) {
+	static void showDSPMem(EmuDataBuffer buffer, byte? dspHighlightOverride = null, int x = 0, int y = 0) {
 		var coloring = new AnsiColor?[0x80];
 		var color    = AnsiColor.DarkGrey;
 		
@@ -447,16 +441,33 @@ public static partial class CliMain {
 			properties[0x7D] = new(BusSize.Bit8, signed: false, scale: 16);
 		}
 		
-		memDisplayRows(
-			BusSize.Bit8,
-			0,
-			7,
-			buffer.DSP_RegisterMem!,
-			memCellProperties: properties,
-			colorData: coloring,
-			memLogs: dspLogs,
-			useHeatMap: heatMapEnabled
-		);
+		if (dspHighlightOverride is byte d) {
+			memDisplayRows(
+				BusSize.Bit8,
+				0,
+				7,
+				buffer.DSP_RegisterMem!,
+				memCellProperties: properties,
+				colorData: coloring,
+				memLogs: dspLogs,
+				useHeatMap: heatMapEnabled,
+				xOffset: x,
+				yOffset: y,
+				focusAddr: dspHighlightOverride
+			);
+		}
+		else {
+			memDisplayRows(
+				BusSize.Bit8,
+				0,
+				7,
+				buffer.DSP_RegisterMem!,
+				memCellProperties: properties,
+				colorData: coloring,
+				memLogs: dspLogs,
+				useHeatMap: heatMapEnabled
+			);
+		}
 	}
 	
 	static byte vFlagsToByte(bool[] flags) {

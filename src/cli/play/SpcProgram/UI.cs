@@ -29,6 +29,7 @@ public static partial class CliMain {
 		Script700Viewer,
 		BRRViewer,
 		EchoViewer,
+		SMPViewer,
 	}
 	
 	enum StatusMSG {
@@ -87,6 +88,7 @@ public static partial class CliMain {
 		View.MemoryViewer,
 		View.BRRViewer,
 		View.EchoViewer,
+		View.SMPViewer,
 		View.Script700Viewer,
 		View.ASMViewer
 	];
@@ -450,6 +452,11 @@ public static partial class CliMain {
 			
 			case View.EchoViewer: {
 				showEchoViewer(buffer!);
+				break;
+			}
+			
+			case View.SMPViewer: {
+				showSMPViewer(buffer!);
 				break;
 			}
 			
@@ -920,7 +927,7 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.ToggleHeatMap: {
-				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.Script700Viewer) {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.SMPViewer or View.Script700Viewer) {
 					heatMapEnabled = !heatMapEnabled;
 					Display.Clear();
 					
@@ -1342,6 +1349,22 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case View.SMPViewer: {
+				resetStatusMsg();
+				requestEmuData(
+					  Transfer.Requests.DSP_RegisterMem
+					| Transfer.Requests.DSP_1 
+					| Transfer.Requests.DSP_2
+					| Transfer.Requests.MemLogs
+					| Transfer.Requests.SMP_Bus
+					| Transfer.Requests.SMP_State,
+					0xFF00, 0x200
+				);
+				Display.HideWindow();
+				Display.UseBlending = true;
+				break;
+			}
+			
 			default: {
 				resetStatusMsg();
 				requestEmuData(Transfer.Requests.CycleCountOnly);
@@ -1529,12 +1552,14 @@ public static partial class CliMain {
 	                           UInt32? pc = null,
 	                           bool isDSP = false,
 	                           bool useHeatMap = false,
+	                           int xOffset = 0,
 	                           int yOffset = 0,
+	                           int? focusAddr = null,
 	                           bool writeToScrollBuf = false)
 	{
 		Display.UpdateState(writeToScrollBuf);
 		
-		Display.X = 0;
+		Display.X = xOffset;
 		Display.Y = yOffset;
 		
 		for (var i = startRow; i <= endRow; i++) {
@@ -1545,6 +1570,7 @@ public static partial class CliMain {
 				var idx      = (i - startRow) * 16 + c;
 				
 				var color = colorData?[idx];
+				var highlighted = false;
 				
 				if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Write) is not null) {
 					if (realAddr is >= 0x0F0 and <= 0x00FF) {
@@ -1559,18 +1585,24 @@ public static partial class CliMain {
 					else {
 						color = writeColor;
 					}
+					
+					highlighted = true;
 				}
 				else if (realAddr == pc) {
 					color = pcColor;
+					highlighted = true;
 				}
 				else if (memLogs?.FirstOrDefault()?.Type == SMP.MemAccessLog.LogType.Exec && memLogs[0].Address == realAddr) {
 					color = execColor;
+					highlighted = true;
 				}
 				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Fetch) is not null) {
 					color = fetchColor;
+					highlighted = true;
 				}
 				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Fetch) is not null) {
 					color = fetchColor;
+					highlighted = true;
 				}
 				else if (memLogs?.FirstOrDefault(x => x.Address == realAddr && x.Type == SMP.MemAccessLog.LogType.Read) is not null) {
 					if (realAddr is >= 0x0F0 and <= 0x00FC) {
@@ -1588,6 +1620,12 @@ public static partial class CliMain {
 					else {
 						color = readColor;
 					}
+					
+					highlighted = true;
+				}
+				
+				if (!highlighted && focusAddr is int n && idx == n) {
+					return new(AnsiColor.Code.Black, AnsiColor.Code.BrightYellow);
 				}
 				
 				return color;
@@ -1595,19 +1633,19 @@ public static partial class CliMain {
 
 			switch (addrBusSize) {
 				case BusSize.Bit8: {
-					Display.Write($"{startAddr:X2} | ", writeToScrollBuf: writeToScrollBuf);
+					Display.Write($"{startAddr:X2} │ ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit16: {
-					Display.Write($"{startAddr:X4} | ", writeToScrollBuf: writeToScrollBuf);
+					Display.Write($"{startAddr:X4} │ ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit24: {
-					Display.Write($"{startAddr:X6} | ", writeToScrollBuf: writeToScrollBuf);
+					Display.Write($"{startAddr:X6} │ ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 				case BusSize.Bit32: {
-					Display.Write($"{startAddr:X8} | ", writeToScrollBuf: writeToScrollBuf);
+					Display.Write($"{startAddr:X8} │ ", writeToScrollBuf: writeToScrollBuf);
 					break;
 				}
 			}
@@ -1622,17 +1660,18 @@ public static partial class CliMain {
 					Display.Write(" ", writeToScrollBuf: writeToScrollBuf);
 				}
 			}
-			Display.Write("| ", writeToScrollBuf: writeToScrollBuf);
+			Display.Write("│ ", writeToScrollBuf: writeToScrollBuf);
 			
 			if (useHeatMap) {
 				for (var c = 0; c < 16; c++) {
+					var addr = startAddr + c;
 					var idx = (i - startRow) * 16 + c;
 					
 					if (idx >= 0 && idx < data.Length) {
 						int val = data[idx];
 						AnsiColor col;
 						
-						if (memCellProperties is null) {
+						if (bootRomEnabled && addr >= 0xFFC0 || memCellProperties is null) {
 							col = HeatMapColor(BusSize.Bit8, signed: false, scale: 1.0, val);
 						}
 						else {
@@ -1668,6 +1707,7 @@ public static partial class CliMain {
 			}
 			
 			Display.Write("\n", writeToScrollBuf: writeToScrollBuf);
+			Display.X = xOffset;
 		}
 	}
 	

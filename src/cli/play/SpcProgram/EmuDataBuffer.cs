@@ -344,7 +344,7 @@ public class EmuDataBuffer: ICloneable {
 			SMP_BusData = new byte[length];
 			
 			var startPage = startAddr & 0xFF00;
-			var lastPage  = Math.Clamp(startAddr + length - 1, 0, 0xFFFF) & 0xFF00;
+			var lastPage  = Math.Max(startAddr + length - 1, 0) & 0xFFFF00;
 			
 			var srcData = new byte[lastPage + 0x100 - startPage];
 			

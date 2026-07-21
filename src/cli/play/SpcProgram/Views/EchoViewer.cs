@@ -72,6 +72,9 @@ public static partial class CliMain {
 		}
 		
 		var cursorAddr = ds.EchoAddress / 4 * 4;
+		if (cursorAddr < echoStart) {
+			cursorAddr += 0x1_0000;
+		}
 		
 		var prevSegmentLength = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
 		
@@ -211,7 +214,7 @@ public static partial class CliMain {
 			zoomText = $" 1 sample  : {fullLength / bufferLength} chars";
 		}
 		
-		Display.Write($"Current addr: [{cursorAddr:X4}]", 48, 29);
+		Display.Write($"Current addr: [{(UInt16) cursorAddr:X4}]", 48, 29);
 		
 		Display.Write($"Scale: {zoomText}", 6, 29);
 		

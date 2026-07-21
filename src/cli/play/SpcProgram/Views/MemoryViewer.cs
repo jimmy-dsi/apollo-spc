@@ -23,15 +23,15 @@ public static partial class CliMain {
 		var echoDelaySize = buffer.DSP_State!.EchoDelay * 0x800;
 		var echoDelayRows = echoDelaySize >> 4;
 		
-		var echoEndRow = (echoStartRow + echoDelayRows - 1) & 0xFFF;
-		if (echoEndRow < echoStartRow) {
+		var echoEndRow = (echoStartRow + echoDelayRows - 1) /*& 0xFFF*/;
+		if (echoEndRow == echoStartRow - 1) {
 			echoEndRow = echoStartRow;
 		}
 		
 		var dirStartAddr = buffer.DSP_State!.SourceStartPage << 8;
 		var dirStartRow  = dirStartAddr >> 4;
 		
-		var dirEndRow = (dirStartRow + 0x3F) & 0xFFF;
+		var dirEndRow = (dirStartRow + 0x3F) /*& 0xFFF*/;
 		
 		var regionSamples = buffer.RecentSnapshot.CheckForSampleData((UInt16) (startRow << 4), 0x300);
 		var rowSamples    = new byte?[0x30];
@@ -52,7 +52,7 @@ public static partial class CliMain {
 			for (var r = startRow; r <= endRow; r++) {
 				var s = r - startRow;
 				
-				if (r >= echoStartRow && r <= echoEndRow) {
+				if (r >= echoStartRow && r <= echoEndRow || (echoEndRow & 0xFFF) != echoEndRow && r <= (echoEndRow & 0xFFF)) {
 					for (var c = 0; c < (echoStartRow == echoEndRow ? 4 : 16); c++) {
 						var idx = (r - startRow) * 16 + c;
 						
@@ -65,7 +65,7 @@ public static partial class CliMain {
 				else if (rowSamples[s] is not null) {
 					// Do nothing, already 8-bit unsigned by default
 				}
-				else if (r >= dirStartRow && r <= dirEndRow) {
+				else if (r >= dirStartRow && r <= dirEndRow || (dirEndRow & 0xFFF) != dirEndRow && r <= (dirEndRow & 0xFFF)) {
 					for (var c = 0; c < 16; c++) {
 						var idx = (r - startRow) * 16 + c;
 						
@@ -111,7 +111,7 @@ public static partial class CliMain {
 				Display.Write("                                  ", 74, r, col: null, writeToScrollBuf: true);
 			}
 			
-			if (r >= dirStartRow && r <= dirEndRow) {
+			if (r >= dirStartRow && r <= dirEndRow || (dirEndRow & 0xFFF) != dirEndRow && r <= (dirEndRow & 0xFFF)) {
 				if (heatMapEnabled) {
 					Display.Write("▒▒▒▒▒▒", 96, r, col: AnsiColor.Blue, writeToScrollBuf: true);
 				}
@@ -134,7 +134,7 @@ public static partial class CliMain {
 				Display.Write("▒", 4, r, col: new(readRegColor2.BackgroundRGB!), writeToScrollBuf: true);
 			}
 			
-			if (r >= echoStartRow && r <= echoEndRow) {
+			if (r >= echoStartRow && r <= echoEndRow || (echoEndRow & 0xFFF) != echoEndRow && r <= (echoEndRow & 0xFFF)) {
 				if (heatMapEnabled) {
 					Display.Write("▒▒▒▒▒▒", 90, r, col: AnsiColor.Magenta, writeToScrollBuf: true);
 				}
