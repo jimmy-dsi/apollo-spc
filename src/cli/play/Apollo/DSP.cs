@@ -603,6 +603,14 @@ public class DSP {
 				}
 			}
 			
+			public UInt32 CurrentLoopIter {
+				get {
+					emu.MaybeAcquireLock();
+					try     { return *((UInt32*) state.CurrentLoopIter); }
+					finally { emu.MaybeReleaseLock(); }
+				}
+			}
+			
 			internal DebugVoiceProps(Emulator emu, DLL.DspDebugVoiceState state) {
 				this.emu   = emu;
 				this.state = state;

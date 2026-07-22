@@ -526,19 +526,19 @@ public static class Display {
 		var bottom = y + height - 1;
 			
 		for (var xx = left; xx <= right; xx++) {
-			writeChar('-', xx, top,    col ?? color, writeToScrollBuf);
-			writeChar('-', xx, bottom, col ?? color, writeToScrollBuf);
+			writeChar('─', xx, top,    col ?? color, writeToScrollBuf);
+			writeChar('─', xx, bottom, col ?? color, writeToScrollBuf);
 		}
 		
 		if (!removeSides) {
-			writeChar('+', left,  top,    col ?? color, writeToScrollBuf);
-			writeChar('+', right, top,    col ?? color, writeToScrollBuf);
-			writeChar('+', left,  bottom, col ?? color, writeToScrollBuf);
-			writeChar('+', right, bottom, col ?? color, writeToScrollBuf);
+			writeChar('┌', left,  top,    col ?? color, writeToScrollBuf);
+			writeChar('┐', right, top,    col ?? color, writeToScrollBuf);
+			writeChar('└', left,  bottom, col ?? color, writeToScrollBuf);
+			writeChar('┘', right, bottom, col ?? color, writeToScrollBuf);
 			
 			for (var yy = top + 1; yy < bottom; yy++) {
-				writeChar('|', left,  yy, col ?? color, writeToScrollBuf);
-				writeChar('|', right, yy, col ?? color, writeToScrollBuf);
+				writeChar('│', left,  yy, col ?? color, writeToScrollBuf);
+				writeChar('│', right, yy, col ?? color, writeToScrollBuf);
 			}
 		}
 	}

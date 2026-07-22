@@ -137,6 +137,8 @@ internal partial class DLL {
 		
 		public IntPtr TruePitch;
 		public IntPtr BrrSubOffset;
+		
+		public IntPtr CurrentLoopIter;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]

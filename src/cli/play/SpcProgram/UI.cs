@@ -489,12 +489,12 @@ public static partial class CliMain {
 			cursorPos  = Math  .Min(cursorPos,                          Display.Width - 1);
 			cursorPos2 = Math.Clamp(cursorPos2, Math.Max(1, cursorPos), Display.Width);
 			
-			Display.Write(new string('=', cursorPos) + '|',                         14,                 Display.Height - 3, AnsiColor    .Cyan);
-			Display.Write(new string('=', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, AnsiColor.DarkGrey);
+			Display.Write(new string('═', cursorPos) + '█',                         14,                 Display.Height - 3, AnsiColor.BrightCyan);
+			Display.Write(new string('═', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, AnsiColor  .DarkGrey);
 		}
 		
-		Display.Write("[", 13,                Display.Height - 3, AnsiColor.Cyan);
-		Display.Write("]", Display.Width - 1, Display.Height - 3, AnsiColor.Cyan);
+		Display.Write("║", 13,                Display.Height - 3, AnsiColor.Cyan);
+		Display.Write("║", Display.Width - 1, Display.Height - 3, AnsiColor.Cyan);
 		
 		// Display Menu Bar
 		AnsiColor barColor;

@@ -35,21 +35,37 @@ public static partial class CliMain {
 			var brrStart   = (UInt16) (buffer.ARAM_Data![entryStart]     | buffer.ARAM_Data![entryStart + 1] << 8);
 			var loopStart  = (UInt16) (buffer.ARAM_Data![entryStart + 2] | buffer.ARAM_Data![entryStart + 3] << 8);
 			
-			var brrOffset  = v.BRRAddress < brrStart ?
+			var brrOffset = v.BRRAddress < brrStart ?
 					(v.BRRAddress + 0x1_0000 - brrStart) / 9 * 16 + (v.BRROffset - 1) * 2
 				: 
 					(v.BRRAddress - brrStart) / 9 * 16 + (v.BRROffset - 1) * 2;
-			var loopOffset = -1;
 			
-			brrOffset += v.BRRSubOffset / 0x1000;
+			var brrLoopOffset = -1;
+			var loopOffset    = -1;
 			
 			var (decoded, looped) = DSP.DecodeBrrFromBuffer(buffer.ARAM_Data!, brrStart, 0x10_0000);
 			if (looped) {
-				var lo = loopStart - brrStart;
-				if (lo % 9 == 0) {
-					loopOffset = lo / 9 * 16;
+				brrLoopOffset = loopStart - brrStart;
+				loopOffset = brrLoopOffset / 9 * 16;
+			}
+			
+			if (loopOffset >= 0 && (loopOffset >= decoded.Length || brrLoopOffset % 9 != 0)) {
+				loopOffset = decoded.Length;
+				
+				var (decodedLoop, _) = DSP.DecodeBrrFromBuffer(buffer.ARAM_Data!, loopStart, 0x10_0000, decoded[^1], decoded[^2]);
+				decoded = decoded.Concat(decodedLoop).ToArray();
+			
+				if (v.CurrentLoopIter > 0) {
+					brrOffset = v.BRRAddress < loopStart ?
+						(v.BRRAddress + 0x1_0000 - loopStart) / 9 * 16 + (v.BRROffset - 1) * 2
+					: 
+						(v.BRRAddress - loopStart) / 9 * 16 + (v.BRROffset - 1) * 2;
+					
+					brrOffset += loopOffset;
 				}
 			}
+			
+			brrOffset += v.BRRSubOffset / 0x1000;
 			
 			AnsiColor?     fgTextWhite   = muted ? AnsiColor.DarkGrey : null;
 			AnsiColor.Code fgTextYellow  = muted ? AnsiColor.Code.DarkGrey : AnsiColor.Code.Yellow;
@@ -62,7 +78,7 @@ public static partial class CliMain {
 				bgCol *= 0.5;
 			}
 			
-			if (v.EnvLevel > 0) {
+			if (v.EnvLevel > 0 || v.KeyOnDelay is > 0 and < 5) {
 				AnsiColor col;
 				
 				if (muted) {
@@ -71,11 +87,27 @@ public static partial class CliMain {
 				else if (v.NoiseOn) {
 					col = AnsiColor.Yellow;
 				}
+				else if (v.KeyOnDelay is > 0 and < 5) {
+					col = AnsiColor.Cyan;
+				}
 				else {
 					col = AnsiColor.Green;
 				}
 				
 				Display.Write("■", 33 * cx + 3, 17 * cy, col: col);
+			}
+			else if (v.KeyOnDelay == 5) {
+				AnsiColor col;
+				
+				if (muted) {
+					col = AnsiColor.DarkGrey;
+				}
+				else {
+					col = AnsiColor.Blue;
+				}
+				
+				Display.Write("■", 33 * cx + 3, 17 * cy, col: col);
+				brrOffset = -1;
 			}
 			else {
 				Display.Write("■", 33 * cx + 3, 17 * cy, col: new(bgCol));

@@ -49,6 +49,7 @@ pub const DSPStateInternal = struct {
         __true_pitch: u15 = 0,
 
         __brr_sub_offset: u14 = 0,
+        __cur_iteration:  u32 = 0,
     };
 
     pub const Echo = struct {
@@ -288,8 +289,10 @@ pub const DSPStateInternal = struct {
                 v._buffer_offset = 0;
 
                 v.__cur_playing_srcn = v.__queued_srcn;
+                v.__cur_iteration    = 0;
 
                 self._brr._cur_block_header = 0; // I guess the first BRR block of a sample when keyed on is forced to header value 00 (Is that why most encoders zero out the first block?)
+                                                 // Update: Nevermind, it gets overwritten by the real header byte value before the first decode call happens
             }
 
             // Envelope is never run during KON
@@ -366,6 +369,7 @@ pub const DSPStateInternal = struct {
                     // It just sets envelope level to 0 instantly
                     v._brr_address = self._brr._next_address;
                     v.__looped = 1;
+                    v.__cur_iteration +%= 1;
                     v.__cur_playing_srcn = v.__queued_srcn;
                 }
                 v._brr_offset = 1;
