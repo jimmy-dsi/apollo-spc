@@ -411,7 +411,7 @@ pub const Pipeline2 = struct {
             }
 
             self.dac_left[i]  = i16_to_f64(@intCast(clamp_i16(i17,  dac_left_i17)));
-            self.dac_right[i] = i16_to_f64(@intCast(clamp_i16(i17,  dac_left_i17)));
+            self.dac_right[i] = i16_to_f64(@intCast(clamp_i16(i17, dac_right_i17)));
         }
     }
 
