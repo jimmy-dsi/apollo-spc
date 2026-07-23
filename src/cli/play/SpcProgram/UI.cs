@@ -94,6 +94,8 @@ public static partial class CliMain {
 	];
 	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
+	static int actionDisableBuffer = 0;
+	
 	static bool heatMapEnabled     = false;
 	static bool cyclesInSpcClocks  = false;
 	static bool breakpointsEnabled = true;
@@ -365,7 +367,16 @@ public static partial class CliMain {
 			}
 		}
 		else if (state is not State.NonFatalError and not State.Init) {
-			action = KeyBindings.GetAction();
+			if (actionDisableBuffer > 0) {
+				actionDisableBuffer--;
+			}
+			else if (buffer is not null && buffer.DSPCycle >= fullLengthInCycles()) {
+				action = KeyBindings.Action.SeekPos_0;
+				actionDisableBuffer = 5;
+			}
+			else {
+				action = KeyBindings.GetAction();
+			}
 		
 			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
 			var stepInTransit = InstrStepInTransit;
@@ -475,22 +486,36 @@ public static partial class CliMain {
 			Display.ClearLine(Display.Height - 3);
 			Display.Write(formatTime(curCycle / 32, TimeUnit.Timer2s), 0, Display.Height - 3, AnsiColor.Cyan);
 			
-			var seconds = PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12;
-			if (seconds == 0) {
-				seconds = 60 * 12;
+			var baseSeconds = PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12;
+			if (baseSeconds == 0) {
+				baseSeconds = 60 * 12;
 			}
 			
-			var fullTimeInCycles = (long) seconds  * 2048000;
+			var fullTimeInCycles = fullLengthInCycles();
 			var barLength        = Display.Width - 1 - 14;
 			
 			var cursorPos  = (int) ((double)      curCycle / fullTimeInCycles * barLength);
 			var cursorPos2 = (int) ((double) RunAheadCycle / fullTimeInCycles * barLength);
 			
+			var fadePos = (int) ((double) baseSeconds * 2048000 / fullTimeInCycles * barLength);
+			
 			cursorPos  = Math  .Min(cursorPos,                          Display.Width - 1);
 			cursorPos2 = Math.Clamp(cursorPos2, Math.Max(1, cursorPos), Display.Width);
 			
-			Display.Write(new string('═', cursorPos) + '█',                         14,                 Display.Height - 3, AnsiColor.BrightCyan);
+			Display.Write(new string('═', cursorPos),                               14,                 Display.Height - 3, AnsiColor.BrightCyan);
 			Display.Write(new string('═', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, AnsiColor  .DarkGrey);
+			
+			if (cursorPos > fadePos + 1) {
+				Display.Write("╬", 14 + fadePos + 1, Display.Height - 3, AnsiColor.BrightCyan);
+			}
+			else if (cursorPos2 > fadePos + 1) {
+				Display.Write("╬", 14 + fadePos + 1, Display.Height - 3, AnsiColor.DarkGrey);
+			}
+			else {
+				Display.Write("║", 14 + fadePos + 1, Display.Height - 3, AnsiColor.DarkGrey);
+			}
+			
+			Display.Write("█", 14 + cursorPos, Display.Height - 3, AnsiColor.BrightCyan);
 		}
 		
 		Display.Write("║", 13,                Display.Height - 3, AnsiColor.Cyan);
@@ -581,6 +606,15 @@ public static partial class CliMain {
 		}
 		
 		Console.Write(Display.Flush());
+	}
+	
+	static long fullLengthInCycles() {
+		var baseSeconds = PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12;
+		var ms          = baseSeconds * 1000 + (PrimaryEmu.SpcMetadata.FadeLengthInMS ?? 10_000);
+			
+		var fullTimeInCycles = (long) ms * 2048;
+		
+		return fullTimeInCycles;
 	}
 	
 	static void doAction(KeyBindings.Action action) {

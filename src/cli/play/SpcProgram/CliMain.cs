@@ -109,6 +109,7 @@ public static partial class CliMain {
 			}
 			
 			Emulator.BurstAction = Analysis.TrackSampleUsage;
+			PrimaryEmu.AdditionalState = new Analysis.Container();
 			
 			RunAheadEmu = PrimaryEmu.SaveState();
 			seekBarSnapshot(0, RunAheadEmu);

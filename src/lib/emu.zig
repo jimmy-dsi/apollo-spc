@@ -245,6 +245,13 @@ pub inline fn disable_lowpass(emu_ptr: ?*Emu) !void {
     return ep.?.disable_lowpass();
 }
 
+pub inline fn set_mixing_vol(emu_ptr: ?*Emu, vol: f32) !void {
+    var ep = get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.set_mixing_vol(vol);
+}
+
 pub inline fn copy(dest_emu_ptr: ?*Emu, src_emu_ptr: ?*const Emu) !void {
     var ep = get_ptr(dest_emu_ptr);
     try main.validate_ptr(Emu, ep);

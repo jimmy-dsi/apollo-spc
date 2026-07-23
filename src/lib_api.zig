@@ -158,6 +158,11 @@ pub export fn emu_disable_lowpass(emu_ptr: ?[*]Emu) bool {
     return true;
 }
 
+pub export fn emu_set_mixing_vol(emu_ptr: ?[*]Emu, vol: f32) bool {
+    emu.set_mixing_vol(@ptrCast(emu_ptr), vol) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
 pub export fn emu_copy(dest_emu_ptr: ?[*]Emu, src_emu_ptr: ?[*]Emu) bool {
     emu.copy(@ptrCast(dest_emu_ptr), @ptrCast(src_emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(dest_emu_ptr)); };
     return true;

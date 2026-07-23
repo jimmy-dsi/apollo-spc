@@ -13,11 +13,15 @@ using SampleEntry = (UInt16 Start,  UInt16 Loop);
 
 public static class Analysis {
 	public class Container: ICloneable {
+		public double FadeVolume = 1.0;
 		public SampleEntry[] SampleEntries = new SampleEntry[0x100];
 		
 		public Container Clone() {
 			Container c = new();
+			
+			c.FadeVolume    = FadeVolume;
 			c.SampleEntries = (SampleEntry[]) SampleEntries.Clone();
+			
 			return c;
 		}
 		
@@ -27,6 +31,19 @@ public static class Analysis {
 	public static void TrackSampleUsage(this Emulator emu) {
 		var container = emu.AdditionalState as Container;
 		var prevSampleDir = container?.SampleEntries;
+		
+		if (container is not null) {
+			var fadeCycles = (long) (Emulator.MainInstance!.SpcMetadata.LengthInSeconds ?? 12 * 60) * 2048000;
+			
+			if (emu.DSP.CurrentCycle >= fadeCycles) {
+				container.FadeVolume = Math.Pow(Math.Clamp(1 - (emu.DSP.CurrentCycle - fadeCycles) / 20480000.0, 0, 1), 1.5);
+			}
+			else {
+				container.FadeVolume = 1;
+			}
+			
+			emu.PrimaryMixingVol = (float) container.FadeVolume;
+		}
 		
 		var newSampleDir = new SampleEntry[256];
 		var sampleBank   = emu.DSP.Register[0x5D];

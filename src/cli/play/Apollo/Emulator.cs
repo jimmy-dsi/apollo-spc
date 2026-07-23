@@ -248,6 +248,9 @@ public class Emulator {
 	static bool lowpassEnabled = true;
 	static object lowpassLock = new();
 	
+	static float  primaryMixingVol = 1;
+	static object primaryMixingVolLock = new();
+	
 	public bool LowpassEnabled {
 		get {
 			lock (lowpassLock) {
@@ -282,7 +285,34 @@ public class Emulator {
 		}
 	}
 	
-	public ICloneable? AdditionalState { get; internal set; } = null;
+	public float PrimaryMixingVol {
+		get {
+			lock (primaryMixingVolLock) {
+				return primaryMixingVol;
+			}
+		}
+		set {
+			lock (primaryMixingVolLock) {
+				primaryMixingVol = value;
+			}
+			
+			MaybeAcquireLock();
+			
+			try {
+				var result = DLL.EmuSetMixingVol(handle, primaryMixingVol);
+				
+				if (!result) {
+					var errorCode = DLL.EmuGetLastError(handle);
+					Error.Throw(errorCode);
+				}
+			}
+			finally {
+				MaybeReleaseLock();
+			}
+		}
+	}
+	
+	public ICloneable? AdditionalState { get; set; } = null;
 	
 	public UInt32 LastResultCode => DLL.EmuGetLastResult(handle); // Get the last result code, regardless of whether it has succeeded or failed
 	public UInt32 LastErrorCode  => DLL.EmuGetLastError(handle);  // Get the last result code of the previous operation which resulted in an error
@@ -758,6 +788,10 @@ public class Emulator {
 			if (!result) {
 				var errorCode = DLL.EmuGetLastError(handle);
 				Error.Throw(errorCode);
+			}
+			
+			if (AdditionalState is not null) {
+				emuCopy.AdditionalState = (ICloneable) AdditionalState.Clone();
 			}
 			
 			return emuCopy;

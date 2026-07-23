@@ -63,8 +63,6 @@ pub const Pipeline2 = struct {
 
         interpolation: Interpolation = .gauss,
 
-        snes_lowpass: bool = true,
-
         pitch_adjust: f32 = 1.0,
         speed_adjust: f32 = 1.0,
 
@@ -79,7 +77,6 @@ pub const Pipeline2 = struct {
 
         stereo_sep: f32 = 1.0,
 
-        reverse_master: bool = false,
         reverse_main:   bool = false,
         reverse_echo:   bool = false,
 
