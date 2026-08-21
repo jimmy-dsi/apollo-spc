@@ -34,6 +34,7 @@ public static partial class CliMain {
 	
 	enum StatusMSG {
 		Default,
+		NowPlaying,
 		HeatMapOff, HeatMapOn, BusSizeChanged,
 		
 		ChannelX_Enabled,  MainChannelX_Enabled,  EchoChannelX_Enabled,
@@ -62,6 +63,7 @@ public static partial class CliMain {
 	static bool   disableScript700 = false;
 	static object uiStateLock      = new();
 	
+	static bool displayInit = true;
 	static bool ignoreStepDisplay = false;
 	
 	static View       realView       = View.Metadata;
@@ -370,11 +372,17 @@ public static partial class CliMain {
 			if (actionDisableBuffer > 0) {
 				actionDisableBuffer--;
 			}
+			else if (displayInit && currentView != View.BRRViewer) {
+				action = KeyBindings.Action.NavPrevView;
+				setTempStatusMsg(StatusMSG.NowPlaying);
+				actionDisableBuffer = 1;
+			}
 			else if (buffer is not null && buffer.DSPCycle >= fullLengthInCycles()) {
 				action = KeyBindings.Action.SeekPos_0;
 				actionDisableBuffer = 5;
 			}
 			else {
+				displayInit = false;
 				action = KeyBindings.GetAction();
 			}
 		
@@ -505,14 +513,14 @@ public static partial class CliMain {
 			Display.Write(new string('═', cursorPos),                               14,                 Display.Height - 3, AnsiColor.BrightCyan);
 			Display.Write(new string('═', Math.Max(0, cursorPos2 - cursorPos - 1)), 14 + cursorPos + 1, Display.Height - 3, AnsiColor  .DarkGrey);
 			
-			if (cursorPos > fadePos + 1) {
-				Display.Write("╬", 14 + fadePos + 1, Display.Height - 3, AnsiColor.BrightCyan);
+			if (cursorPos > fadePos) {
+				Display.Write("╬", 14 + fadePos, Display.Height - 3, AnsiColor.BrightCyan);
 			}
-			else if (cursorPos2 > fadePos + 1) {
-				Display.Write("╬", 14 + fadePos + 1, Display.Height - 3, AnsiColor.DarkGrey);
+			else if (cursorPos2 > fadePos) {
+				Display.Write("╬", 14 + fadePos, Display.Height - 3, AnsiColor.DarkGrey);
 			}
 			else {
-				Display.Write("║", 14 + fadePos + 1, Display.Height - 3, AnsiColor.DarkGrey);
+				Display.Write("║", 14 + fadePos, Display.Height - 3, AnsiColor.DarkGrey);
 			}
 			
 			Display.Write("█", 14 + cursorPos, Display.Height - 3, AnsiColor.BrightCyan);
@@ -610,7 +618,11 @@ public static partial class CliMain {
 	
 	static long fullLengthInCycles() {
 		var baseSeconds = PrimaryEmu.SpcMetadata.LengthInSeconds ?? 60 * 12;
-		var ms          = baseSeconds * 1000 + (PrimaryEmu.SpcMetadata.FadeLengthInMS ?? 10_000);
+		if (baseSeconds == 0) {
+			baseSeconds = 60 * 12;
+		}
+		
+		var ms = baseSeconds * 1000 + (PrimaryEmu.SpcMetadata.FadeLengthInMS ?? 10_000);
 			
 		var fullTimeInCycles = (long) ms * 2048;
 		
@@ -1244,7 +1256,7 @@ public static partial class CliMain {
 			Driver.ChangeSampleRate(32000);
 		}
 		
-		setTempStatusMsg(newLpfEnabled ? StatusMSG.LPF_Enabled : StatusMSG.LPF_Disabled);
+		//setTempStatusMsg(newLpfEnabled ? StatusMSG.LPF_Enabled : StatusMSG.LPF_Disabled);
 	}
 	
 	static void seek(int offsetInSeconds) {
@@ -1443,6 +1455,34 @@ public static partial class CliMain {
 		tempMsgTime.Start();
 	}
 	
+	static string nowPlayingText() {
+		var game   = PrimaryEmu.SpcMetadata.Game;
+		var artist = PrimaryEmu.SpcMetadata.Artist;
+		var title  = PrimaryEmu.SpcMetadata.Title;
+		
+		if (title == "" || title.StartsWith("<INSERT")) {
+			title = "???";
+		}
+		
+		if (game.StartsWith("<INSERT") || game == "Super Mario World (custom)") {
+			game = "";
+		}
+		
+		if (artist.StartsWith("<INSERT")) {
+			artist = "";
+		}
+		
+		if (game != "") {
+			return $"{game} - {title}";
+		}
+		else if (artist != "") {
+			return $"{artist} - {title}";
+		}
+		else {
+			return title;
+		}
+	}
+	
 	static StatusMSG lastSetMsg = StatusMSG.Default;
 	
 	static string statusMsg(StatusMSG msg) {
@@ -1450,6 +1490,7 @@ public static partial class CliMain {
 		
 		return msg switch {
 			StatusMSG.Default               => "Press CTRL+L for help menu",
+			StatusMSG.NowPlaying            => $"Now playing: {nowPlayingText()} [{Env.FileName(SpcFilePath)}]",
 			StatusMSG.HeatMapOff            => "Heat map disabled",
 			StatusMSG.HeatMapOn             => "Heat map enabled",
 			StatusMSG.BusSizeChanged        => $"Heat map data size changed to {heatMapDataSize.Name()}",

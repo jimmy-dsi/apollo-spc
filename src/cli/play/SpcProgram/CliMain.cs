@@ -63,6 +63,8 @@ public static partial class CliMain {
 			}
 		}
 	}
+	
+	public static string SpcFilePath { get; internal set; }
 
 	public static int Start(string[] args) {
 		try {
@@ -89,6 +91,8 @@ public static partial class CliMain {
 			PrimaryEmu = new(setAsMain: true, makeShared: true);
 			PrimaryEmu.LoadSpcFile(spcFilePath);
 			PrimaryEmu.SMP.LoggingEnabled = true;
+			
+			SpcFilePath = spcFilePath;
 			
 			// Enable Script700 if binary or source file is present
 			var scriptBinary = Script700.BinaryFile(spcFilePath);

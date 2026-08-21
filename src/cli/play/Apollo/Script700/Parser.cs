@@ -21,6 +21,8 @@ public partial class Script700 {
 			List<byte> binData = [];
 		
 			var lines = Simplify(scriptText).Split('\n').Select(x => x.TrimEnd());
+			//Console.WriteLine(string.Join('\n', lines));
+			//Environment.Exit(0);
 		
 			var mode = ParseMode.Script;
 		

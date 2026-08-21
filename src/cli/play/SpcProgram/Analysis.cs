@@ -12,6 +12,9 @@ using SampleRef   = (byte SampleID, UInt16 Address, UInt16 Length, bool Looped);
 using SampleEntry = (UInt16 Start,  UInt16 Loop);
 
 public static class Analysis {
+	static SampleEntry[]? sampleEntries     = null;
+	static object         sampleEntriesLock = new();
+	
 	public class Container: ICloneable {
 		public double FadeVolume = 1.0;
 		public SampleEntry[] SampleEntries = new SampleEntry[0x100];
@@ -30,13 +33,24 @@ public static class Analysis {
 	
 	public static void TrackSampleUsage(this Emulator emu) {
 		var container = emu.AdditionalState as Container;
-		var prevSampleDir = container?.SampleEntries;
+		SampleEntry[]? prevSampleDir;
+			
+		lock (sampleEntriesLock) {
+			prevSampleDir = sampleEntries?.ToArray();
+		}
 		
 		if (container is not null) {
-			var fadeCycles = (long) (Emulator.MainInstance!.SpcMetadata.LengthInSeconds ?? 12 * 60) * 2048000;
+			var seconds = Emulator.MainInstance!.SpcMetadata.LengthInSeconds;
+			
+			if ((seconds ?? 0) == 0) {
+				seconds = 12 * 60;
+			}
+			
+			var fadeCycles = (long) seconds! * 2048000;
 			
 			if (emu.DSP.CurrentCycle >= fadeCycles) {
-				container.FadeVolume = Math.Pow(Math.Clamp(1 - (emu.DSP.CurrentCycle - fadeCycles) / 20480000.0, 0, 1), 1.5);
+				var fadeLength = Emulator.MainInstance!.SpcMetadata.FadeLengthInMS ?? 10_000;
+				container.FadeVolume = Math.Pow(Math.Clamp(1 - (emu.DSP.CurrentCycle - fadeCycles) / (fadeLength * 2048.0), 0, 1), 1.5);
 			}
 			else {
 				container.FadeVolume = 1;
@@ -45,7 +59,7 @@ public static class Analysis {
 			emu.PrimaryMixingVol = (float) container.FadeVolume;
 		}
 		
-		var newSampleDir = new SampleEntry[256];
+		var newSampleDir = new SampleEntry[0x100];
 		var sampleBank   = emu.DSP.Register[0x5D];
 		
 		for (var i = 0; i < 256; i++) {
@@ -71,8 +85,15 @@ public static class Analysis {
 				}
 			}
 		}
-		
-		//prevSampleDir = newSampleDir;
+			
+		lock (sampleEntriesLock) {
+			if (sampleEntries is null) {
+				sampleEntries = newSampleDir;
+			}
+			else {
+				newSampleDir.CopyTo(sampleEntries, 0);
+			}
+		}
 	}
 	
 	public static byte?[] CheckForSampleData(this Emulator snapshot, UInt16 startAddr, UInt16 length, byte maxSamples = 0xFF) {
