@@ -184,10 +184,6 @@ public static class Env {
 	}
 	
 	public static string FileName(string filePath) {
-		// TODO: Remove this replacement before release
-		if (filePath.Contains("Challenge18")) {
-			filePath = filePath.Replace(".spc", ".smc");
-		}
 		return SPath.GetFileName(filePath);
 	}
 }
