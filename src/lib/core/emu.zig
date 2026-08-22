@@ -27,7 +27,7 @@ pub const Emu = struct {
         dac_buffer_offset: u32 = 0,
         dac_offset_prev:   u32 = 0,
 
-        lowpass_enabled: bool = false,
+        lowpass_enabled: bool = true,
         
         mixing_vol: f32 = 1.0,        // Mixing volume multiplier for final output stream
         reverse_master: bool = false, // Whether or not to reverse left and right channels on final output

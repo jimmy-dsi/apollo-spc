@@ -94,6 +94,7 @@ public static partial class CliMain {
 		View.Script700Viewer,
 		View.ASMViewer
 	];
+	static View targetLoadView = View.Metadata;
 	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
 	static int actionDisableBuffer = 0;
@@ -372,10 +373,12 @@ public static partial class CliMain {
 			if (actionDisableBuffer > 0) {
 				actionDisableBuffer--;
 			}
-			else if (displayInit && currentView != View.BRRViewer) {
-				action = KeyBindings.Action.NavPrevView;
+			else if (displayInit) {
+				if (currentView != targetLoadView) changeCurrentView(targetLoadView);
+				viewIndex = views.IndexOf(targetLoadView);
 				setTempStatusMsg(StatusMSG.NowPlaying);
-				actionDisableBuffer = 1;
+				actionDisableBuffer = 5;
+				displayInit = false;
 			}
 			else if (buffer is not null && buffer.DSPCycle >= fullLengthInCycles()) {
 				action = KeyBindings.Action.SeekPos_0;
@@ -1256,7 +1259,7 @@ public static partial class CliMain {
 			Driver.ChangeSampleRate(32000);
 		}
 		
-		//setTempStatusMsg(newLpfEnabled ? StatusMSG.LPF_Enabled : StatusMSG.LPF_Disabled);
+		setTempStatusMsg(newLpfEnabled ? StatusMSG.LPF_Enabled : StatusMSG.LPF_Disabled);
 	}
 	
 	static void seek(int offsetInSeconds) {

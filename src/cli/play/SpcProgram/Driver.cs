@@ -14,7 +14,7 @@ public static class Driver {
 	static object frameLock = new();
 	
 	const  int DspSampleRate    = 32000;
-	static int nativeSampleRate = 32000;
+	static int nativeSampleRate = 96000;
 	
 	static double rateMultiplier => nativeSampleRate / DspSampleRate;
 	

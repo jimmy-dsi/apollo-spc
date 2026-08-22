@@ -3,6 +3,7 @@ namespace SpcProgram;
 using Apollo;
 using Jimbl;
 using Jimbl.Graphics;
+using Jimbl.JSON5;
 
 public static partial class CliMain {
 	public static Emulator PrimaryEmu  { get; private set; }
@@ -111,6 +112,9 @@ public static partial class CliMain {
 			else if (scriptBinary is not null) {
 				PrimaryEmu.Script700.LoadBinaryFile(File.ReadAllBytes(scriptBinary));
 			}
+			
+			// Load JSON5 settings if it exists
+			LoadSettings(PrimaryEmu);
 			
 			Emulator.BurstAction = Analysis.TrackSampleUsage;
 			PrimaryEmu.AdditionalState = new Analysis.Container();
@@ -225,10 +229,15 @@ public static partial class CliMain {
 			return 0;
 		}
 		finally {
-			KillAllThreads = true; // Send signal to run-ahead thread to terminate
-			runAheadThread?.Join();
-			Lib.Deinit();
-			Console.CursorVisible = true;
+			try {
+				if (settingsLoaded) SaveSettings();
+			}
+			finally {
+				KillAllThreads = true; // Send signal to run-ahead thread to terminate
+				runAheadThread?.Join();
+				Lib.Deinit();
+				Console.CursorVisible = true;
+			}
 		}
 		
 		return 0;
