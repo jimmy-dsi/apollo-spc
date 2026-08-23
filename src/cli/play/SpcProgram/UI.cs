@@ -81,6 +81,8 @@ public static partial class CliMain {
 	static BusSize     heatMapDataSize    = BusSize.Bit32;
 	static HeatMapMode heatMapMemMode     = HeatMapMode.TypeAware;
 	
+	static bool lowpassStatus = true;
+	
 	static int viewIndex = 0;
 	static View[] views = [
 		View.Metadata,
@@ -98,6 +100,16 @@ public static partial class CliMain {
 	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
 	static bool initLPStatus = true;
+	
+	static bool[] mainChannelsEnabled = new [] {
+		true, true, true, true, 
+		true, true, true, true
+	};
+	
+	static bool[] echoChannelsEnabled = new [] {
+		true, true, true, true, 
+		true, true, true, true
+	};
 	
 	static int actionDisableBuffer = 0;
 	
@@ -685,6 +697,8 @@ public static partial class CliMain {
 			case KeyBindings.Action.EnableAllChannels: {
 				for (var i = 0; i < 8; i++) {
 					PrimaryEmu.EnableVoice(i);
+					mainChannelsEnabled[i] = true;
+					echoChannelsEnabled[i] = true;
 				}
 				
 				setTempStatusMsg(StatusMSG.AllChannelsEnabled);
@@ -1243,6 +1257,8 @@ public static partial class CliMain {
 	
 	static void toggleChannel(int channelIndex) {
 		var newOnState = PrimaryEmu.ToggleVoice(channelIndex);
+		mainChannelsEnabled[channelIndex] = newOnState;
+		echoChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
 		
 		setTempStatusMsg(newOnState ? StatusMSG.ChannelX_Enabled : StatusMSG.ChannelX_Disabled);
@@ -1250,6 +1266,7 @@ public static partial class CliMain {
 	
 	static void toggleMainChannel(int channelIndex) {
 		var newOnState = PrimaryEmu.ToggleMainVoice(channelIndex);
+		mainChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
 		
 		setTempStatusMsg(newOnState ? StatusMSG.MainChannelX_Enabled : StatusMSG.MainChannelX_Disabled);
@@ -1257,6 +1274,7 @@ public static partial class CliMain {
 	
 	static void toggleEchoChannel(int channelIndex) {
 		var newOnState = PrimaryEmu.ToggleEchoVoice(channelIndex);
+		echoChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
 		
 		setTempStatusMsg(newOnState ? StatusMSG.EchoChannelX_Enabled : StatusMSG.EchoChannelX_Disabled);
@@ -1265,6 +1283,7 @@ public static partial class CliMain {
 	static void toggleLPF() {
 		var newLpfEnabled = !PrimaryEmu.LowpassEnabled;
 		PrimaryEmu.LowpassEnabled = newLpfEnabled;
+		lowpassStatus = newLpfEnabled;
 		
 		if (newLpfEnabled) {
 			Driver.ChangeSampleRate(96000);

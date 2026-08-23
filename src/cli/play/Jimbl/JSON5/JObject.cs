@@ -11,7 +11,7 @@ public class JObject: JItem, IDictionary<string, JItem?>, IDictionary {
 	public int Count => dict.Count;
 	public bool IsReadOnly => false;
 
-	internal JObject() {
+	public JObject() {
 		dict = [];
 	}
 
@@ -60,7 +60,7 @@ public class JObject: JItem, IDictionary<string, JItem?>, IDictionary {
 	public bool   IsSynchronized => (dict as ICollection).IsSynchronized;
 	public object SyncRoot       => (dict as ICollection).SyncRoot;
 
-	public JItem? this[string propName] {
+	public new JItem? this[string propName] {
 		get => dict[propName];
 		set => dict[propName] = value;
 	}

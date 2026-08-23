@@ -34,7 +34,10 @@ public static partial class CliMain {
 		}
 		catch (Exception) { }
 		
-		if (settings is null) return;
+		if (settings is null) {
+			settingsLoaded = true;
+			return;
+		}
 			
 		// Map properties from settings
 		if (settings.TryGetValue("current_view",     out var  view) && view  is JString v) currentView    = v;
@@ -95,6 +98,9 @@ public static partial class CliMain {
 			
 		// Apply settings - set values to internal UI variables and emulator
 		for (var i = 0; i < 8; i++) {
+			mainChannelsEnabled[i] = mainChannels[i];
+			echoChannelsEnabled[i] = echoChannels[i];
+			
 			if (!mainChannels[i]) emu.DisableMainVoice(i);
 			if (!echoChannels[i]) emu.DisableEchoVoice(i);
 		}
@@ -104,7 +110,8 @@ public static partial class CliMain {
 			targetLoadView = vw;
 		}
 		
-		initLPStatus = useLowPass;
+		initLPStatus  = useLowPass;
+		lowpassStatus = initLPStatus;
 		if (!initLPStatus) emu.LowpassEnabled = false;
 		
 		FadeoutsEnabled = fadeoutEnabled;
@@ -154,7 +161,34 @@ public static partial class CliMain {
 		};
 	}
 	
+	static int serializeHeatMapStatus() {
+		if (heatMapEnabled) {
+			if (heatMapMemMode == HeatMapMode.TypeAware) return 1;
+			if (heatMapMemMode == HeatMapMode.Unsigned)  return 2;
+		}
+		return 0;
+	}
+	
+	static int serializeHeatMapDataSize() {
+		return heatMapDataSize switch {
+			BusSize.Bit8  => 1, BusSize.Bit16 => 2,
+			BusSize.Bit32 => 4, BusSize.Bit64 => 8,
+			_ => 4
+		};
+	}
+	
 	public static void SaveSettings() {
+		JObject settings = new() {
+			["current_view"]      = serializeView(currentView),
+			["use_snes_lowpass"]  = lowpassStatus,
+			["fadeout_enabled"]   = FadeoutsEnabled,
+			["cycle_format"]      = cyclesInSpcClocks ? "spc" : "dsp",
+			["main_channels"]     = mainChannelsEnabled.Select(c => (JItem) c).ToArray(),
+			["echo_channels"]     = echoChannelsEnabled.Select(c => (JItem) c).ToArray(),
+			["heat_map"]          = serializeHeatMapStatus(),
+			["heat_map_datasize"] = serializeHeatMapDataSize()
+		};
 		
+		File.WriteAllText(SettingsPath, settings.Serialize());
 	}
 }

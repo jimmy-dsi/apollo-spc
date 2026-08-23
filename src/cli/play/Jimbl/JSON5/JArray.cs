@@ -10,7 +10,7 @@ public class JArray: JItem, IList<JItem?>, IList {
 	public int  Length     => list.Count;
 	public bool IsReadOnly => false;
 
-	internal JArray() {
+	public JArray() {
 		list = [];
 	}
 
