@@ -214,7 +214,7 @@ public static partial class CliMain {
 			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
 			
-			Driver.Setup(handleUI);
+			Driver.Setup(handleUI, initLPStatus);
 		}
 		catch (SpcMissingHeaderError) {
 			Console.Error.WriteLine($"error: An unknown error occurred while attempting to process SPC metadata");

@@ -9,87 +9,114 @@ public static partial class CliMain {
 	static bool settingsLoaded = false;
 	
 	public static void LoadSettings(Emulator emu) {
+		// Set up defaults, in case any properties could not be loaded
+		string currentView    = "metadata";
+		bool   useLowPass     = true;
+		bool   fadeoutEnabled = true;
+		bool   useSPCCycles   = false;
+			
+		bool[] mainChannels = new [] {
+			true, true, true, true,
+			true, true, true, true
+		};
+		bool[] echoChannels = new [] {
+			true, true, true, true,
+			true, true, true, true
+		};
+			
+		int heatMap            = 0;
+		int heatMapDataSizeInt = 4;
+		
+		JObject? settings = null;
+		
 		try {
-			var settings = JItem.Load(File.ReadAllText(SettingsPath));
-			
-			// Set up defaults, in case any properties could not be loaded
-			string currentView = "metadata";
-			bool   useLowPass  = true;
-			
-			bool[] mainChannels = new [] {
-				true, true, true, true,
-				true, true, true, true
-			};
-			bool[] echoChannels = new [] {
-				true, true, true, true,
-				true, true, true, true
-			};
-			
-			int heatMap = 0;
-			int heatMapDataSize = 4;
-			
-			// Map properties from settings
-			if (settings.TryGetValue("current_view",     out var  view) && view  is JString v) currentView = v;
-			if (settings.TryGetValue("use_snes_lowpass", out var lpass) && lpass is JBool   L) useLowPass  = L;
-			
-			if (settings.TryGetValue("main_channels", out var mchan) && mchan is JArray m) {
-				List<bool> channels = [];
-				bool convFailed = false;
-				
-				for (var i = 0; i < Math.Min(8, m.Count); i++) {
-					if (m[i] is JBool b) channels.Add(b);
-					else {
-						convFailed = true;
-						break;
-					}
-				}
-				
-				if (!convFailed) {
-					for (var i = 0; i < channels.Count; i++) {
-						mainChannels[i] = channels[i];
-					}
-				}
-			}
-			
-			if (settings.TryGetValue("echo_channels", out var echan) && echan is JArray e) {
-				List<bool> channels   = [];
-				bool       convFailed = false;
-				
-				for (var i = 0; i < Math.Min(8, e.Count); i++) {
-					if (e[i] is JBool b) channels.Add(b);
-					else {
-						convFailed = true;
-						break;
-					}
-				}
-				
-				if (!convFailed) {
-					for (var i = 0; i < channels.Count; i++) {
-						echoChannels[i] = channels[i];
-					}
-				}
-			}
-			
-			if (settings.TryGetValue("heat_map", out var hmap) && hmap is JNumber h) {
-				if ((int) h is >= 0 and <= 2) heatMap = (int) h;
-			}
-			
-			if (settings.TryGetValue("heat_map_datasize", out var hsize) && hsize is JNumber s) {
-				if ((int) s is 1 or 2 or 4 or 8) heatMapDataSize = (int) s;
-			}
-			
-			// Apply settings - set values to internal UI variables and emulator
-			for (var i = 0; i < 8; i++) {
-				if (!mainChannels[i]) emu.DisableMainVoice(i);
-				if (!echoChannels[i]) emu.DisableEchoVoice(i);
-			}
-			
-			var loadView = mapView(currentView);
-			if (loadView is View vw) {
-				targetLoadView = vw;
-			}
+			settings = JItem.Load(File.ReadAllText(SettingsPath));
 		}
 		catch (Exception) { }
+		
+		if (settings is null) return;
+			
+		// Map properties from settings
+		if (settings.TryGetValue("current_view",     out var  view) && view  is JString v) currentView    = v;
+		if (settings.TryGetValue("use_snes_lowpass", out var lpass) && lpass is JBool   L) useLowPass     = L;
+		if (settings.TryGetValue("fadeout_enabled",  out var  fade) && fade  is JBool   f) fadeoutEnabled = f;
+		
+		if (settings.TryGetValue("cycle_format", out var cyclef) && cyclef is JString c) {
+			string cs = c;
+			if      (cs.ToLower() == "dsp") useSPCCycles = false;
+			else if (cs.ToLower() == "spc") useSPCCycles = true;
+		}
+		
+		if (settings.TryGetValue("main_channels", out var mchan) && mchan is JArray m) {
+			List<bool> channels = [];
+			bool convFailed = false;
+			
+			for (var i = 0; i < Math.Min(8, m.Count); i++) {
+				if (m[i] is JBool b) channels.Add(b);
+				else {
+					convFailed = true;
+					break;
+				}
+			}
+			
+			if (!convFailed) {
+				for (var i = 0; i < channels.Count; i++) {
+					mainChannels[i] = channels[i];
+				}
+			}
+		}
+		
+		if (settings.TryGetValue("echo_channels", out var echan) && echan is JArray e) {
+			List<bool> channels   = [];
+			bool       convFailed = false;
+			
+			for (var i = 0; i < Math.Min(8, e.Count); i++) {
+				if (e[i] is JBool b) channels.Add(b);
+				else {
+					convFailed = true;
+					break;
+				}
+			}
+			
+			if (!convFailed) {
+				for (var i = 0; i < channels.Count; i++) {
+					echoChannels[i] = channels[i];
+				}
+			}
+		}
+		
+		if (settings.TryGetValue("heat_map", out var hmap) && hmap is JNumber h) {
+			if ((int) h is >= 0 and <= 2) heatMap = (int) h;
+		}
+		
+		if (settings.TryGetValue("heat_map_datasize", out var hsize) && hsize is JNumber s) {
+			if ((int) s is 1 or 2 or 4 or 8) heatMapDataSizeInt = (int) s;
+		}
+			
+		// Apply settings - set values to internal UI variables and emulator
+		for (var i = 0; i < 8; i++) {
+			if (!mainChannels[i]) emu.DisableMainVoice(i);
+			if (!echoChannels[i]) emu.DisableEchoVoice(i);
+		}
+			
+		var loadView = mapView(currentView);
+		if (loadView is View vw) {
+			targetLoadView = vw;
+		}
+		
+		initLPStatus = useLowPass;
+		if (!initLPStatus) emu.LowpassEnabled = false;
+		
+		FadeoutsEnabled = fadeoutEnabled;
+		
+		cyclesInSpcClocks = useSPCCycles;
+		heatMapEnabled    = heatMap > 0;
+		heatMapMemMode    = heatMap == 1 ? HeatMapMode.TypeAware : HeatMapMode.Unsigned;
+		heatMapDataSize   = heatMapDataSizeInt switch {
+			1 => BusSize.Bit8,  2 => BusSize.Bit16,
+			4 => BusSize.Bit32, 8 => BusSize.Bit64,
+			_ => BusSize.Bit32
+		};
 		
 		settingsLoaded = true;
 	}

@@ -22,8 +22,8 @@ public static class Analysis {
 		public Container Clone() {
 			Container c = new();
 			
-			c.FadeVolume    = FadeVolume;
-			c.SampleEntries = (SampleEntry[]) SampleEntries.Clone();
+			c.FadeVolume     = FadeVolume;
+			c.SampleEntries  = (SampleEntry[]) SampleEntries.Clone();
 			
 			return c;
 		}
@@ -48,7 +48,7 @@ public static class Analysis {
 			
 			var fadeCycles = (long) seconds! * 2048000;
 			
-			if (emu.DSP.CurrentCycle >= fadeCycles) {
+			if (emu.DSP.CurrentCycle >= fadeCycles && CliMain.FadeoutsEnabled) {
 				var fadeLength = Emulator.MainInstance!.SpcMetadata.FadeLengthInMS ?? 10_000;
 				container.FadeVolume = Math.Pow(Math.Clamp(1 - (emu.DSP.CurrentCycle - fadeCycles) / (fadeLength * 2048.0), 0, 1), 1.5);
 			}

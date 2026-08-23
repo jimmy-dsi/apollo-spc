@@ -13,6 +13,9 @@ public static class Driver {
 	static long   frame = 0;
 	static object frameLock = new();
 	
+	const int NativeSampleRate   = 32000;
+	const int NativeSampleRateLP = 96000;
+	
 	const  int DspSampleRate    = 32000;
 	static int nativeSampleRate = 96000;
 	
@@ -39,11 +42,13 @@ public static class Driver {
 		}
 	}
 	
-	public static void Setup(Action<EmuDataBuffer?> uiCallback) {
+	public static void Setup(Action<EmuDataBuffer?> uiCallback, bool enableLowPass) {
 		if (SDL.SDL_Init(SDL.SDL_INIT_AUDIO) < 0) {
 			Console.WriteLine("Failed to init SDL: " + SDL.SDL_GetError());
 			return;
 		}
+		
+		nativeSampleRate = enableLowPass ? NativeSampleRateLP : NativeSampleRate;
 		
 		// Run display before first cycle runs, in case it gets stuck in a Script700 infinite loop (we want there to be display instead of black screen)
 		uiCallback(null);

@@ -63,7 +63,7 @@ public static partial class CliMain {
 	static bool   disableScript700 = false;
 	static object uiStateLock      = new();
 	
-	static bool displayInit = true;
+	static bool displayInit       = true;
 	static bool ignoreStepDisplay = false;
 	
 	static View       realView       = View.Metadata;
@@ -97,6 +97,8 @@ public static partial class CliMain {
 	static View targetLoadView = View.Metadata;
 	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
+	static bool initLPStatus = true;
+	
 	static int actionDisableBuffer = 0;
 	
 	static bool heatMapEnabled     = false;
@@ -129,6 +131,8 @@ public static partial class CliMain {
 	];
 	
 	static int selectedItem = 0;
+	
+	public static bool FadeoutsEnabled { get; set; } = true;
 	
 	public static State UI_State {
 		get {
@@ -380,7 +384,7 @@ public static partial class CliMain {
 				actionDisableBuffer = 5;
 				displayInit = false;
 			}
-			else if (buffer is not null && buffer.DSPCycle >= fullLengthInCycles()) {
+			else if (buffer is not null && buffer.DSPCycle >= fullLengthInCycles() && FadeoutsEnabled) {
 				action = KeyBindings.Action.SeekPos_0;
 				actionDisableBuffer = 5;
 			}
@@ -977,7 +981,17 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ToggleHeatMap: {
 				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.SMPViewer or View.Script700Viewer) {
-					heatMapEnabled = !heatMapEnabled;
+					if (!heatMapEnabled) {
+						heatMapEnabled = true;
+						heatMapMemMode = HeatMapMode.TypeAware;
+					}
+					else if (heatMapMemMode == HeatMapMode.TypeAware) {
+						heatMapMemMode = HeatMapMode.Unsigned;
+					}
+					else {
+						heatMapEnabled = false;
+					}
+					
 					Display.Clear();
 					
 					if (heatMapEnabled) {
@@ -1495,7 +1509,7 @@ public static partial class CliMain {
 			StatusMSG.Default               => "Press CTRL+L for help menu",
 			StatusMSG.NowPlaying            => $"Now playing: {nowPlayingText()} [{Env.FileName(SpcFilePath)}]",
 			StatusMSG.HeatMapOff            => "Heat map disabled",
-			StatusMSG.HeatMapOn             => "Heat map enabled",
+			StatusMSG.HeatMapOn             => $"Heat map mode set to: {(heatMapMemMode == HeatMapMode.TypeAware ? "Type-aware" : "Unsigned 8-bit")}",
 			StatusMSG.BusSizeChanged        => $"Heat map data size changed to {heatMapDataSize.Name()}",
 			StatusMSG.ChannelX_Disabled     => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
 			StatusMSG.ChannelX_Enabled      => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
