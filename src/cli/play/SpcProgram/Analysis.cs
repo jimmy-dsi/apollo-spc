@@ -182,7 +182,7 @@ public static class Analysis {
 		#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
 			cellPrecision = 8;
 		#else
-			cellPrecision = 2;
+			cellPrecision = CliMain.FineCharDisplay ? 8 : 2; // But allow our hidden setting to enable it for the few 3rd party terminals that support it
 		#endif
 		
 		var waveCanvasPos = new int[canvasWidth];

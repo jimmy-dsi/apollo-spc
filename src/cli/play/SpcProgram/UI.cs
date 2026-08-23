@@ -51,7 +51,9 @@ public static partial class CliMain {
 		
 		Script700_Error, Continue,
 		
-		ZoomIn, ZoomOut
+		ZoomIn, ZoomOut,
+		
+		FineCharEnabled, FineCharDisabled
 	}
 	
 	enum HeatMapMode {
@@ -145,6 +147,7 @@ public static partial class CliMain {
 	static int selectedItem = 0;
 	
 	public static bool FadeoutsEnabled { get; set; } = true;
+	public static bool FineCharDisplay { get; set; } = false;
 	
 	public static State UI_State {
 		get {
@@ -1222,6 +1225,18 @@ public static partial class CliMain {
 				}
 				break;
 			}
+			
+			case KeyBindings.Action.WindowsCharSetting: {
+				if (!FineCharDisplay) {
+					FineCharDisplay = true;
+					setTempStatusMsg(StatusMSG.FineCharEnabled);
+				}
+				else {
+					FineCharDisplay = false;
+					setTempStatusMsg(StatusMSG.FineCharDisabled);
+				}
+				break;
+			}
 		}
 	}
 	
@@ -1559,6 +1574,9 @@ public static partial class CliMain {
 			StatusMSG.ZoomIn                => $"Zoom level increased {showZoomPercentage()}",
 			StatusMSG.ZoomOut               => $"Zoom level decreased {showZoomPercentage()}",
 			
+			StatusMSG.FineCharEnabled       => "Fine character display enabled",
+			StatusMSG.FineCharDisabled      => "Fine character display disabled",
+			
 			_                               => throw new NotImplementedException()
 		};
 	}
@@ -1862,7 +1880,13 @@ public static partial class CliMain {
 					fgAnsi    = new(bgCol, eqInsideRGB);
 				}
 				
-				#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
+				#if LINUX
+					var linuxDisplay = true;
+				#else
+					var linuxDisplay = FineCharDisplay;
+				#endif
+				
+				if (linuxDisplay) { // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
 					if (i < height / 8) {
 						fgAnsi = new(fgAnsi.ForegroundRGB!, midColor);
 						Display.Write("▄▄▄", x, y - i - 1, fgAnsi);
@@ -1880,7 +1904,8 @@ public static partial class CliMain {
 						};
 						Display.Write(barString, x, y - i - 1, fgAnsi);
 					}
-				#else
+				}
+				else {
 					if (i < height / 8) {
 						fgAnsi = new(fgAnsi.ForegroundRGB!, midColor);
 						Display.Write("▄▄▄", x, y - i - 1, fgAnsi);
@@ -1895,7 +1920,7 @@ public static partial class CliMain {
 						};
 						Display.Write(barString, x, y - i - 1, fgAnsi);
 					}
-				#endif
+				}
 			}
 		}
 		else if (height < 0) {

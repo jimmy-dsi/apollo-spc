@@ -195,6 +195,10 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('+'),  KeyBindings.Action.ZoomIn);
 			KeyBindings.Register(KeyBindings.Key.Char('='),  KeyBindings.Action.ZoomIn);
 			KeyBindings.Register(KeyBindings.Key.Char('-'),  KeyBindings.Action.ZoomOut);
+			#if LINUX
+			#else
+				KeyBindings.Register(KeyBindings.Key.F11, KeyBindings.Action.WindowsCharSetting, ctrl: true);
+			#endif
 			
 			// Create RAM memory view buffer and Trace logger view buffer
 			Display.CurrentBufferId = "aram";

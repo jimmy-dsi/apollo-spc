@@ -183,6 +183,8 @@ public static class KeyBindings {
 		ContextKey_R,
 		ZoomIn,
 		ZoomOut,
+		
+		WindowsCharSetting,
 	}
 		
 	static Key?      lastCtrlKey    = null;
