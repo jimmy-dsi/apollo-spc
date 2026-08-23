@@ -147,6 +147,10 @@ public static partial class CliMain {
 			var rightBarLen = JMath.Round(Math.Abs(volR) / 8.0);
 			var envBarLen   = JMath.Round(env / 128.0);
 			
+			if (volL > 0 &&  leftBarLen == 0) leftBarLen  = 1;
+			if (volR > 0 && rightBarLen == 0) rightBarLen = 1;
+			if (env  > 0 &&   envBarLen == 0) envBarLen   = 1;
+			
 			//Display.Write($"V", 33 * cx + 16, 14 * cy);
 			var refColor = HeatMapColor(BusSize.Bit8, signed: false, scale: 1, 0xFF).BackgroundRGB!;
 			
