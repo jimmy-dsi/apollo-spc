@@ -74,6 +74,30 @@ public static partial class CliMain {
 			                                "On", "On", "On", "On"], ["Ctrl+F1-F4 / F1-F4 to toggle", "Ctrl+F5-F8 to toggle"]),
 	];
 	
+	static (string, string)[] helpMenu = [
+		("Navigate to previous/next view", "LeftArrow / RightArrow"),
+		("", ""),
+		("Pause / resume",                 "Space"),
+		("", ""),
+		("Seek ahead 5 seconds",           "Ctrl+RightArrow"),
+		("Seek back 5 seconds",            "Ctrl+LeftArrow"),
+		("Seek ahead 30 seconds",          "Shift+."),
+		("Seek back 30 seconds",           "Shift+,"),
+		("Seek to position",               "Shift+A+0-9"),
+		
+		("Enable all channels",            "0"),
+		("", ""),
+		("Break execution / resume",       "F5"),
+		("Step SPC700 instruction",        "F6"),
+		("Toggle all breakpoints",         "Ctrl+B"),
+		("", ""),
+		("Scroll one row / sample point",  "UpArrow / DownArrow"),
+		("Scroll 16 rows / 256 bytes",     "PageUp / PageDown"),
+		("Scroll to start / end",          "Home / End"),
+		
+		("Close app",                      "Ctrl+C"),
+	];
+	
 	static void showSettingsMenu() {
 		Color highlight = new(0.10, 0.10, 0.50);
 		Color darkGrey  = new(0.37, 0.37, 0.37);
@@ -83,8 +107,10 @@ public static partial class CliMain {
 		AnsiColor buttonSel = new(black, AnsiColor.Code.White, isBold: false);
 		
 		var columnX_1 = 2;
-		var columnX_2 = 39;
-		var columnX_3 = 80;
+		var columnX_2 = 42;
+		var columnX_3 = 84;
+		var columnX_4 = 84;
+		
 		var topRowY   = 1;
 		
 		var y = topRowY;
@@ -92,6 +118,8 @@ public static partial class CliMain {
 		for (var r = 0; r < settingsMenu.Length; r++) {
 			var (description, options, keybindings) = settingsMenu[r];
 			var x = columnX_1;
+			
+			if (options.Length > 4) y++;
 			
 			AnsiColor? lineColor = r == settingsRow && options.Length > 0 ? new(highlight, isBG: true) : null;
 			
@@ -114,7 +142,7 @@ public static partial class CliMain {
 				}
 				
 				case 2: { // ID666 fadeout
-					selectedItem = 0;
+					selectedItem = FadeoutsEnabled ? 0 : 1;
 					break;
 				}
 				
@@ -179,16 +207,40 @@ public static partial class CliMain {
 				}
 			}
 			
-			x = columnX_3; y = topY;
+			x = columnX_4; y = topY;
 			foreach (var kb in keybindings) {
 				Display.Write(kb, x, y, col: settingsRow == r ? lineColor : AnsiColor.DarkGrey); y++;
 			}
 			y = topY;
 			
-			y += 2;
+			y += 1;
 			if (r == 0 || options.Length > 4) y++;
 		}
 		
-		Display.DrawOutline(0, 0, Display.Width, Display.Height - 10, removeSides: false);
+		Display.DrawOutline(0, 0, Display.Width, Display.Height - 16, removeSides: false);
+		Display.Write(" Settings ", Display.Width / 2 - 5, 0, col: AnsiColor.Yellow);
+		
+		y = Display.Height - 16;
+		
+		Display.DrawOutline(0, y, Display.Width, Display.Height - 22, removeSides: false);
+		Display.Write(" Other UI controls ", Display.Width / 2 - 10, y, col: AnsiColor.Green);
+		
+		y++;
+		
+		var xx = 2;
+		
+		for (var i = 0; i < helpMenu.Length; i++) {
+			var (desc, keybinding) = helpMenu[i];
+			
+			Display.Write(desc,       xx, y, col: i == 18 ? AnsiColor.BrightYellow : null);
+			Display.Write(keybinding, xx + 33, y, col: AnsiColor.DarkGrey);
+			
+			if (i == 8) {
+				y = Display.Height - 16;
+				xx += Display.Width / 2;
+			}
+			
+			y++;
+		}
 	}
 }

@@ -59,6 +59,8 @@ public static partial class CliMain {
 		HeatMapSizeSettingDesc,
 		ChannelSettingDesc, MainChannelSettingDesc, EchoChannelSettingDesc,
 		
+		FadesEnabled, FadesDisabled,
+		
 		FineCharEnabled, FineCharDisabled
 	}
 	
@@ -712,6 +714,7 @@ public static partial class CliMain {
 						}
 				
 						case 2: { // ID666 fadeout
+							toggleFadeouts();
 							break;
 						}
 				
@@ -791,6 +794,7 @@ public static partial class CliMain {
 						}
 				
 						case 2: { // ID666 fadeout
+							toggleFadeouts();
 							break;
 						}
 				
@@ -1402,17 +1406,17 @@ public static partial class CliMain {
 						}
 						
 						case 6: { // Channels
-							toggleChannel(lastChanChanged);
+							toggleChannel(lastChanChanged, updatePos: false);
 							break;
 						}
 						
 						case 7: { // Main channels
-							toggleMainChannel(lastMainChanged);
+							toggleMainChannel(lastMainChanged, updatePos: false);
 							break;
 						}
 						
 						case 8: { // Echo channels
-							toggleEchoChannel(lastEchoChanged);
+							toggleEchoChannel(lastEchoChanged, updatePos: false);
 							break;
 						}
 					}
@@ -1465,7 +1469,7 @@ public static partial class CliMain {
 		}
 	}
 	
-	static void toggleChannel(int channelIndex) {
+	static void toggleChannel(int channelIndex, bool updatePos = true) {
 		var newOnState = PrimaryEmu.ToggleVoice(channelIndex);
 		
 		mainChannelsEnabled[channelIndex] = newOnState;
@@ -1473,33 +1477,39 @@ public static partial class CliMain {
 		
 		channelToToggle = channelIndex + 1;
 		
-		lastChanChanged = channelIndex;
-		lastMainChanged = channelIndex;
-		lastEchoChanged = channelIndex;
+		if (updatePos) {
+			lastChanChanged = channelIndex;
+			lastMainChanged = channelIndex;
+			lastEchoChanged = channelIndex;
+		}
 		
 		setTempStatusMsg(newOnState ? StatusMSG.ChannelX_Enabled : StatusMSG.ChannelX_Disabled);
 	}
 	
-	static void toggleMainChannel(int channelIndex) {
+	static void toggleMainChannel(int channelIndex, bool updatePos = true) {
 		var newOnState = PrimaryEmu.ToggleMainVoice(channelIndex);
 		
 		mainChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
 		
-		lastChanChanged = channelIndex;
-		lastMainChanged = channelIndex;
+		if (updatePos) {
+			lastChanChanged = channelIndex;
+			lastMainChanged = channelIndex;
+		}
 		
 		setTempStatusMsg(newOnState ? StatusMSG.MainChannelX_Enabled : StatusMSG.MainChannelX_Disabled);
 	}
 	
-	static void toggleEchoChannel(int channelIndex) {
+	static void toggleEchoChannel(int channelIndex, bool updatePos = true) {
 		var newOnState = PrimaryEmu.ToggleEchoVoice(channelIndex);
 		
 		echoChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
 		
-		lastChanChanged = channelIndex;
-		lastEchoChanged = channelIndex;
+		if (updatePos) {
+			lastChanChanged = channelIndex;
+			lastEchoChanged = channelIndex;
+		}
 		
 		setTempStatusMsg(newOnState ? StatusMSG.EchoChannelX_Enabled : StatusMSG.EchoChannelX_Disabled);
 	}
@@ -1543,6 +1553,18 @@ public static partial class CliMain {
 		var targetSnapshotIndex = GetSnapshotIndex(targetCycle);
 		
 		loadSnapshot(targetSnapshotIndex);
+	}
+	
+	static void toggleFadeouts() {
+		if (PrimaryEmu.DSP.CurrentCycle < fullLengthInCycles()) {
+			FadeoutsEnabled = !FadeoutsEnabled;
+			if (FadeoutsEnabled) {
+				setTempStatusMsg(StatusMSG.FadesEnabled);
+			}
+			else {
+				setTempStatusMsg(StatusMSG.FadesDisabled);
+			}
+		}
 	}
 	
 	static void loadSnapshot(int targetSnapshotIndex) {
@@ -1792,12 +1814,15 @@ public static partial class CliMain {
 			StatusMSG.ExitSettingsMenu        => "Exit settings menu",
 			StatusMSG.LowpassSettingDesc      => "Sets whether or not to simulate the analog lowpass filter of the SNES DAC",
 			StatusMSG.ID666SettingDesc        => "Sets whether the song should fade out or play endlessly",
-			StatusMSG.CycleDisplaySettingDesc => "Sets the displayed cycles in units of S-DSP cycles (2 MHz) or SPC700 cycles (1 MHz)",
+			StatusMSG.CycleDisplaySettingDesc => "Sets whether the displayed cycles should be in units of S-DSP cycles (2 MHz) or SPC700 cycles (1 MHz)",
 			StatusMSG.HeatMapSettingDesc      => "Sets how the memory viewer heatmap should interpret data; native type, forced unsigned 8-bit, or disabled",
 			StatusMSG.HeatMapSizeSettingDesc  => "Configures how Script700 state parameters should be interpreted using the heatmap",
 			StatusMSG.ChannelSettingDesc      => "Enable or disable each S-DSP channel (press enter to toggle)",
 			StatusMSG.MainChannelSettingDesc  => "Enable or disable the main output component each S-DSP channel (press enter to toggle)",
 			StatusMSG.EchoChannelSettingDesc  => "Enable or disable the echo output component each S-DSP channel (press enter to toggle)",
+			
+			StatusMSG.FadesEnabled            => "ID666 song fadeout enabled",
+			StatusMSG.FadesDisabled           => "ID666 song fadeout disabled",
 			
 			StatusMSG.FineCharEnabled         => "Fine character display enabled",
 			StatusMSG.FineCharDisabled        => "Fine character display disabled",
