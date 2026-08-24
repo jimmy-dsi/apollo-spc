@@ -47,7 +47,22 @@ public class EmuDataBuffer: ICloneable {
 	}
 	
 	public class DSP3State: ICloneable {
-		public DSPVoice3[] Voice { get; internal set; } = new DSPVoice3[8];
+		public UInt16      EchoOffset         { get; internal set; }
+		public UInt16      EchoAddress        { get; internal set; }
+		public byte        EchoPage           { get; internal set; }
+		public UInt16      EchoLength         { get; internal set; }
+		
+		public UInt64      LastEchoReadCycle  { get; internal set; }
+		public UInt16      LastEchoReadAddr   { get; internal set; }
+		public Int16       LastEchoReadLeft   { get; internal set; }
+		public Int16       LastEchoReadRight  { get; internal set; }
+		
+		public UInt64      LastEchoWriteCycle { get; internal set; }
+		public UInt16      LastEchoWriteAddr  { get; internal set; }
+		public Int16       LastEchoWriteLeft  { get; internal set; }
+		public Int16       LastEchoWriteRight { get; internal set; }
+		
+		public DSPVoice3[] Voice         { get; internal set; } = new DSPVoice3[8];
 		
 		public DSP3State Clone() {
 			var clone = (DSP3State) MemberwiseClone();
@@ -97,24 +112,32 @@ public class EmuDataBuffer: ICloneable {
 	}
 	
 	public class DSPVoice3: ICloneable {
-		public Int16[]          Buffer         { get; internal set; } = new Int16[8];
-		public byte             BufferOffset   { get; internal set; }
-		public UInt16           GaussianOffset { get; internal set; }
-		public UInt16           BRRAddress     { get; internal set; }
-		public byte             BRROffset      { get; internal set; }
-		public byte             KeyOnDelay     { get; internal set; }
-		public DSP.EnvelopeMode EnvMode        { get; internal set; }
-		public UInt16           EnvLevel       { get; internal set; }
+		public Int16[]          Buffer          { get; internal set; } = new Int16[8];
+		public byte             BufferOffset    { get; internal set; }
+		public UInt16           GaussianOffset  { get; internal set; }
+		public UInt16           BRRAddress      { get; internal set; }
+		public byte             BRROffset       { get; internal set; }
+		public byte             KeyOnDelay      { get; internal set; }
+		public DSP.EnvelopeMode EnvMode         { get; internal set; }
+		public UInt16           EnvLevel        { get; internal set; }
 		
-		public Int16            GAINEnvLevel   { get; internal set; }
-		public bool             KeyLatch       { get; internal set; }
-		public bool             KeyOn          { get; internal set; }
-		public bool             KeyOff         { get; internal set; }
-		public bool             PitchModOn     { get; internal set; }
-		public bool             NoiseOn        { get; internal set; }
-		public bool             EchoOn         { get; internal set; }
-		public bool             End            { get; internal set; }
-		public bool             Looped         { get; internal set; }
+		public Int16            GAINEnvLevel    { get; internal set; }
+		public bool             KeyLatch        { get; internal set; }
+		public bool             KeyOn           { get; internal set; }
+		public bool             KeyOff          { get; internal set; }
+		public bool             PitchModOn      { get; internal set; }
+		public bool             NoiseOn         { get; internal set; }
+		public bool             EchoOn          { get; internal set; }
+		public bool             End             { get; internal set; }
+		public bool             Looped          { get; internal set; }
+		
+		public byte             QueuedSRCN      { get; internal set; }
+		public byte             CurrentSRCN     { get; internal set; }
+		
+		public UInt16           TruePitch       { get; internal set; }
+		public UInt16           BRRSubOffset    { get; internal set; }
+		
+		public UInt32           CurrentLoopIter { get; internal set; }
 		
 		public DSPVoice3 Clone() {
 			var clone = (DSPVoice3) MemberwiseClone();
@@ -152,14 +175,14 @@ public class EmuDataBuffer: ICloneable {
 	
 	public class SMPState: ICloneable {
 		public struct TimerState {
-			bool Enabled;
+			public bool Enabled { get; internal set; }
 			
-			byte Stage0;
-			byte Stage1;
-			byte Stage2;
+			public byte Stage0  { get; internal set; }
+			public byte Stage1  { get; internal set; }
+			public byte Stage2  { get; internal set; }
 			
-			byte Divider;
-			byte Output;
+			public byte Divider { get; internal set; }
+			public byte Output  { get; internal set; }
 			
 			internal TimerState(SMP.Properties.TimerProps timerProps) {
 				Enabled = timerProps.Enabled;
@@ -248,10 +271,11 @@ public class EmuDataBuffer: ICloneable {
 		object ICloneable.Clone() => Clone();
 	}
 	
-	public long    Step      { get; private set; }
-	public long    DSPCycle  { get; private set; }
-	public long    InstrStep { get; private set; }
-	public UInt16? BreakPC   { get; private set; }
+	public long     Step           { get; private set; }
+	public long     DSPCycle       { get; private set; }
+	public long     InstrStep      { get; private set; }
+	public UInt16?  BreakPC        { get; private set; }
+	public Emulator RecentSnapshot { get; private set; }
 	
 	public byte[]?             ARAM_Data             { get; private set; }
 	public byte[]?             SMP_BusData           { get; private set; }
@@ -268,10 +292,12 @@ public class EmuDataBuffer: ICloneable {
 	static long nextStep = 0;
 	
 	public EmuDataBuffer(long dspCycle, long instrStep, UInt16? breakPC) {
-		DSPCycle = dspCycle;
-		Step = nextStep;
-		InstrStep = instrStep;
-		BreakPC = breakPC;
+		DSPCycle       = dspCycle;
+		Step           = nextStep;
+		InstrStep      = instrStep;
+		BreakPC        = breakPC;
+		RecentSnapshot = CliMain.GetSnapshot(dspCycle)!;
+		
 		nextStep++;
 	}
 	
@@ -307,7 +333,7 @@ public class EmuDataBuffer: ICloneable {
 			ARAM_Data = new byte[length];
 			
 			for (var a = startAddr; a < startAddr + length; a++) {
-				if (startAddr + length > 0xFFFF) {
+				if (a > 0xFFFF) {
 					break;
 				}
 				
@@ -320,7 +346,7 @@ public class EmuDataBuffer: ICloneable {
 			SMP_BusData = new byte[length];
 			
 			var startPage = startAddr & 0xFF00;
-			var lastPage  = Math.Clamp(startAddr + length - 1, 0, 0xFFFF) & 0xFF00;
+			var lastPage  = Math.Max(startAddr + length - 1, 0) & 0xFFFF00;
 			
 			var srcData = new byte[lastPage + 0x100 - startPage];
 			
@@ -397,28 +423,49 @@ public class EmuDataBuffer: ICloneable {
 		}
 		
 		if ((requests & Transfer.Requests.DSP_3) != 0) {
-			DSP_DebugState = new();
+			DSP_DebugState = new() {
+				EchoOffset         = emu.DSP.State.Echo.Offset,
+				EchoAddress        = emu.DSP.State.Echo.Address,
+				EchoPage           = emu.DSP.State.Echo.Page,
+				EchoLength         = emu.DSP.State.Echo.Length,
+				LastEchoReadCycle  = emu.DSP.State.Echo.LastReadCycle,
+				LastEchoReadAddr   = emu.DSP.State.Echo.LastReadAddr,
+				LastEchoReadLeft   = emu.DSP.State.Echo.LastReadLeft,
+				LastEchoReadRight  = emu.DSP.State.Echo.LastReadRight,
+				LastEchoWriteCycle = emu.DSP.State.Echo.LastWriteCycle,
+				LastEchoWriteAddr  = emu.DSP.State.Echo.LastWriteAddr,
+				LastEchoWriteLeft  = emu.DSP.State.Echo.LastWriteLeft,
+				LastEchoWriteRight = emu.DSP.State.Echo.LastWriteRight,
+			};
 			
 			for (var v = 0; v < 8; v++) {
 				DSP_DebugState.Voice[v] = new() {
-					Buffer         = emu.DSP.State.VoiceDebug[v].Buffer,
-					BufferOffset   = emu.DSP.State.VoiceDebug[v].BufferOffset,
-					GaussianOffset = emu.DSP.State.VoiceDebug[v].GaussianOffset,
-					BRRAddress     = emu.DSP.State.VoiceDebug[v].BRRAddress,
-					BRROffset      = emu.DSP.State.VoiceDebug[v].BRROffset,
-					KeyOnDelay     = emu.DSP.State.VoiceDebug[v].KeyOnDelay,
-					EnvMode        = emu.DSP.State.VoiceDebug[v].EnvMode,
-					EnvLevel       = emu.DSP.State.VoiceDebug[v].EnvLevel,
+					Buffer          = emu.DSP.State.VoiceDebug[v].Buffer,
+					BufferOffset    = emu.DSP.State.VoiceDebug[v].BufferOffset,
+					GaussianOffset  = emu.DSP.State.VoiceDebug[v].GaussianOffset,
+					BRRAddress      = emu.DSP.State.VoiceDebug[v].BRRAddress,
+					BRROffset       = emu.DSP.State.VoiceDebug[v].BRROffset,
+					KeyOnDelay      = emu.DSP.State.VoiceDebug[v].KeyOnDelay,
+					EnvMode         = emu.DSP.State.VoiceDebug[v].EnvMode,
+					EnvLevel        = emu.DSP.State.VoiceDebug[v].EnvLevel,
 					
-					GAINEnvLevel   = emu.DSP.State.VoiceDebug[v].GAINEnvLevel,
-					KeyLatch       = emu.DSP.State.VoiceDebug[v].KeyLatch,
-					KeyOn          = emu.DSP.State.VoiceDebug[v].KeyOn,
-					KeyOff         = emu.DSP.State.VoiceDebug[v].KeyOff,
-					PitchModOn     = emu.DSP.State.VoiceDebug[v].PitchModOn,
-					NoiseOn        = emu.DSP.State.VoiceDebug[v].NoiseOn,
-					EchoOn         = emu.DSP.State.VoiceDebug[v].EchoOn,
-					End            = emu.DSP.State.VoiceDebug[v].End,
-					Looped         = emu.DSP.State.VoiceDebug[v].Looped,
+					GAINEnvLevel    = emu.DSP.State.VoiceDebug[v].GAINEnvLevel,
+					KeyLatch        = emu.DSP.State.VoiceDebug[v].KeyLatch,
+					KeyOn           = emu.DSP.State.VoiceDebug[v].KeyOn,
+					KeyOff          = emu.DSP.State.VoiceDebug[v].KeyOff,
+					PitchModOn      = emu.DSP.State.VoiceDebug[v].PitchModOn,
+					NoiseOn         = emu.DSP.State.VoiceDebug[v].NoiseOn,
+					EchoOn          = emu.DSP.State.VoiceDebug[v].EchoOn,
+					End             = emu.DSP.State.VoiceDebug[v].End,
+					Looped          = emu.DSP.State.VoiceDebug[v].Looped,
+					
+					QueuedSRCN      = emu.DSP.State.VoiceDebug[v].QueuedSRCN,
+					CurrentSRCN     = emu.DSP.State.VoiceDebug[v].CurrentSRCN,
+					
+					TruePitch       = emu.DSP.State.VoiceDebug[v].TruePitch,
+					BRRSubOffset    = emu.DSP.State.VoiceDebug[v].BRRSubOffset,
+					
+					CurrentLoopIter = emu.DSP.State.VoiceDebug[v].CurrentLoopIter,
 				};
 			}
 		}

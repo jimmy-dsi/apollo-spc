@@ -37,6 +37,7 @@ public static class Display {
 	public static List<AnsiColor?[]> ColorBuffer => colorBuffer;
 	
 	public static bool UseBufferBlending { get; set; } = true;
+	public static bool UseBlending       { get; set; } = true;
 	
 	// Previous scrollable display color buffers
 	static List<      char[]>[] prevCharBuffers  = new List<      char[]>[]{};
@@ -367,6 +368,16 @@ public static class Display {
 		}
 	}
 	
+	public static AnsiColor? GetBufferColorAt(int x, int y) {
+		y %= MaxBufferRows;
+		
+		if (y < charBuffer.Count && x < charBuffer[y].Length) {
+			return colorBuffer[y][x];
+		}
+		
+		return null;
+	}
+	
 	public static void SetBufferCharAt(int x, int y, char ch, AnsiColor? col) {
 		y %= MaxBufferRows;
 		
@@ -433,6 +444,18 @@ public static class Display {
 				writeChar(c, x, y, col ?? color, writeToScrollBuf);
 				x++;
 			}
+		}
+	}
+	
+	public static void Highlight(int length, int? x_ = null, int? y_ = null, AnsiColor.Code? col = null, bool writeToScrollBuf = false) {
+		updateState(writeToScrollBuf);
+		
+		if (x_ != null) x = x_.Value;
+		if (y_ != null) y = y_.Value;
+		
+		for (var i = 0; i < length; i++) {
+			highlightChar(x, y, col, writeToScrollBuf);
+			x++;
 		}
 	}
 	
@@ -503,19 +526,19 @@ public static class Display {
 		var bottom = y + height - 1;
 			
 		for (var xx = left; xx <= right; xx++) {
-			writeChar('-', xx, top,    col ?? color, writeToScrollBuf);
-			writeChar('-', xx, bottom, col ?? color, writeToScrollBuf);
+			writeChar('─', xx, top,    col ?? color, writeToScrollBuf);
+			writeChar('─', xx, bottom, col ?? color, writeToScrollBuf);
 		}
 		
 		if (!removeSides) {
-			writeChar('+', left,  top,    col ?? color, writeToScrollBuf);
-			writeChar('+', right, top,    col ?? color, writeToScrollBuf);
-			writeChar('+', left,  bottom, col ?? color, writeToScrollBuf);
-			writeChar('+', right, bottom, col ?? color, writeToScrollBuf);
+			writeChar('┌', left,  top,    col ?? color, writeToScrollBuf);
+			writeChar('┐', right, top,    col ?? color, writeToScrollBuf);
+			writeChar('└', left,  bottom, col ?? color, writeToScrollBuf);
+			writeChar('┘', right, bottom, col ?? color, writeToScrollBuf);
 			
 			for (var yy = top + 1; yy < bottom; yy++) {
-				writeChar('|', left,  yy, col ?? color, writeToScrollBuf);
-				writeChar('|', right, yy, col ?? color, writeToScrollBuf);
+				writeChar('│', left,  yy, col ?? color, writeToScrollBuf);
+				writeChar('│', right, yy, col ?? color, writeToScrollBuf);
 			}
 		}
 	}
@@ -611,7 +634,7 @@ public static class Display {
 				}
 				else if (cl is not null && cl.IsBG || isMulti) {
 					if ((!cutoutEnabled || !IsInCutout(x, y)) && windowEnabled && IsInWindow(x, y)) {
-						if (UseBufferBlending) {
+						if (UseBufferBlending && UseBlending) {
 							var (wx, wy) = WindowCoords(x, y).AsTuple;
 						
 							cl = blendColors(
@@ -624,7 +647,7 @@ public static class Display {
 						}
 					}
 					else if (x < Width - 32 && y >= 0 && y < Height) {
-						if (isMulti) {
+						if (isMulti && UseBlending) {
 							isMultiBlended = true;
 							
 							cl = blendDualColors(
@@ -635,7 +658,7 @@ public static class Display {
 								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
 							);
 						}
-						else {
+						else if (UseBlending) {
 							cl = blendColors(
 								cl,
 								prevColorGrids[0][y][x],
@@ -646,7 +669,7 @@ public static class Display {
 						}
 					}
 					else {
-						if (isMulti) {
+						if (isMulti && UseBlending) {
 							isMultiBlended = true;
 							
 							cl = blendDualColors(
@@ -657,7 +680,7 @@ public static class Display {
 								(prevColorGrids[3][y][x], prevCharGrids[3][y][x])
 							);
 						}
-						else {
+						else if (UseBlending) {
 							cl = blendColors(
 								cl,
 								prevColorGrids[0][y][x],
@@ -859,8 +882,40 @@ public static class Display {
 		}
 	}
 	
+	static void highlightChar(int x, int y, AnsiColor.Code? color, bool writeToScrollBuf = false) {
+		var baseCol = writeToScrollBuf ? GetBufferColorAt(x, y) : ColorAt(x, y);
+		var fgCol   = (object?) baseCol?.ForegroundRGB ?? baseCol?.ForegroundANSI;
+		
+		AnsiColor? newCol;
+		
+		switch (fgCol) {
+			case Color c: {
+				newCol = color is null ? new(c) : new(c, color.Value);
+				break;
+			}
+			
+			case AnsiColor.Code c: {
+				newCol = color is null ? new(c) : new(c, color.Value);
+				break;
+			}
+			
+			default: {
+				newCol = color is null ? null : new(color.Value, isBG: true);
+				break;
+			}
+		}
+		
+		if (writeToScrollBuf) {
+			SetBufferColorAt(x, y, newCol);
+		}
+		else {
+			if (x >= Width || y >= Height) return;
+			colorGrid[y][x] = newCol;
+		}
+	}
+	
 	static void highlightChar(int x, int y, Color? color, bool writeToScrollBuf = false) {
-		var baseCol = ColorAt(x, y);
+		var baseCol = writeToScrollBuf ? GetBufferColorAt(x, y) : ColorAt(x, y);
 		var fgCol   = (object?) baseCol?.ForegroundRGB ?? baseCol?.ForegroundANSI;
 		
 		AnsiColor? newCol;

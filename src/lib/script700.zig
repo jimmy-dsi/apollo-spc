@@ -139,6 +139,13 @@ pub inline fn is_running(emu_ptr: ?*Emu) !bool {
     return ep.?.script700.enabled;
 }
 
+pub inline fn is_or_was_running(emu_ptr: ?*Emu) !bool {
+    const ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    return ep.?.script700.is_or_was_enabled;
+}
+
 pub inline fn get_wait_until_cycle(emu_ptr: ?*Emu) !?u64 {
     const ep = emu.get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);

@@ -4,6 +4,51 @@ const std = @import("std");
 // i.e. Channel disables, sample rate, interpolation/echo settings, etc.
 // This all goes through a separate pipeline so as not to interfere with emulation
 pub const Pipeline2 = struct {
+    pub const ProcessStage = enum {
+        Voices, MainEcho, Master
+    };
+
+    // Full emulator rendering diagram:
+    // ┌───────────────────────────────────────────────────────┐
+    // │ S-DSP                                    ┌────────┐   │  ┌┐ ┌───────────┐
+    // │                                      ┌───┤ Master ├───┼──┤├─┤ Post-proc ├─ Speaker
+    // │   ┌────────────┐            ┌──────┐ │ ┌─┤        │   │ ┌┤│ │           │
+    // │   │ Voices 0-8 ├───█───/────┤ Main ├─█ │ │        │   │ │└┘ └───────────┘
+    // │   └────────────┘   │        │      │ │ │ │        │   │ │      ▲
+    // │                    │        └──────┘ │ │ └────────┘   │ │     Final mix
+    // │                    │        ┌──────┐ │ │              │ │     multiplier
+    // │                    █───/────┤ Echo ├─┼─█              │ │
+    // │                    │        │      │ │ │              │ │
+    // │                    │        └──────┘ │ │              │ │
+    // └────────────────────┼─────────────────┼─┼──────────────┘ │
+    // ┌────────────────────┼─────────────────┼─┼──────────────┐ │
+    // │ "Pipeline 2"       │   Chan. muting  │ │ ┌────────┐   │ │
+    // │                    │           ▼     │ └─┤ Master ├───┼─┘
+    // │                    │     ┌┐ ┌──────┐ └───┤        │   │
+    // │   ┌────────────┐   █───/─┤├─┤ Main ├─────┤        │   │
+    // │   │ Voices 0-8 ├─█─┼───/─┤│ │      │ ┌───┤        │   │
+    // │   └────────────┘ │ │     └┘ └──────┘ │   └────────┘   │
+    // │     ▲            │ │     ┌┐ ┌──────┐ │     ▲          │
+    // │    Speed/pitch   │ └───/─┤├─┤ Echo ├─┘   Main/vol mix │
+    // │    changes       └─────/─┤│ │      │     multipliers  │
+    // │                          └┘ └──────┘                  │
+    // └───────────────────────────────────────────────────────┘
+    //
+    // Notes:
+    //  - S-DSP is always processed regardless of any Pipeline 2 overrides. Therefore, these do not affect the actual emulation in any way
+    //  - In terms of what gets output to the speaker, Pipeline 2 can override S-DSP rendering at any stage and utilize the output of
+    //    any of the S-DSP sub-modules diagrammed above.
+    //  - This is done to ensure that the output is as true to hardware as possible, and only some components will be overridden as is necessary
+    // Examples:
+    //  - Adjusting the mixing levels of the main or echo streams will override the "Master" submodule in the Pipeline 2 engine
+    //    In this case, Pipeline 2 will not handle "Voices 0-8" or Main and Echo - It will take the S-DSP's output from those instead
+    //  - Disabling 1 or more channels will override the "Main" and "Echo" submodules in the Pipeline 2 engine
+    //  - Adjusting the pitch offset of the song requires Pipeline 2 to override the "Voices 0-8" portion
+    //    This effectively overrides the entire S-DSP output and makes it so the final output is produced entirely from Pipeline 2
+
+    // Note: Currently, pipeline 2 always overrides the "Main/echo" portion
+    // TODO: Finish implementation according to the above diagram
+
     pub const Format = enum {
         u8, s16le, s24le, s32le, f32
     };
@@ -18,8 +63,6 @@ pub const Pipeline2 = struct {
 
         interpolation: Interpolation = .gauss,
 
-        snes_lowpass: bool = true,
-
         pitch_adjust: f32 = 1.0,
         speed_adjust: f32 = 1.0,
 
@@ -29,13 +72,11 @@ pub const Pipeline2 = struct {
         e_channels_enabled: [8]bool = [_]bool {true} ** 8, // For echo
         channel_mixer:      [8]f32  = [_]f32  {1.0}  ** 8,
 
-        master_vol: f32 = 1.0,
         main_vol:   f32 = 1.0,
         echo_vol:   f32 = 1.0,
 
         stereo_sep: f32 = 1.0,
 
-        reverse_master: bool = false,
         reverse_main:   bool = false,
         reverse_echo:   bool = false,
 
@@ -369,7 +410,7 @@ pub const Pipeline2 = struct {
                 dac_right_i17 +%= out_right;
             }
 
-            self.dac_left[i]  = i16_to_f64(@intCast(clamp_i16(i17, dac_left_i17)));
+            self.dac_left[i]  = i16_to_f64(@intCast(clamp_i16(i17,  dac_left_i17)));
             self.dac_right[i] = i16_to_f64(@intCast(clamp_i16(i17, dac_right_i17)));
         }
     }
@@ -467,5 +508,17 @@ pub const Pipeline2 = struct {
     fn trunc_i16(comptime T: type, n: T) T {
         const n_i16: i16 = @truncate(n);
         return @as(T, n_i16);
+    }
+
+    fn clamp_float(comptime T: type, n: T) T {
+        if (n > 1) {
+            return 1;
+        }
+        else if (n < -1) {
+            return -1;
+        }
+        else {
+            return n;
+        }
     }
 };

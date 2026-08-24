@@ -1,10 +1,9 @@
-using System.Diagnostics;
-using Jimbl;
-
 namespace SpcProgram;
 
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+using Jimbl;
 using Apollo;
 using SDL2;
 
@@ -13,6 +12,16 @@ public static class Driver {
 	
 	static long   frame = 0;
 	static object frameLock = new();
+	
+	const int NativeSampleRate   = 32000;
+	const int NativeSampleRateLP = 96000;
+	
+	const  int DspSampleRate    = 32000;
+	static int nativeSampleRate = 96000;
+	
+	static double rateMultiplier => nativeSampleRate / DspSampleRate;
+	
+	static uint device = (uint) IntPtr.Zero;
 	
 	public static long Frame {
 		get {
@@ -33,17 +42,19 @@ public static class Driver {
 		}
 	}
 	
-	public static void Setup(Action<EmuDataBuffer?> uiCallback) {
+	public static void Setup(Action<EmuDataBuffer?> uiCallback, bool enableLowPass) {
 		if (SDL.SDL_Init(SDL.SDL_INIT_AUDIO) < 0) {
 			Console.WriteLine("Failed to init SDL: " + SDL.SDL_GetError());
 			return;
 		}
 		
+		nativeSampleRate = enableLowPass ? NativeSampleRateLP : NativeSampleRate;
+		
 		// Run display before first cycle runs, in case it gets stuck in a Script700 infinite loop (we want there to be display instead of black screen)
 		uiCallback(null);
 
 		SDL.SDL_AudioSpec want = new();
-		want.freq     = 32000;
+		want.freq     = nativeSampleRate;
 		want.format   = SDL.AUDIO_S16; // 16-bit signed
 		want.channels = 2;             // Stereo
 		want.samples  = 512;           // Buffer size in samples
@@ -51,7 +62,7 @@ public static class Driver {
 
 		SDL.SDL_SetHint(SDL.SDL_HINT_AUDIO_RESAMPLING_MODE, "3"); // Use highest possible quality resampling if available
 
-		var device = SDL.SDL_OpenAudioDevice(null, 0, ref want, out SDL.SDL_AudioSpec have, 0);
+		device = SDL.SDL_OpenAudioDevice(null, 0, ref want, out _, 0);
 		if (device == IntPtr.Zero) {
 			Console.WriteLine("Failed to open audio: " + SDL.SDL_GetError());
 			SDL.SDL_Quit();
@@ -63,15 +74,44 @@ public static class Driver {
 			CliMain.MainLoop(uiCallback);
 		}
 		finally {
-			SDL.SDL_CloseAudioDevice(device);
-			SDL.SDL_Quit();
+			if (device != IntPtr.Zero) {
+				SDL.SDL_CloseAudioDevice(device);
+				SDL.SDL_Quit();
+			}
+		}
+	}
+	
+	public static void ChangeSampleRate(int newRate) {
+		lock (CliMain.EmuRestoreLock) {
+			nativeSampleRate = newRate;
+			
+			if (device != IntPtr.Zero) {
+				SDL.SDL_CloseAudioDevice(device);
+
+				SDL.SDL_AudioSpec want = new();
+				want.freq     = nativeSampleRate;
+				want.format   = SDL.AUDIO_S16; // 16-bit signed
+				want.channels = 2;             // Stereo
+				want.samples  = 512;           // Buffer size in samples
+				want.callback = Callback;
+
+				device = SDL.SDL_OpenAudioDevice(null, 0, ref want, out _, 0);
+			}
+			
+			if (device == IntPtr.Zero) {
+				SDL.SDL_Quit();
+				throw new Exception("Failed to open audio: " + SDL.SDL_GetError());
+			}
+			
+			SDL.SDL_PauseAudioDevice(device, 0); // Start playback
 		}
 	}
 	
 	static Random rng = new();
 	static int cycleSpillOver = 0;
 	
-	static bool    paused = false;
+	static List<Int16> leftOverSamps = [];
+	
 	static long    instrStep = 0;
 	static UInt16? breakPC = null;
 	
@@ -84,6 +124,9 @@ public static class Driver {
 	static void Callback(IntPtr userdata, IntPtr stream, int len) {
 		var numShorts = len / sizeof(Int16);
 		Int16[] buffer = new Int16[numShorts];
+		
+		var leftOverCopy = leftOverSamps.ToArray();
+		leftOverSamps.Clear();
 		
 		lock (CliMain.EmuRestoreLock) {
 			try {
@@ -105,23 +148,24 @@ public static class Driver {
 				}
 					
 				breakPC = null;
-				paused = false;
 				
-				var samples = numShorts / 2;
-		
-				var approxCycles = (samples - 1) * 64 - cycleSpillOver;
+				var samplesNative = (numShorts - leftOverCopy.Length) / 2;
+				var reqSamplesDSP = (int) Math.Ceiling(samplesNative / rateMultiplier);
+				
+				var approxCycles = (reqSamplesDSP - 1) * 64 - cycleSpillOver;
+				
 				if (!StepCycles(approxCycles)) {
 					return;
 				}
 				
-				if (!StepCycles(() => emu.SamplesQueued < samples)) {
+				if (!StepCycles(() => emu.SamplesQueued < reqSamplesDSP * rateMultiplier)) {
 					return;
 				}
 			
 				// Run a random extra number of cycles, between 0 and 63
 				// This way the UI display doesn't stay "phase-locked" with DSP pipeline step and look too unnatural
 				cycleSpillOver = rng.Next(0, 64);
-			
+				
 				if (!StepCycles(cycleSpillOver)) {
 					return;
 				}
@@ -129,8 +173,28 @@ public static class Driver {
 				buffer = emu.GetBufferedSamples();
 			}
 			finally {
+				// Perform burst process - custom routine that needs to run periodically but not at any specific rate
+				emu.BurstProcess(Emulator.BurstAction);
+				
+				// Copy leftover array into unmanaged buffer if non-empty
+				if (leftOverCopy.Length > 0 && leftOverCopy.Length < numShorts) {
+					Marshal.Copy(leftOverCopy, 0, stream, leftOverCopy.Length);
+					
+					numShorts -= leftOverCopy.Length;
+					stream    += leftOverCopy.Length * sizeof(Int16);
+				}
+				
 				// Copy managed array into unmanaged buffer
 				Marshal.Copy(buffer, 0, stream, numShorts);
+				
+				// Roll over into leftover array if any remaining
+				leftOverSamps.Clear();
+				
+				if (numShorts < buffer.Length && numShorts > buffer.Length - 12) {
+					for (var i = numShorts; i < buffer.Length; i++) {
+						leftOverSamps.Add(buffer[i]);
+					}
+				}
 				
 				Transfer.SendEmuData(instrStep, breakPC);
 				advanceFrame();
@@ -151,7 +215,7 @@ public static class Driver {
 			return false;
 		}
 		
-		if (emu.Script700.IsRunning) {
+		if (emu.Script700.IsOrWasRunning) {
 			var bpEnabled = CliMain.BreakpointsEnabled;
 			var completed = emu.StepNCycles(cycles, breakpointsEnabled: bpEnabled);
 			
@@ -209,7 +273,7 @@ public static class Driver {
 			return false;
 		}
 		
-		if (emu.Script700.IsRunning) {
+		if (emu.Script700.IsOrWasRunning) {
 			var bpEnabled = CliMain.BreakpointsEnabled;
 			var success = emu.StepCyclesUntil(condition, out var steps, out var breakpoint, breakpointsEnabled: bpEnabled);
 			
@@ -257,7 +321,7 @@ public static class Driver {
 	}
 	
 	static bool StepInstruction() {
-		if (emu.Script700.IsRunning) {
+		if (emu.Script700.IsOrWasRunning) {
 			var success = true;
 			try { emu.StepInstruction(consumeBreakpoint: true); } catch (Script700Timeout) { success = false; }
 			

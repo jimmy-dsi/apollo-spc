@@ -100,7 +100,7 @@ public static class KeyBindings {
 		}
 		
 		public Key(char printable) {
-			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '<' or '>' or ' ') && !printable.IsAsciiLetterOrDigit()) {
+			if (!(printable is '!' or '@' or '#' or '$' or '%' or '^' or '&' or '*' or '(' or ')' or '<' or '>' or ' ' or '-' or '+' or '=') && !printable.IsAsciiLetterOrDigit()) {
 				throw new ArgumentException();
 			}
 			
@@ -148,6 +148,7 @@ public static class KeyBindings {
 		ToggleEchoChannel_6,
 		ToggleEchoChannel_7,
 		ToggleEchoChannel_8,
+		ToggleLPF,
 		ScrollRowUp,
 		ScrollRowDown,
 		ScrollPageUp,
@@ -176,6 +177,15 @@ public static class KeyBindings {
 		ToggleBreakpoints,
 		IncHeatMapDataSize,
 		DecHeatMapDataSize,
+		ContextKey_B,
+		ContextKey_L,
+		ContextKey_M,
+		ContextKey_R,
+		ZoomIn,
+		ZoomOut,
+		SettingsMenuSelect,
+		
+		WindowsCharSetting,
 	}
 		
 	static Key?      lastCtrlKey    = null;

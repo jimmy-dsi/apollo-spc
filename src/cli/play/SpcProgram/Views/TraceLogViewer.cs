@@ -211,7 +211,7 @@ public static partial class CliMain {
 			
 			var c = spc.Mode == SPC.ExecMode.Interrupt ? '*' : ' ';
 			
-			Display.Write($"{pc:X4} | {c}", x,                      y, col: highlight,     writeToScrollBuf: true);
+			Display.Write($"{pc:X4} │ {c}", x,                      y, col: highlight,     writeToScrollBuf: true);
 			Display.Write($"{insName} ",    x + 8,                  y, col: highlightName, writeToScrollBuf: true);
 			Display.Write($"{operands}",    x + 9 + insName.Length, y, col: highlight,     writeToScrollBuf: true);
 			

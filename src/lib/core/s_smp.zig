@@ -992,16 +992,13 @@ pub const SSMP = struct {
                     self.append_read_log(address, self.last_read_bytes[0]);
                 }
 
-                const delay = 
-                    if (address & 0xFFFC == 0x00F4) b: {
-                        const d, _ = self.get_wait_cycles(true, address);
-                        break :b d;
-                    }
-                    else
-                        0
-                    ;
+                if (address & 0xFFFC == 0x00F4) {
+                    try self.wait(true, address);
+                }
+                else {
+                    try self.co.wait(0); // Trigger immediate state advance
+                }
 
-                try self.co.wait(delay);
                 unreachable;
             },
             2 => {

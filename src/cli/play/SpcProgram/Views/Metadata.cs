@@ -17,9 +17,9 @@ public static partial class CliMain {
 		
 		if (titleField[0].TrimEnd() != "")  Display.WriteBox(titleField,  17, 1);
 		else                                Display.WriteBox(["<none>"],  17, 1, AnsiColor.Green);
-		if (gameField[0].TrimEnd() != "")   Display.WriteBox(gameField,   17, 2);
+		if (artistField[0].TrimEnd() != "") Display.WriteBox(artistField, 17, 2);
 		else                                Display.WriteBox(["<none>"],  17, 2, AnsiColor.Green);
-		if (artistField[0].TrimEnd() != "") Display.WriteBox(artistField, 17, 3);
+		if (gameField[0].TrimEnd() != "")   Display.WriteBox(gameField,   17, 3);
 		else                                Display.WriteBox(["<none>"],  17, 3, AnsiColor.Green);
 		if (dumperField[0].TrimEnd() != "") Display.WriteBox(dumperField, 17, 4);
 		else                                Display.WriteBox(["<none>"],  17, 4, AnsiColor.Green);

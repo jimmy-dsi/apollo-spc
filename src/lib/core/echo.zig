@@ -45,9 +45,11 @@ fn read(s: *DSPStateInternal, comptime channel: u1, aram_echo_0: [*]u8, aram_ech
     }
 
     if (channel == 0) {
+        e.__last_read_left_q = samp_i16;
         e._history_left[e._history_offset] = samp_i16 >> 1;
     }
     else {
+        e.__last_read_right_q = samp_i16;
         e._history_right[e._history_offset] = samp_i16 >> 1;
     }
 }
@@ -62,6 +64,18 @@ fn write(s: *DSPStateInternal, comptime channel: u1, aram_echo_0: [*]u8, aram_ec
     if (e._readonly == 0) {
         const addr = e._address +% @as(u16, channel) * 2;
         const sample: u17 = @bitCast(echo_out.*);
+
+        const samp_u16: u16 = @intCast(sample & 0xFFFF);
+        const samp_i16: i16 = @bitCast(samp_u16);
+
+        if (channel == 0) {
+            e.__last_write_left_q = samp_i16;
+        }
+        else {
+            e.__last_write_right_q = samp_i16;
+        }
+
+        e.__write_triggered = true;
     
         aram_echo_0[addr]      = @truncate(sample & 0xFF);
         aram_echo_1[addr +% 1] = @truncate(sample >> 8);
@@ -114,7 +128,6 @@ pub fn step_b(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, fir_
     left  +%= calc_fir(s, 0, 2, fir_2);
     right +%= calc_fir(s, 1, 2, fir_2);
 
-
     if (s.pipeline_2) |p| {
         p.set_fir_coef(1, fir_1);
         p.set_fir_coef(2, fir_2);
@@ -124,6 +137,12 @@ pub fn step_b(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, fir_
     e._input_right +%= right;
 
     read(s, 1, aram_echo_0, aram_echo_1);
+
+    //e.__last_read_cycle = s.
+    e.__last_read_addr = e._address;
+
+    e.__last_read_left  = e.__last_read_left_q;
+    e.__last_read_right = e.__last_read_right_q;
 }
 
 pub fn step_c(s: *DSPStateInternal, fir_3: i8, fir_4: i8, fir_5: i8) void {
@@ -252,5 +271,16 @@ pub fn step_h(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8, edl:
 }
 
 pub fn step_i(s: *DSPStateInternal, aram_echo_0: [*]u8, aram_echo_1: [*]u8) void {
+    var e = &s._echo;
     write(s, 1, aram_echo_0, aram_echo_1);
+
+    if (e.__write_triggered) {
+        //e.__last_write_cycle = s.
+        e.__last_write_addr = e._address;
+
+        e.__last_write_left  = e.__last_write_left_q;
+        e.__last_write_right = e.__last_write_right_q;
+
+        e.__write_triggered = false;
+    }
 }

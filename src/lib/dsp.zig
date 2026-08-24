@@ -2,6 +2,7 @@ const std = @import("std");
 
 const Emu  = @import("core/emu.zig").Emu;
 const SDSP = @import("core/s_dsp.zig").SDSP;
+const BRR  = @import("core/brr.zig");
 
 const main = @import("main.zig");
 const emu  = @import("emu.zig");
@@ -50,28 +51,53 @@ pub const VoiceState = extern struct {
 };
 
 pub const DebugGlobalState = extern struct {
+    echo_offset:  ?[*]u16 = null,
+    echo_address: ?[*]u16 = null,
+    echo_page:    ?[*]u8  = null,
+    echo_length:  ?[*]u16 = null,
 
+    last_echo_read_cycle: ?[*]u64 = null,
+    last_echo_read_addr:  ?[*]u16 = null,
+    last_echo_read_left:  ?[*]i16 = null,
+    last_echo_read_right: ?[*]i16 = null,
+
+    last_echo_write_cycle: ?[*]u64 = null,
+    last_echo_write_addr:  ?[*]u16 = null,
+    last_echo_write_left:  ?[*]i16 = null,
+    last_echo_write_right: ?[*]i16 = null,
 };
 
 pub const DebugVoiceState = extern struct {
-    buffer:          ?[*]const i16 = null,
-    buffer_offset:   ?[*]const u8  = null,
-    gaussian_offset: ?[*]const u16 = null,
-    brr_address:     ?[*]const u16 = null,
-    brr_offset:      ?[*]const u8  = null,
-    key_on_delay:    ?[*]const u8  = null,
-    env_mode:        ?[*]const u8  = null,
-    env_level:       ?[*]const u16 = null,
+    buffer:            ?[*]const i16 = null,
+    buffer_offset:     ?[*]const u8  = null,
+    gaussian_offset:   ?[*]const u16 = null,
+    brr_address:       ?[*]const u16 = null,
+    brr_offset:        ?[*]const u8  = null,
+    key_on_delay:      ?[*]const u8  = null,
+    env_mode:          ?[*]const u8  = null,
+    env_level:         ?[*]const u16 = null,
 
-    gain_env_level:  ?[*]const u8  = null,
-    key_latch:       ?[*]const u8  = null,
-    key_on:          ?[*]const u8  = null,
-    key_off:         ?[*]const u8  = null,
-    pitch_mod_on:    ?[*]const u8  = null,
-    noise_on:        ?[*]const u8  = null,
-    echo_on:         ?[*]const u8  = null,
-    end:             ?[*]const u8  = null,
-    looped:          ?[*]const u8  = null,
+    gain_env_level:    ?[*]const u8  = null,
+    key_latch:         ?[*]const u8  = null,
+    key_on:            ?[*]const u8  = null,
+    key_off:           ?[*]const u8  = null,
+    pitch_mod_on:      ?[*]const u8  = null,
+    noise_on:          ?[*]const u8  = null,
+    echo_on:           ?[*]const u8  = null,
+    end:               ?[*]const u8  = null,
+    looped:            ?[*]const u8  = null,
+
+    queued_srcn:       ?[*]const u8  = null,
+    current_srcn:      ?[*]const u8  = null,
+
+    true_pitch:        ?[*]const u16 = null,
+    brr_sub_offset:    ?[*]const u16 = null,
+
+    current_loop_iter: ?[*]const u32 = null,
+};
+
+pub const SampleUsageFlags = extern struct {
+    flags: ?[*]const u8 = null,
 };
 
 pub inline fn get_aram_ptr(emu_ptr: ?*Emu) !?[]u8 {
@@ -123,6 +149,30 @@ pub inline fn get_global_state(emu_ptr: ?*Emu) !GlobalState {
     };
 }
 
+pub inline fn get_global_debug_state(emu_ptr: ?*Emu) !DebugGlobalState {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const state = &ep.?.s_dsp.state._internal;
+
+    return .{
+        .echo_offset  = @ptrCast(&state._echo._offset),
+        .echo_address = @ptrCast(&state._echo._address),
+        .echo_page    = @ptrCast(&state._echo._esa_page),
+        .echo_length  = @ptrCast(&state._echo._length),
+
+        .last_echo_read_cycle = @ptrCast(&state._echo.__last_read_cycle),
+        .last_echo_read_addr  = @ptrCast(&state._echo.__last_read_addr),
+        .last_echo_read_left  = @ptrCast(&state._echo.__last_read_left),
+        .last_echo_read_right = @ptrCast(&state._echo.__last_read_right),
+
+        .last_echo_write_cycle = @ptrCast(&state._echo.__last_write_cycle),
+        .last_echo_write_addr  = @ptrCast(&state._echo.__last_write_addr),
+        .last_echo_write_left  = @ptrCast(&state._echo.__last_write_left),
+        .last_echo_write_right = @ptrCast(&state._echo.__last_write_right),
+    };
+}
+
 pub inline fn get_voice_state(voice_idx: u3, emu_ptr: ?*Emu) !VoiceState {
     var ep = emu.get_ptr(emu_ptr);
     try main.validate_ptr(Emu, ep);
@@ -159,23 +209,64 @@ pub inline fn get_voice_debug_state(voice_idx: u3, emu_ptr: ?*Emu) !DebugVoiceSt
     const voice = &ep.?.s_dsp.state._internal._voice[voice_idx];
 
     return .{
-        .buffer          = @ptrCast(&voice._buffer),
-        .buffer_offset   = @ptrCast(&voice._buffer_offset),
-        .gaussian_offset = @ptrCast(&voice._gaussian_offset),
-        .brr_address     = @ptrCast(&voice._brr_address),
-        .brr_offset      = @ptrCast(&voice._brr_offset),
-        .key_on_delay    = @ptrCast(&voice._key_on_delay),
-        .env_mode        = @ptrCast(&voice._env_mode),
-        .env_level       = @ptrCast(&voice._env_level),
+        .buffer            = @ptrCast(&voice._buffer),
+        .buffer_offset     = @ptrCast(&voice._buffer_offset),
+        .gaussian_offset   = @ptrCast(&voice._gaussian_offset),
+        .brr_address       = @ptrCast(&voice._brr_address),
+        .brr_offset        = @ptrCast(&voice._brr_offset),
+        .key_on_delay      = @ptrCast(&voice._key_on_delay),
+        .env_mode          = @ptrCast(&voice._env_mode),
+        .env_level         = @ptrCast(&voice._env_level),
 
-        .gain_env_level  = @ptrCast(&voice.__env_level),
-        .key_latch       = @ptrCast(&voice.__key_latch),
-        .key_on          = @ptrCast(&voice.__key_on),
-        .key_off         = @ptrCast(&voice.__key_off),
-        .pitch_mod_on    = @ptrCast(&voice.__pitch_mod_on),
-        .noise_on        = @ptrCast(&voice.__noise_on),
-        .echo_on         = @ptrCast(&voice.__echo_on),
-        .end             = @ptrCast(&voice.__end),
-        .looped          = @ptrCast(&voice.__looped),
+        .gain_env_level    = @ptrCast(&voice.__env_level),
+        .key_latch         = @ptrCast(&voice.__key_latch),
+        .key_on            = @ptrCast(&voice.__key_on),
+        .key_off           = @ptrCast(&voice.__key_off),
+        .pitch_mod_on      = @ptrCast(&voice.__pitch_mod_on),
+        .noise_on          = @ptrCast(&voice.__noise_on),
+        .echo_on           = @ptrCast(&voice.__echo_on),
+        .end               = @ptrCast(&voice.__end),
+        .looped            = @ptrCast(&voice.__looped),
+
+        .queued_srcn       = @ptrCast(&voice.__queued_srcn),
+        .current_srcn      = @ptrCast(&voice.__cur_playing_srcn),
+
+        .true_pitch        = @ptrCast(&voice.__true_pitch),
+        .brr_sub_offset    = @ptrCast(&voice.__brr_sub_offset),
+
+        .current_loop_iter = @ptrCast(&voice.__cur_iteration),
     };
+}
+
+pub inline fn get_sample_usage_flags(emu_ptr: ?*Emu) !SampleUsageFlags {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const dsp = &ep.?.s_dsp;
+
+    return .{
+        .flags = @ptrCast(&dsp.sample_usage_flags)
+    };
+}
+
+pub inline fn reset_sample_usage(sample_id: u8, emu_ptr: ?*Emu) !void {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const dsp = &ep.?.s_dsp;
+
+    dsp.reset_sample_usage(sample_id);
+}
+
+pub inline fn decode_brr_from_buffer(input_buffer: []const u8, offset: u16, decode_buffer: []i16, old_decoded: i16, older_decoded: i16) !i32 {
+    return BRR.decode_from_buffer(input_buffer, offset, decode_buffer, old_decoded, older_decoded);
+}
+
+pub inline fn decode_brr_at_address(addr: u16, decode_buffer: []i16, old_decoded: i16, older_decoded: i16, emu_ptr: ?*Emu) !i32 {
+    var ep = emu.get_ptr(emu_ptr);
+    try main.validate_ptr(Emu, ep);
+
+    const dsp = &ep.?.s_dsp;
+
+    return BRR.decode_from_address(dsp, addr, decode_buffer, old_decoded, older_decoded);
 }

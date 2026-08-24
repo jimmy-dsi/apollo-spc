@@ -182,4 +182,8 @@ public static class Env {
 		splits = splits[..^1];
 		return string.Join('.', splits);
 	}
+	
+	public static string FileName(string filePath) {
+		return SPath.GetFileName(filePath);
+	}
 }

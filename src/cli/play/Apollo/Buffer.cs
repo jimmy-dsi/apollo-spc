@@ -65,6 +65,21 @@ public unsafe class UInt8Buffer: IEnumerable<byte> {
 			*(ptr + index % size) = value;
 		}
 	}
+	
+	public virtual byte[] this[Range range] {
+		get {
+			var start = range.Start.Normalize(Length);
+			var end   = range  .End.Normalize(Length);
+			
+			var result = new byte[end - start];
+			
+			for (var i = start; i < end; i++) {
+				result[i - start] = this[i];
+			}
+			
+			return result;
+		}
+	}
 
 	public IEnumerator<byte> GetEnumerator() {
 		for (var i = 0; i < size; i++) {
@@ -96,6 +111,27 @@ public unsafe class UInt8BufferShared: UInt8Buffer {
 			emu.AcquireLock();
 			try     { *(ptr + index % size) = value; }
 			finally { emu.ReleaseLock(); }
+		}
+	}
+	
+	public override byte[] this[Range range] {
+		get {
+			emu.AcquireLock();
+			try {
+				var start = range.Start.Normalize(Length);
+				var end   = range  .End.Normalize(Length);
+			
+				var result = new byte[end - start];
+			
+				for (var i = start; i < end; i++) {
+					result[i - start] = *(ptr + i % size);
+				}
+			
+				return result;
+			}
+			finally {
+				emu.ReleaseLock();
+			}
 		}
 	}
 }

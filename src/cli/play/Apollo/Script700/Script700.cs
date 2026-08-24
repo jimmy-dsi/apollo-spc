@@ -206,11 +206,13 @@ public partial class Script700 {
 		
 		public string Compile() {
 			StringBuilder sb = new();
-			var currentByte = 0;
-			var labelIndex  = 0;
+			var currentByte  = 0;
+			var labelIndex   = 0;
+			var lineAppended = false;
 			
 			foreach (var bytes in Bytes) {
 				sb.Append(";@line").Append('\n');
+				lineAppended = false;
 				
 				foreach (var (i, b) in bytes.Enum()) {
 					if (labelIndex < Labels.Count && currentByte == Labels[^1].Item1) {
@@ -223,13 +225,19 @@ public partial class Script700 {
 					sb.Append(b.ToString("X2"));
 					
 					if (i % 8 == 7) {
+						lineAppended = true;
 						sb.Append('\n');
 					}
 					else {
+						lineAppended = false;
 						sb.Append(' ');
 					}
 					
 					currentByte++;
+				}
+				
+				if (!lineAppended) {
+					sb.Append('\n');
 				}
 			}
 			
@@ -402,6 +410,21 @@ public partial class Script700 {
 			Emulator.MaybeAcquireLock();
 			try {
 				var isRunning = DLL.Script700IsRunning(Emulator.handle);
+				if (!isRunning) {
+					Emulator.CheckForError();
+				}
+				
+				return isRunning;
+			}
+			finally { Emulator.MaybeReleaseLock(); }
+		}
+	}
+	
+	public bool IsOrWasRunning {
+		get {
+			Emulator.MaybeAcquireLock();
+			try {
+				var isRunning = DLL.Script700IsOrWasRunning(Emulator.handle);
 				if (!isRunning) {
 					Emulator.CheckForError();
 				}

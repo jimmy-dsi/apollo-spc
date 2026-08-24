@@ -26,6 +26,7 @@ public enum ResultType {
 	EmuIsNotMain          = 13,
 	
 	SpcNotLoaded          = 14,
+	RangeError            = 15,
 }
 
 public class Error: Exception {
@@ -49,7 +50,7 @@ public class Error: Exception {
 			case ResultType.Script700LoadError:    throw new Script700LoadError();
 			case ResultType.Script700CompileError: throw new Script700CompileError();
 			case ResultType.EmuIsNotMain:          throw new EmuNotMainError();
-			case ResultType.SpcNotLoaded:          throw new SpcNotLoadedError();
+			case ResultType.RangeError:            throw new ArgumentOutOfRangeException();
 		}
 	}
 }

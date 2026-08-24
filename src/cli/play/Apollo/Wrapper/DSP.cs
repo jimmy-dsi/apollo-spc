@@ -15,11 +15,38 @@ internal partial class DLL {
 	[LibraryImport("apollo", EntryPoint = "dsp_get_global_state")]
 	public static partial DspGlobalState DspGetGlobalState(Emulator.Handle? emuPtr);
 	
+	[LibraryImport("apollo", EntryPoint = "dsp_get_global_debug_state")]
+	public static partial DspDebugGlobalState DspGetGlobalDebugState(Emulator.Handle? emuPtr);
+	
 	[LibraryImport("apollo", EntryPoint = "dsp_get_voice_state")]
 	public static partial DspVoiceState DspGetVoiceState(Byte voiceIdx, Emulator.Handle? emuPtr);
 	
 	[LibraryImport("apollo", EntryPoint = "dsp_get_voice_debug_state")]
 	public static partial DspDebugVoiceState DspGetVoiceDebugState(Byte voiceIdx, Emulator.Handle? emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "dsp_get_sample_usage_flags")]
+	public static partial DspSampleUsageFlags DspGetSampleUsageFlags(Emulator.Handle? emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "dsp_reset_sample_usage")]
+	[return: MarshalAs(UnmanagedType.I1)]
+	public static partial bool DspResetSampleUsage(byte sampleId, Emulator.Handle emuPtr);
+	
+	[LibraryImport("apollo", EntryPoint = "dsp_decode_brr_from_buffer")]
+	public static partial Int32 DspDecodeBrrFromBuffer(IntPtr inputBuffer,
+	                                                   UInt16 inputLen,
+	                                                   UInt16 offset,
+	                                                   IntPtr decodeBuffer,
+	                                                   UInt32 bufferLen,
+	                                                   Int16 oldDecoded,
+	                                                   Int16 olderDecoded);
+	
+	[LibraryImport("apollo", EntryPoint = "dsp_decode_brr_at_address")]
+	public static partial Int32 DspDecodeBrrAtAddress(UInt16 addr,
+	                                                  IntPtr decodeBuffer,
+	                                                  UInt32 bufferLen,
+	                                                  Int16 oldDecoded,
+	                                                  Int16 olderDecoded,
+	                                                  Emulator.Handle emuPtr);
 	
 	[StructLayout(LayoutKind.Sequential)]
 	internal struct DspGlobalState {
@@ -41,6 +68,24 @@ internal partial class DLL {
 		public IntPtr MainVolRight;
 		
 		public IntPtr BrrBank;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct DspDebugGlobalState {
+		public IntPtr EchoOffset;
+		public IntPtr EchoAddress;
+		public IntPtr EchoPage;
+		public IntPtr EchoLength;
+		
+		public IntPtr LastEchoReadCycle;
+		public IntPtr LastEchoReadAddr;
+		public IntPtr LastEchoReadLeft;
+		public IntPtr LastEchoReadRight;
+		
+		public IntPtr LastEchoWriteCycle;
+		public IntPtr LastEchoWriteAddr;
+		public IntPtr LastEchoWriteLeft;
+		public IntPtr LastEchoWriteRight;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
@@ -86,5 +131,18 @@ internal partial class DLL {
 		public IntPtr EchoOn;
 		public IntPtr End;
 		public IntPtr Looped;
+		
+		public IntPtr QueuedSRCN;
+		public IntPtr CurrentSRCN;
+		
+		public IntPtr TruePitch;
+		public IntPtr BrrSubOffset;
+		
+		public IntPtr CurrentLoopIter;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	internal struct DspSampleUsageFlags {
+		public IntPtr Flags;
 	}
 }

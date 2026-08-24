@@ -20,12 +20,17 @@ pub const Emu = struct {
 
     // This struct is for storing the emulator-specific info where it only makes sense to have one single global instance
     pub const Singleton = struct {
-        pipeline_2: Pipeline2 = .{}, // Second audio rendering pipeline
+        pipeline_2: Pipeline2 = .{},  // Second audio rendering pipeline
 
         dac_buffer_left:  [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
         dac_buffer_right: [DacBufSize]i16 = [_]i16 {0} ** DacBufSize,
         dac_buffer_offset: u32 = 0,
         dac_offset_prev:   u32 = 0,
+
+        lowpass_enabled: bool = true,
+        
+        mixing_vol: f32 = 1.0,        // Mixing volume multiplier for final output stream
+        reverse_master: bool = false, // Whether or not to reverse left and right channels on final output
 
         master_debug_mode: DebugMode = DebugMode.none,
         cur_debug_mode:    DebugMode = DebugMode.none,
@@ -50,13 +55,34 @@ pub const Emu = struct {
             const lu16: u16 = @intCast(lu17 & 0xFFFF);
             const ru16: u16 = @intCast(ru17 & 0xFFFF);
             //
-            const ls16: i16 = @bitCast(lu16);
-            const rs16: i16 = @bitCast(ru16);
+            var ls16: i16 = @bitCast(lu16);
+            var rs16: i16 = @bitCast(ru16);
+
+            // Do mixing
+            var lf64: f64 = @floatFromInt(ls16);
+            var rf64: f64 = @floatFromInt(rs16);
+            lf64 *= self.mixing_vol;
+            rf64 *= self.mixing_vol;
+
+            ls16 = clamp_f64_i16(lf64);
+            rs16 = clamp_f64_i16(rf64);
 
             self.dac_buffer_left [self.dac_buffer_offset] = ls16;
             self.dac_buffer_right[self.dac_buffer_offset] = rs16;
 
             self.dac_buffer_offset = (self.dac_buffer_offset + 1) % DacBufSize;
+        }
+
+        inline fn clamp_f64_i16(n: f64) i16 {
+            if (n > 0x7FFF) {
+                return 0x7FFF;
+            }
+            else if (n < -0x8000) {
+                return -0x8000;
+            }
+            else {
+                return @intFromFloat(n);
+            }
         }
 
         pub inline fn consume_dac_samples(self: *Singleton) struct {[]i16, []i16, ?[]i16, ?[]i16} {
@@ -284,6 +310,18 @@ pub const Emu = struct {
         pub fn disable_echo_voice(self: *Singleton, index: u3) void {
             self.pipeline_2.disable_echo_voice(index);
         }
+
+        pub inline fn enable_lowpass(self: *Singleton) void {
+            self.lowpass_enabled = true;
+        }
+
+        pub inline fn disable_lowpass(self: *Singleton) void {
+            self.lowpass_enabled = false;
+        }
+
+        pub inline fn set_mixing_vol(self: *Singleton, vol: f32) void {
+            self.mixing_vol = vol;
+        }
     };
 
     const StepTimeout = 100;
@@ -361,6 +399,32 @@ pub const Emu = struct {
     pub fn set_default_vector(self: *Emu, vector: u16) void {
         self.default_interrupt_vector = vector;
         self.s_smp.update_interrupt_vector(vector);
+    }
+
+    pub inline fn lowpass_enabled(self: *const Emu) bool {
+        if (self.singleton) |s| {
+            return s.lowpass_enabled;
+        }
+
+        return false;
+    }
+
+    pub inline fn enable_lowpass(self: *Emu) void {
+        if (self.singleton) |s| {
+            s.enable_lowpass();
+        }
+    }
+
+    pub inline fn disable_lowpass(self: *Emu) void {
+        if (self.singleton) |s| {
+            s.disable_lowpass();
+        }
+    }
+
+    pub inline fn set_mixing_vol(self: *Emu, vol: f32) void {
+        if (self.singleton) |s| {
+            s.set_mixing_vol(vol);
+        }
     }
 
     pub inline fn queue_dac_sample(self: *Emu, left: i17, right: i17) void {

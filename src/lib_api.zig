@@ -148,6 +148,21 @@ pub export fn emu_consume_breakpoint(emu_ptr: ?[*]Emu) bool {
     return emu.consume_breakpoint(@ptrCast(emu_ptr)) catch |e| return emu.ferr(e, @ptrCast(emu_ptr));
 }
 
+pub export fn emu_enable_lowpass(emu_ptr: ?[*]Emu) bool {
+    emu.enable_lowpass(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_disable_lowpass(emu_ptr: ?[*]Emu) bool {
+    emu.disable_lowpass(@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn emu_set_mixing_vol(emu_ptr: ?[*]Emu, vol: f32) bool {
+    emu.set_mixing_vol(@ptrCast(emu_ptr), vol) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
 pub export fn emu_copy(dest_emu_ptr: ?[*]Emu, src_emu_ptr: ?[*]Emu) bool {
     emu.copy(@ptrCast(dest_emu_ptr), @ptrCast(src_emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(dest_emu_ptr)); };
     return true;
@@ -188,12 +203,36 @@ pub export fn dsp_get_global_state(emu_ptr: ?[*]Emu) dsp.GlobalState {
     return dsp.get_global_state(@ptrCast(emu_ptr)) catch |e| emu.derr(dsp.GlobalState, e, @ptrCast(emu_ptr));
 }
 
+pub export fn dsp_get_global_debug_state(emu_ptr: ?[*]Emu) dsp.DebugGlobalState {
+    return dsp.get_global_debug_state(@ptrCast(emu_ptr)) catch |e| emu.derr(dsp.DebugGlobalState, e, @ptrCast(emu_ptr));
+}
+
 pub export fn dsp_get_voice_state(voice_idx: u8, emu_ptr: ?[*]Emu) dsp.VoiceState {
     return dsp.get_voice_state(@intCast(voice_idx & 7), @ptrCast(emu_ptr)) catch |e| emu.derr(dsp.VoiceState, e, @ptrCast(emu_ptr));
 }
 
 pub export fn dsp_get_voice_debug_state(voice_idx: u8, emu_ptr: ?[*]Emu) dsp.DebugVoiceState {
     return dsp.get_voice_debug_state(@intCast(voice_idx & 7), @ptrCast(emu_ptr)) catch |e| emu.derr(dsp.DebugVoiceState, e, @ptrCast(emu_ptr));
+}
+
+pub export fn dsp_get_sample_usage_flags(emu_ptr: ?[*]Emu) dsp.SampleUsageFlags {
+    return dsp.get_sample_usage_flags(@ptrCast(emu_ptr)) catch |e| emu.derr(dsp.SampleUsageFlags, e, @ptrCast(emu_ptr));
+}
+
+pub export fn dsp_reset_sample_usage(sample_id: u8, emu_ptr: ?[*]Emu) bool {
+    dsp.reset_sample_usage(sample_id ,@ptrCast(emu_ptr)) catch |e| { return emu.ferr(e, @ptrCast(emu_ptr)); };
+    return true;
+}
+
+pub export fn dsp_decode_brr_from_buffer(input_buffer: ?[*]u8, input_len: u16, offset: u16, decode_buffer: ?[*]i16, buffer_len: u32, old_decoded: i16, older_decoded: i16) i32 {
+    const in_slice: []u8  = if (input_buffer)  |ptr| ptr[0..input_len]  else &.{};
+    const slice:    []i16 = if (decode_buffer) |ptr| ptr[0..buffer_len] else &.{};
+    return dsp.decode_brr_from_buffer(in_slice, offset, slice, old_decoded, older_decoded) catch |e| main.zerr(i32, e);
+}
+
+pub export fn dsp_decode_brr_at_address(addr: u16, decode_buffer: ?[*]i16, buffer_len: u32, old_decoded: i16, older_decoded: i16, emu_ptr: ?[*]Emu) i32 {
+    const slice: []i16 = if (decode_buffer) |ptr| ptr[0..buffer_len] else &.{};
+    return dsp.decode_brr_at_address(addr, slice, old_decoded, older_decoded, @ptrCast(emu_ptr)) catch |e| emu.zerr(i32, e, @ptrCast(emu_ptr));
 }
 
 // SMP
@@ -328,6 +367,10 @@ pub export fn script700_load_label_remappings(emu_ptr: ?[*]Emu, label_remappings
 
 pub export fn script700_is_running(emu_ptr: ?[*]Emu) bool {
     return script700.is_running(@ptrCast(emu_ptr)) catch |e| emu.ferr(e, @ptrCast(emu_ptr));
+}
+
+pub export fn script700_is_or_was_running(emu_ptr: ?[*]Emu) bool {
+    return script700.is_or_was_running(@ptrCast(emu_ptr)) catch |e| emu.ferr(e, @ptrCast(emu_ptr));
 }
 
 pub export fn script700_get_wait_until_cycle(emu_ptr: ?[*]Emu) u64 {

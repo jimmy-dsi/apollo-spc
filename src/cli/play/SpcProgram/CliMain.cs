@@ -3,6 +3,7 @@ namespace SpcProgram;
 using Apollo;
 using Jimbl;
 using Jimbl.Graphics;
+using Jimbl.JSON5;
 
 public static partial class CliMain {
 	public static Emulator PrimaryEmu  { get; private set; }
@@ -63,6 +64,8 @@ public static partial class CliMain {
 			}
 		}
 	}
+	
+	public static string SpcFilePath { get; internal set; }
 
 	public static int Start(string[] args) {
 		try {
@@ -90,6 +93,8 @@ public static partial class CliMain {
 			PrimaryEmu.LoadSpcFile(spcFilePath);
 			PrimaryEmu.SMP.LoggingEnabled = true;
 			
+			SpcFilePath = spcFilePath;
+			
 			// Enable Script700 if binary or source file is present
 			var scriptBinary = Script700.BinaryFile(spcFilePath);
 			var scriptSource = Script700.ScriptFile(spcFilePath);
@@ -108,12 +113,19 @@ public static partial class CliMain {
 				PrimaryEmu.Script700.LoadBinaryFile(File.ReadAllBytes(scriptBinary));
 			}
 			
+			// Load JSON5 settings if it exists
+			LoadSettings(PrimaryEmu);
+			
+			Emulator.BurstAction = Analysis.TrackSampleUsage;
+			PrimaryEmu.AdditionalState = new Analysis.Container();
+			
 			RunAheadEmu = PrimaryEmu.SaveState();
 			seekBarSnapshot(0, RunAheadEmu);
 			
 			// Register Key Bindings
 			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
 			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
+			//KeyBindings.Register(KeyBindings.Key.Char('G'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowRight, KeyBindings.Action.NavNextView);
 			KeyBindings.Register(KeyBindings.Key.ArrowLeft,  KeyBindings.Action.NavPrevView);
 			KeyBindings.Register(KeyBindings.Key.Char('0'),  KeyBindings.Action.EnableAllChannels);
@@ -145,6 +157,7 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.F2,         KeyBindings.Action.ToggleEchoChannel_2);
 			KeyBindings.Register(KeyBindings.Key.F3,         KeyBindings.Action.ToggleEchoChannel_3);
 			KeyBindings.Register(KeyBindings.Key.F4,         KeyBindings.Action.ToggleEchoChannel_4);
+			KeyBindings.Register(KeyBindings.Key.Char('P'),  KeyBindings.Action.ToggleLPF, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.ArrowUp,    KeyBindings.Action.ScrollRowUp);
 			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.ScrollRowDown);
 			KeyBindings.Register(KeyBindings.Key.PageUp,     KeyBindings.Action.ScrollPageUp);
@@ -175,10 +188,22 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.ArrowDown,  KeyBindings.Action.DecHeatMapDataSize, ctrl: true);
 			KeyBindings.Register(KeyBindings.Key.F9,         KeyBindings.Action.IncHeatMapDataSize);
 			KeyBindings.Register(KeyBindings.Key.F10,        KeyBindings.Action.DecHeatMapDataSize);
+			KeyBindings.Register(KeyBindings.Key.Char('B'),  KeyBindings.Action.ContextKey_B);
+			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ContextKey_L);
+			KeyBindings.Register(KeyBindings.Key.Char('M'),  KeyBindings.Action.ContextKey_M);
+			KeyBindings.Register(KeyBindings.Key.Char('R'),  KeyBindings.Action.ContextKey_R);
+			KeyBindings.Register(KeyBindings.Key.Char('+'),  KeyBindings.Action.ZoomIn);
+			KeyBindings.Register(KeyBindings.Key.Char('='),  KeyBindings.Action.ZoomIn);
+			KeyBindings.Register(KeyBindings.Key.Char('-'),  KeyBindings.Action.ZoomOut);
+			KeyBindings.Register(KeyBindings.Key.Enter,      KeyBindings.Action.SettingsMenuSelect);
+			#if LINUX
+			#else
+				KeyBindings.Register(KeyBindings.Key.F11, KeyBindings.Action.WindowsCharSetting, ctrl: true);
+			#endif
 			
 			// Create RAM memory view buffer and Trace logger view buffer
 			Display.CurrentBufferId = "aram";
-			Display.ResetWindowBuffer(91, 0x1000, 0, 0, 91, ScrollAreaRows);
+			Display.ResetWindowBuffer(110, 0x1000, 0, 0, 110, ScrollAreaRows);
 			Display.CurrentBufferId = "trace";
 			Display.ResetWindowBuffer(Display.Width, ScrollAreaRows, 0, 0, Display.Width, ScrollAreaRows);
 			Display.SetWindowProps(0, 0, 91, ScrollAreaRows);
@@ -194,7 +219,7 @@ public static partial class CliMain {
 			Thread keyListener = new(KeyListener.Run);
 			keyListener.Start();
 			
-			Driver.Setup(handleUI);
+			Driver.Setup(handleUI, initLPStatus);
 		}
 		catch (SpcMissingHeaderError) {
 			Console.Error.WriteLine($"error: An unknown error occurred while attempting to process SPC metadata");
@@ -209,10 +234,15 @@ public static partial class CliMain {
 			return 0;
 		}
 		finally {
-			KillAllThreads = true; // Send signal to run-ahead thread to terminate
-			runAheadThread?.Join();
-			Lib.Deinit();
-			Console.CursorVisible = true;
+			try {
+				if (settingsLoaded) SaveSettings();
+			}
+			finally {
+				KillAllThreads = true; // Send signal to run-ahead thread to terminate
+				runAheadThread?.Join();
+				Lib.Deinit();
+				Console.CursorVisible = true;
+			}
 		}
 		
 		return 0;
@@ -292,6 +322,8 @@ public static partial class CliMain {
 				runAheadEmu.StepNCyclesFast(cycles);
 			}
 			
+			runAheadEmu.BurstProcess(Emulator.BurstAction);
+			
 			long playCycle;
 			lock (barCycleLock) {
 				playCycle = barCycle;
@@ -326,12 +358,24 @@ public static partial class CliMain {
 		}
 	}
 	
-	static int getSnapshotIndex(long cycle) {
+	public static int GetSnapshotIndex(long cycle) {
 		return (int) (cycle / (2048000 / SnapsPerSecond));
 	}
 	
+	static Emulator? lastGottenSnapshot = null;
+	
+	public static Emulator? GetSnapshot(long cycle) {
+		var snapshotIndex = GetSnapshotIndex(cycle);
+		lock (seekBarLock) {
+			if (seekBarSnapshots.ContainsKey(snapshotIndex)) {
+				lastGottenSnapshot = seekBarSnapshots[snapshotIndex];
+			}
+			return lastGottenSnapshot;
+		}
+	}
+	
 	static void seekBarSnapshot(long cycle, Emulator runAheadEmu) {
-		var snapshotIndex = getSnapshotIndex(cycle);
+		var snapshotIndex = GetSnapshotIndex(cycle);
 		
 		lock (seekBarLock) {
 			if (ReferenceEquals(runAheadEmu, RunAheadEmu) && !seekBarSnapshots.ContainsKey(snapshotIndex)) {

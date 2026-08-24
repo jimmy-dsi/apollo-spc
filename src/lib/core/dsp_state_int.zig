@@ -3,6 +3,7 @@ const envelope = @import("envelope.zig");
 const brr      = @import("brr.zig");
 
 const Pipeline2 = @import("pipeline_2.zig").Pipeline2;
+const SDSP      = @import("s_dsp.zig").SDSP;
 
 pub const DSPStateInternal = struct {
     pub const EnvMode = enum(u8) {
@@ -40,6 +41,15 @@ pub const DSPStateInternal = struct {
         __echo_on:      u1  = 0,
         __end:          u1  = 0,
         __looped:       u1  = 0,
+
+        // Misc. debug values
+        __queued_srcn:      u8 = 0x00,
+        __cur_playing_srcn: u8 = 0x00, // The source number of the current BRR address
+
+        __true_pitch: u15 = 0,
+
+        __brr_sub_offset: u14 = 0,
+        __cur_iteration:  u32 = 0,
     };
 
     pub const Echo = struct {
@@ -58,6 +68,29 @@ pub const DSPStateInternal = struct {
         _history_offset: u3  = 0,
 
         // Debug stuff
+        // Echo read
+        __last_read_cycle: u64 = 0,
+        __last_read_addr:  u16 = 0,
+
+        __last_read_left:  i16 = 0,
+        __last_read_right: i16 = 0,
+
+        __last_read_left_q:  i16 = 0,
+        __last_read_right_q: i16 = 0,
+
+        // Echo write
+        __write_triggered: bool = false,
+
+        __last_write_cycle: u64 = 0,
+        __last_write_addr:  u16 = 0,
+
+        __last_write_left:  i16 = 0,
+        __last_write_right: i16 = 0,
+
+        __last_write_left_q:  i16 = 0,
+        __last_write_right_q: i16 = 0,
+
+        // Other
         __fir_coefs_processed: u3 = 0,
 
         __calc_history_left:  [8]i17 = [_]i17{0x00} ** 8,
@@ -96,6 +129,19 @@ pub const DSPStateInternal = struct {
     _outx:   i8  = 0x00,
     _pitch:  u15 = 0x0000,
     _output: i16 = 0x0000,
+
+    pub inline fn init(self: *DSPStateInternal, dsp: *const SDSP) void {
+        // Ensure internal state is sync'd with DSP register values upon loading an SPC file
+        const e = &self._echo;
+        const b = &self._brr;
+
+        e._esa_page = dsp.state.echo.esa_page;
+        e._readonly = dsp.state.echo.readonly;
+        e._address  = @as(u16, dsp.state.echo.esa_page) << 8;
+        e._length   = @as(u16, dsp.state.echo.delay) << 11;
+
+        b._bank = dsp.state.brr_bank;
+    }
 
     pub inline fn load_from(self: *DSPStateInternal, other: *const DSPStateInternal) void {
         // Copy all but Pipeline 2 reference
@@ -162,9 +208,10 @@ pub const DSPStateInternal = struct {
         }
     }
 
-    pub fn voice_step_a(self: *DSPStateInternal, source: u8) void {
+    pub fn voice_step_a(self: *DSPStateInternal, v_idx: u3, source: u8) void {
         self._brr._cur_address = (@as(u16, self._brr._bank) << 8) +% (@as(u16, self._brr._cur_source) << 2);
         self._brr._cur_source = source;
+        self._voice[v_idx].__queued_srcn = source;
     }
 
     pub fn voice_step_b(self: *DSPStateInternal, v_idx: u3, aram_0: [*]u8, aram_1: [*]u8, pitch_lo: u8, adsr_0: u8) void {
@@ -241,7 +288,11 @@ pub const DSPStateInternal = struct {
                 v._brr_offset    = 1;
                 v._buffer_offset = 0;
 
+                v.__cur_playing_srcn = v.__queued_srcn;
+                v.__cur_iteration    = 0;
+
                 self._brr._cur_block_header = 0; // I guess the first BRR block of a sample when keyed on is forced to header value 00 (Is that why most encoders zero out the first block?)
+                                                 // Update: Nevermind, it gets overwritten by the real header byte value before the first decode call happens
             }
 
             // Envelope is never run during KON
@@ -259,6 +310,8 @@ pub const DSPStateInternal = struct {
             // Internal pitch latch is reset to zero during KON and does not advance gaussian offset
             self._pitch = 0;
         }
+
+        v.__true_pitch = self._pitch;
 
         const output: i16 =
             if (v.__noise_on == 0)
@@ -316,10 +369,14 @@ pub const DSPStateInternal = struct {
                     // It just sets envelope level to 0 instantly
                     v._brr_address = self._brr._next_address;
                     v.__looped = 1;
+                    v.__cur_iteration +%= 1;
+                    v.__cur_playing_srcn = v.__queued_srcn;
                 }
                 v._brr_offset = 1;
             }
         }
+
+        v.__brr_sub_offset = @intCast(v._gaussian_offset & 0x3FFF);
 
         // Advance sample offset by last written pitch (should match pitch of current voice when written)
         v._gaussian_offset = (v._gaussian_offset & 0x3FFF) + @as(u16, self._pitch);
