@@ -183,6 +183,7 @@ public static class KeyBindings {
 		ContextKey_R,
 		ZoomIn,
 		ZoomOut,
+		SettingsMenuSelect,
 		
 		WindowsCharSetting,
 	}

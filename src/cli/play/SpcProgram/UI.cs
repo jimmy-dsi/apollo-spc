@@ -53,6 +53,12 @@ public static partial class CliMain {
 		
 		ZoomIn, ZoomOut,
 		
+		ExitSettingsMenu,
+		LowpassSettingDesc, ID666SettingDesc,
+		CycleDisplaySettingDesc, HeatMapSettingDesc,
+		HeatMapSizeSettingDesc,
+		ChannelSettingDesc, MainChannelSettingDesc, EchoChannelSettingDesc,
+		
 		FineCharEnabled, FineCharDisabled
 	}
 	
@@ -68,13 +74,14 @@ public static partial class CliMain {
 	static bool displayInit       = true;
 	static bool ignoreStepDisplay = false;
 	
-	static View       realView       = View.Metadata;
-	static View       currentView    = View.Metadata;
-	static View       nextView       = View.Metadata;
-	static string     menuBarMsg     = "Press CTRL+L for help menu";
-	static string?    tempMenuBarMsg = null;
-	static bool       menuBarError   = false;
-	static Stopwatch? tempMsgTime    = null;
+	static View       realView           = View.Metadata;
+	static View       currentView        = View.Metadata;
+	static View       nextView           = View.Metadata;
+	static StatusMSG? defaultMsgOverride = null;
+	static string     menuBarMsg         = "Press CTRL+L for help/settings menu";
+	static string?    tempMenuBarMsg     = null;
+	static bool       menuBarError       = false;
+	static Stopwatch? tempMsgTime        = null;
 	
 	static int         channelToToggle    = 0;
 	static int         seekPosition       = 1;
@@ -112,6 +119,10 @@ public static partial class CliMain {
 		true, true, true, true, 
 		true, true, true, true
 	};
+	
+	static int lastChanChanged = 0;
+	static int lastMainChanged = 0;
+	static int lastEchoChanged = 0;
 	
 	static int actionDisableBuffer = 0;
 	
@@ -670,30 +681,172 @@ public static partial class CliMain {
 			
 			case KeyBindings.Action.ToggleHelpMenu: {
 				if (currentView == View.Help) {
+					resetStatusMsg();
 					changeCurrentView(realView, setAsRealView: false);
 				}
 				else {
 					realView = currentView;
 					changeCurrentView(View.Help, setAsRealView: false);
+					displaySettingDesc();
 				}
 				
 				break;
 			}
 			
 			case KeyBindings.Action.NavNextView: {
-				tracePrevView = null;
-				viewIndex++;
-				viewIndex %= views.Length;
-				changeCurrentView(views[viewIndex], setAsRealView: false);
+				if (currentView != View.Help) {
+					tracePrevView = null;
+					viewIndex++;
+					viewIndex %= views.Length;
+					changeCurrentView(views[viewIndex], setAsRealView: false);
+				}
+				else {
+					switch (settingsRow) {
+						case 0: { // Save and exit
+							break;
+						}
+				
+						case 1: { // SNES lowpass filter
+							toggleLPF();
+							break;
+						}
+				
+						case 2: { // ID666 fadeout
+							break;
+						}
+				
+						case 3: { // Cycle display format
+							cyclesInSpcClocks = !cyclesInSpcClocks;
+							setTempStatusMsg(StatusMSG.CycleDisplayChanged);
+							break;
+						}
+				
+						case 4: { // Heat map
+							if (!heatMapEnabled) {
+								heatMapEnabled = true;
+								heatMapMemMode = HeatMapMode.TypeAware;
+							}
+							else if (heatMapMemMode == HeatMapMode.TypeAware) {
+								heatMapMemMode = HeatMapMode.Unsigned;
+							}
+							else {
+								heatMapEnabled = false;
+							}
+					
+							if (heatMapEnabled) {
+								setTempStatusMsg(StatusMSG.HeatMapOn);
+							}
+							else {
+								setTempStatusMsg(StatusMSG.HeatMapOff);
+							}
+							
+							break;
+						}
+				
+						case 5: { // Script700 heat map data size
+							heatMapDataSize = heatMapDataSize.Next();
+							setTempStatusMsg(StatusMSG.BusSizeChanged);
+							break;
+						}
+						
+						case 6: { // Channels
+							lastChanChanged++;
+							lastChanChanged %= 8;
+							break;
+						}
+						
+						case 7: { // Main channels
+							lastMainChanged++;
+							lastMainChanged %= 8;
+							break;
+						}
+						
+						case 8: { // Echo channels
+							lastEchoChanged++;
+							lastEchoChanged %= 8;
+							break;
+						}
+					}
+				}
 				break;
 			}
 			
 			case KeyBindings.Action.NavPrevView: {
-				tracePrevView = null;
-				viewIndex--;
-				viewIndex += views.Length;
-				viewIndex %= views.Length;
-				changeCurrentView(views[viewIndex], setAsRealView: false);
+				if (currentView != View.Help) {
+					tracePrevView = null;
+					viewIndex--;
+					viewIndex += views.Length;
+					viewIndex %= views.Length;
+					changeCurrentView(views[viewIndex], setAsRealView: false);
+				}
+				else {
+					switch (settingsRow) {
+						case 0: { // Save and exit
+							break;
+						}
+				
+						case 1: { // SNES lowpass filter
+							toggleLPF();
+							break;
+						}
+				
+						case 2: { // ID666 fadeout
+							break;
+						}
+				
+						case 3: { // Cycle display format
+							cyclesInSpcClocks = !cyclesInSpcClocks;
+							setTempStatusMsg(StatusMSG.CycleDisplayChanged);
+							break;
+						}
+				
+						case 4: { // Heat map
+							if (!heatMapEnabled) {
+								heatMapEnabled = true;
+								heatMapMemMode = HeatMapMode.Unsigned;
+							}
+							else if (heatMapMemMode == HeatMapMode.Unsigned) {
+								heatMapMemMode = HeatMapMode.TypeAware;
+							}
+							else {
+								heatMapEnabled = false;
+							}
+					
+							if (heatMapEnabled) {
+								setTempStatusMsg(StatusMSG.HeatMapOn);
+							}
+							else {
+								setTempStatusMsg(StatusMSG.HeatMapOff);
+							}
+							
+							break;
+						}
+				
+						case 5: { // Script700 heat map data size
+							heatMapDataSize = heatMapDataSize.Prev();
+							setTempStatusMsg(StatusMSG.BusSizeChanged);
+							break;
+						}
+						
+						case 6: { // Channels
+							lastChanChanged--;
+							if (lastChanChanged < 0) lastChanChanged += 8;
+							break;
+						}
+						
+						case 7: { // Main channels
+							lastMainChanged--;
+							if (lastMainChanged < 0) lastMainChanged += 8;
+							break;
+						}
+						
+						case 8: { // Echo channels
+							lastEchoChanged--;
+							if (lastEchoChanged < 0) lastEchoChanged += 8;
+							break;
+						}
+					}
+				}
 				break;
 			}
 			
@@ -856,6 +1009,11 @@ public static partial class CliMain {
 					prevEchoOffsetStart = echoScrollOffset;
 					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
 				}
+				else if (currentView == View.Help) {
+					settingsRow -= 1;
+					if (settingsRow < 0) settingsRow += settingsMenu.Length;
+					displaySettingDesc();
+				}
 				
 				break;
 			}
@@ -883,6 +1041,11 @@ public static partial class CliMain {
 					
 					prevEchoOffsetStart = echoScrollOffset;
 					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
+				}
+				else if (currentView == View.Help) {
+					settingsRow += 1;
+					settingsRow %= settingsMenu.Length;
+					displaySettingDesc();
 				}
 				
 				break;
@@ -997,7 +1160,9 @@ public static partial class CliMain {
 			}
 			
 			case KeyBindings.Action.ToggleHeatMap: {
-				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.SMPViewer or View.Script700Viewer) {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.SMPViewer or View.Script700Viewer
+				                or View.Help)
+				{
 					if (!heatMapEnabled) {
 						heatMapEnabled = true;
 						heatMapMemMode = HeatMapMode.TypeAware;
@@ -1226,6 +1391,36 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.SettingsMenuSelect: {
+				if (currentView == View.Help) {
+					switch (settingsRow) {
+						case 0: { // Save and exit
+							if (currentView == View.Help) {
+								changeCurrentView(realView, setAsRealView: false);
+							}
+							break;
+						}
+						
+						case 6: { // Channels
+							toggleChannel(lastChanChanged);
+							break;
+						}
+						
+						case 7: { // Main channels
+							toggleMainChannel(lastMainChanged);
+							break;
+						}
+						
+						case 8: { // Echo channels
+							toggleEchoChannel(lastEchoChanged);
+							break;
+						}
+					}
+				}
+				
+				break;
+			}
+			
 			case KeyBindings.Action.WindowsCharSetting: {
 				if (!FineCharDisplay) {
 					FineCharDisplay = true;
@@ -1272,25 +1467,39 @@ public static partial class CliMain {
 	
 	static void toggleChannel(int channelIndex) {
 		var newOnState = PrimaryEmu.ToggleVoice(channelIndex);
+		
 		mainChannelsEnabled[channelIndex] = newOnState;
 		echoChannelsEnabled[channelIndex] = newOnState;
+		
 		channelToToggle = channelIndex + 1;
+		
+		lastChanChanged = channelIndex;
+		lastMainChanged = channelIndex;
+		lastEchoChanged = channelIndex;
 		
 		setTempStatusMsg(newOnState ? StatusMSG.ChannelX_Enabled : StatusMSG.ChannelX_Disabled);
 	}
 	
 	static void toggleMainChannel(int channelIndex) {
 		var newOnState = PrimaryEmu.ToggleMainVoice(channelIndex);
+		
 		mainChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
+		
+		lastChanChanged = channelIndex;
+		lastMainChanged = channelIndex;
 		
 		setTempStatusMsg(newOnState ? StatusMSG.MainChannelX_Enabled : StatusMSG.MainChannelX_Disabled);
 	}
 	
 	static void toggleEchoChannel(int channelIndex) {
 		var newOnState = PrimaryEmu.ToggleEchoVoice(channelIndex);
+		
 		echoChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
+		
+		lastChanChanged = channelIndex;
+		lastEchoChanged = channelIndex;
 		
 		setTempStatusMsg(newOnState ? StatusMSG.EchoChannelX_Enabled : StatusMSG.EchoChannelX_Disabled);
 	}
@@ -1481,23 +1690,28 @@ public static partial class CliMain {
 		Display.Clear();
 	}
 	
-	static void setStatusMsg(StatusMSG msg, bool error = false) {
+	static void setStatusMsg(StatusMSG msg, bool error = false, bool forceOverride = false) {
 		tempMenuBarMsg = null;
 		menuBarError   = false;
 		tempMsgTime    = null;
 		
 		menuBarMsg   = statusMsg(msg);
 		menuBarError = error;
+		
+		if (forceOverride) {
+			defaultMsgOverride = msg;
+		}
 	}
 	
 	static void resetStatusMsg() {
+		defaultMsgOverride = null;
 		if (tempMenuBarMsg is null) {
 			setStatusMsg(StatusMSG.Default);
 		}
 	}
 	
 	static void setTempStatusMsg(StatusMSG msg, bool error = false) {
-		setStatusMsg(StatusMSG.Default);
+		setStatusMsg(defaultMsgOverride ?? StatusMSG.Default);
 		
 		tempMenuBarMsg = statusMsg(msg);
 		tempMsgTime    = new();
@@ -1540,44 +1754,55 @@ public static partial class CliMain {
 		lastSetMsg = msg;
 		
 		return msg switch {
-			StatusMSG.Default               => "Press CTRL+L for help menu",
-			StatusMSG.NowPlaying            => $"Now playing: {nowPlayingText()} [{Env.FileName(SpcFilePath)}]",
-			StatusMSG.HeatMapOff            => "Heat map disabled",
-			StatusMSG.HeatMapOn             => $"Heat map mode set to: {(heatMapMemMode == HeatMapMode.TypeAware ? "Type-aware" : "Unsigned 8-bit")}",
-			StatusMSG.BusSizeChanged        => $"Heat map data size changed to {heatMapDataSize.Name()}",
-			StatusMSG.ChannelX_Disabled     => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
-			StatusMSG.ChannelX_Enabled      => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
-			StatusMSG.MainChannelX_Disabled => $"Main channel {channelToToggle} disabled {showActiveChannels()}",
-			StatusMSG.MainChannelX_Enabled  => $"Main channel {channelToToggle} enabled  {showActiveChannels()}",
-			StatusMSG.EchoChannelX_Disabled => $"Echo channel {channelToToggle} disabled {showActiveChannels()}",
-			StatusMSG.EchoChannelX_Enabled  => $"Echo channel {channelToToggle} enabled  {showActiveChannels()}",
-			StatusMSG.LPF_Disabled          => $"SNES Low-Pass Filter disabled",
-			StatusMSG.LPF_Enabled           => $"SNES Low-Pass Filter enabled",
-			StatusMSG.AllChannelsEnabled    => $"All channels enabled    {showActiveChannels()}",
-			StatusMSG.SeekFwd               => $"Seek +5 seconds",
-			StatusMSG.SeekBack              => $"Seek -5 seconds",
-			StatusMSG.SeekFwdFar            => $"Seek +30 seconds",
-			StatusMSG.SeekBackFar           => $"Seek -30 seconds",
-			StatusMSG.SeekPos               => $"Seek to position {seekPosition}",
-			StatusMSG.SteppedCycles         => cyclesInSpcClocks ? 
-			                                         $"Stepped {stepCycles / 2} SPC cycle{(stepCycles / 2 == 1 ? "" : "s")}"
-			                                       : $"Stepped {stepCycles} DSP cycles",
-			StatusMSG.CycleDisplayChanged   => $"Cycle display mode changed: {(cyclesInSpcClocks ? "SPC700" : "S-DSP")}",
-			StatusMSG.Paused                => $"Paused",
-			StatusMSG.BreakExec             => $"Execution break",
-			StatusMSG.BreakpointHit         => $"Execution breakpoint hit at ${execBreakpointAddr:X4}",
-			StatusMSG.BreakpointsOn         => $"All breakpoints enabled",
-			StatusMSG.BreakpointsOff        => $"All breakpoints disabled",
-			StatusMSG.Script700_Error       => $"Script700 error occurred",
-			StatusMSG.Continue              => $"Resuming playback",
+			StatusMSG.Default                 => "Press CTRL+L for help/settings menu"
+			                                     + (nextView == View.EchoViewer ? "       + or - to zoom       L/R/B/M to change wave view" : ""),
+			StatusMSG.NowPlaying              => $"Now playing: {nowPlayingText()} [{Env.FileName(SpcFilePath)}]",
+			StatusMSG.HeatMapOff              => "Heat map disabled",
+			StatusMSG.HeatMapOn               => $"Heat map mode set to: {(heatMapMemMode == HeatMapMode.TypeAware ? "Type-aware" : "Unsigned 8-bit")}",
+			StatusMSG.BusSizeChanged          => $"Heat map data size changed to {heatMapDataSize.Name()}",
+			StatusMSG.ChannelX_Disabled       => $"Channel {channelToToggle} disabled      {showActiveChannels()}",
+			StatusMSG.ChannelX_Enabled        => $"Channel {channelToToggle} enabled       {showActiveChannels()}",
+			StatusMSG.MainChannelX_Disabled   => $"Main channel {channelToToggle} disabled {showActiveChannels()}",
+			StatusMSG.MainChannelX_Enabled    => $"Main channel {channelToToggle} enabled  {showActiveChannels()}",
+			StatusMSG.EchoChannelX_Disabled   => $"Echo channel {channelToToggle} disabled {showActiveChannels()}",
+			StatusMSG.EchoChannelX_Enabled    => $"Echo channel {channelToToggle} enabled  {showActiveChannels()}",
+			StatusMSG.LPF_Disabled            => $"SNES Low-Pass Filter disabled",
+			StatusMSG.LPF_Enabled             => $"SNES Low-Pass Filter enabled",
+			StatusMSG.AllChannelsEnabled      => $"All channels enabled    {showActiveChannels()}",
+			StatusMSG.SeekFwd                 => $"Seek +5 seconds",
+			StatusMSG.SeekBack                => $"Seek -5 seconds",
+			StatusMSG.SeekFwdFar              => $"Seek +30 seconds",
+			StatusMSG.SeekBackFar             => $"Seek -30 seconds",
+			StatusMSG.SeekPos                 => $"Seek to position {seekPosition}",
+			StatusMSG.SteppedCycles           => cyclesInSpcClocks ? 
+			                                           $"Stepped {stepCycles / 2} SPC cycle{(stepCycles / 2 == 1 ? "" : "s")}"
+			                                         : $"Stepped {stepCycles} DSP cycles",
+			StatusMSG.CycleDisplayChanged     => $"Cycle display mode changed: {(cyclesInSpcClocks ? "SPC700" : "S-DSP")}",
+			StatusMSG.Paused                  => $"Paused",
+			StatusMSG.BreakExec               => $"Execution break",
+			StatusMSG.BreakpointHit           => $"Execution breakpoint hit at ${execBreakpointAddr:X4}",
+			StatusMSG.BreakpointsOn           => $"All breakpoints enabled",
+			StatusMSG.BreakpointsOff          => $"All breakpoints disabled",
+			StatusMSG.Script700_Error         => $"Script700 error occurred",
+			StatusMSG.Continue                => $"Resuming playback",
 			
-			StatusMSG.ZoomIn                => $"Zoom level increased {showZoomPercentage()}",
-			StatusMSG.ZoomOut               => $"Zoom level decreased {showZoomPercentage()}",
+			StatusMSG.ZoomIn                  => $"Zoom level increased {showZoomPercentage()}",
+			StatusMSG.ZoomOut                 => $"Zoom level decreased {showZoomPercentage()}",
 			
-			StatusMSG.FineCharEnabled       => "Fine character display enabled",
-			StatusMSG.FineCharDisabled      => "Fine character display disabled",
+			StatusMSG.ExitSettingsMenu        => "Exit settings menu",
+			StatusMSG.LowpassSettingDesc      => "Sets whether or not to simulate the analog lowpass filter of the SNES DAC",
+			StatusMSG.ID666SettingDesc        => "Sets whether the song should fade out or play endlessly",
+			StatusMSG.CycleDisplaySettingDesc => "Sets the displayed cycles in units of S-DSP cycles (2 MHz) or SPC700 cycles (1 MHz)",
+			StatusMSG.HeatMapSettingDesc      => "Sets how the memory viewer heatmap should interpret data; native type, forced unsigned 8-bit, or disabled",
+			StatusMSG.HeatMapSizeSettingDesc  => "Configures how Script700 state parameters should be interpreted using the heatmap",
+			StatusMSG.ChannelSettingDesc      => "Enable or disable each S-DSP channel (press enter to toggle)",
+			StatusMSG.MainChannelSettingDesc  => "Enable or disable the main output component each S-DSP channel (press enter to toggle)",
+			StatusMSG.EchoChannelSettingDesc  => "Enable or disable the echo output component each S-DSP channel (press enter to toggle)",
 			
-			_                               => throw new NotImplementedException()
+			StatusMSG.FineCharEnabled         => "Fine character display enabled",
+			StatusMSG.FineCharDisabled        => "Fine character display disabled",
+			
+			_                                 => throw new NotImplementedException()
 		};
 	}
 	
@@ -1604,6 +1829,55 @@ public static partial class CliMain {
 		}
 		
 		return $"({percentStr}%) {suffix}";
+	}
+	
+	static void displaySettingDesc() {
+		switch (settingsRow) {
+			case 0: { // Save and exit
+				setStatusMsg(StatusMSG.ExitSettingsMenu, forceOverride: true);
+				break;
+			}
+				
+			case 1: { // SNES lowpass filter
+				setStatusMsg(StatusMSG.LowpassSettingDesc, forceOverride: true);
+				break;
+			}
+				
+			case 2: { // ID666 fadeout
+				setStatusMsg(StatusMSG.ID666SettingDesc, forceOverride: true);
+				break;
+			}
+				
+			case 3: { // Cycle display format
+				setStatusMsg(StatusMSG.CycleDisplaySettingDesc, forceOverride: true);
+				break;
+			}
+				
+			case 4: { // Heat map
+				setStatusMsg(StatusMSG.HeatMapSettingDesc, forceOverride: true);
+				break;
+			}
+				
+			case 5: { // Script700 heat map data size
+				setStatusMsg(StatusMSG.HeatMapSizeSettingDesc, forceOverride: true);
+				break;
+			}
+				
+			case 6: { // Channels
+				setStatusMsg(StatusMSG.ChannelSettingDesc, forceOverride: true);
+				break;
+			}
+				
+			case 7: { // Main channels
+				setStatusMsg(StatusMSG.MainChannelSettingDesc, forceOverride: true);
+				break;
+			}
+				
+			case 8: { // Main channels
+				setStatusMsg(StatusMSG.EchoChannelSettingDesc, forceOverride: true);
+				break;
+			}
+		}
 	}
 	
 	static string showActiveChannels() {

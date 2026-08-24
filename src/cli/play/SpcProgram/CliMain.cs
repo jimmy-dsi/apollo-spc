@@ -195,6 +195,7 @@ public static partial class CliMain {
 			KeyBindings.Register(KeyBindings.Key.Char('+'),  KeyBindings.Action.ZoomIn);
 			KeyBindings.Register(KeyBindings.Key.Char('='),  KeyBindings.Action.ZoomIn);
 			KeyBindings.Register(KeyBindings.Key.Char('-'),  KeyBindings.Action.ZoomOut);
+			KeyBindings.Register(KeyBindings.Key.Enter,      KeyBindings.Action.SettingsMenuSelect);
 			#if LINUX
 			#else
 				KeyBindings.Register(KeyBindings.Key.F11, KeyBindings.Action.WindowsCharSetting, ctrl: true);
