@@ -52,6 +52,7 @@ public static partial class CliMain {
 		Script700_Error, Continue,
 		
 		ZoomIn, ZoomOut,
+		EchoLeft, EchoRight, EchoBoth, EchoMixed,
 		
 		ExitSettingsMenu,
 		LowpassSettingDesc, ID666SettingDesc,
@@ -1350,6 +1351,7 @@ public static partial class CliMain {
 			case KeyBindings.Action.ContextKey_B: {
 				if (currentView == View.EchoViewer) {
 					currentEchoView = EchoView.All;
+					setTempStatusMsg(StatusMSG.EchoBoth);
 				}
 				break;
 			}
@@ -1357,6 +1359,7 @@ public static partial class CliMain {
 			case KeyBindings.Action.ContextKey_L: {
 				if (currentView == View.EchoViewer) {
 					currentEchoView = EchoView.LeftOnly;
+					setTempStatusMsg(StatusMSG.EchoLeft);
 				}
 				break;
 			}
@@ -1364,6 +1367,7 @@ public static partial class CliMain {
 			case KeyBindings.Action.ContextKey_M: {
 				if (currentView == View.EchoViewer) {
 					currentEchoView = EchoView.Mixed;
+					setTempStatusMsg(StatusMSG.EchoMixed);
 				}
 				break;
 			}
@@ -1371,6 +1375,7 @@ public static partial class CliMain {
 			case KeyBindings.Action.ContextKey_R: {
 				if (currentView == View.EchoViewer) {
 					currentEchoView = EchoView.RightOnly;
+					setTempStatusMsg(StatusMSG.EchoRight);
 				}
 				break;
 			}
@@ -1810,6 +1815,10 @@ public static partial class CliMain {
 			
 			StatusMSG.ZoomIn                  => $"Zoom level increased {showZoomPercentage()}",
 			StatusMSG.ZoomOut                 => $"Zoom level decreased {showZoomPercentage()}",
+			StatusMSG.EchoLeft                => "Viewing left echo channel",
+			StatusMSG.EchoRight               => "Viewing right echo channel",
+			StatusMSG.EchoBoth                => "Viewing left and right echo channels",
+			StatusMSG.EchoMixed               => "Viewing left and right echo channels, mixed",
 			
 			StatusMSG.ExitSettingsMenu        => "Exit settings menu",
 			StatusMSG.LowpassSettingDesc      => "Sets whether or not to simulate the analog lowpass filter of the SNES DAC",
