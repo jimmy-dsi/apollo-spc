@@ -1937,6 +1937,10 @@ public static partial class CliMain {
 	static void resetMenuBar() {
 		tempMenuBarMsg = null;
 		tempMsgTime    = null;
+		if (currentView != View.Help) {
+			defaultMsgOverride = null;
+			menuBarMsg = statusMsg(StatusMSG.Default);
+		}
 	}
 	
 	public enum BusSize {
