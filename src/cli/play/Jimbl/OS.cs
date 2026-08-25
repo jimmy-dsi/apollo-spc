@@ -5,16 +5,22 @@ using System.Runtime.InteropServices;
 public static class OS {
 	public enum Platform {
 		Windows,
-		Linux
+		Linux,
+		OSX,
 	}
 	
 	public const Platform Windows = Platform.Windows;
 	public const Platform Linux   = Platform.Linux;
+	public const Platform OSX     = Platform.OSX;
 	
 	static Platform curPlatform;
 	
 	public static Platform Get() {
 		return curPlatform;
+	}
+
+	public static bool IsPosix() {
+		return curPlatform != OS.Windows;
 	}
 	
 	static OS() {
@@ -23,6 +29,9 @@ public static class OS {
 		}
 		else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
 			curPlatform = Platform.Linux;
+		}
+		else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+			curPlatform = Platform.OSX;
 		}
 		else {
 			throw new Exception("OS not supported");

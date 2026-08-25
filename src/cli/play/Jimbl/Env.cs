@@ -36,7 +36,7 @@ public static class Env {
 				return parentTerminal;
 			}
 			
-			if (OS.Get() == OS.Linux) {
+			if (OS.IsPosix()) {
 				if (Var["KONSOLE_VERSION"] is not null && Shell.ExecGetStdout("which", "konsole").Trim() != "") {
 					parentTerminal = "konsole";
 					return parentTerminal;
@@ -74,7 +74,7 @@ public static class Env {
 	/// </summary>
 	public static (int, int) WindowSize {
 		get {
-			if (OS.Get() == OS.Linux) {
+			if (OS.IsPosix()) {
 				var size   = Shell.ExecGetStdout("stty", "size").Split();
 				var height = int.Parse(size[0]);
 				var width  = int.Parse(size[1]);
@@ -92,7 +92,7 @@ public static class Env {
 			if (OS.Get() == OS.Windows) {
 				return Var["PATH"]?.Split(';') ?? [];
 			}
-			else if (OS.Get() == OS.Linux) {
+			else if (OS.IsPosix()) {
 				return Var["PATH"]?.Split(':') ?? [];
 			}
 			else {
@@ -114,7 +114,7 @@ public static class Env {
 				return SPath.GetFullPath(p);
 			}
 		}
-		else if (OS.Get() == OS.Linux && command.Contains('/') && IsExecutable(command)) {
+		else if (OS.IsPosix() && command.Contains('/') && IsExecutable(command)) {
 			return SPath.GetFullPath(command);
 		}
 		
@@ -136,7 +136,7 @@ public static class Env {
 	}
 	
 	public static string? ExePath(string exePath) {
-		if (OS.Get() == OS.Linux) {
+		if (OS.IsPosix()) {
 			return exePath;
 		}
 		else if (OS.Get() == OS.Windows) {
@@ -159,7 +159,7 @@ public static class Env {
 			path = path.ToLower();
 			return path.EndsWith(".exe") || path.EndsWith(".cmd") || path.EndsWith(".bat") || path.EndsWith(".com");
 		}
-		else if (OS.Get() == OS.Linux) {
+		else if (OS.IsPosix()) {
 			var perms = Shell.ExecGetStdout("stat", "-c", "%A", path);
 			return perms.Length > 9 && perms[9] == 'x'
 			    || perms.Length > 6 && perms[6] == 'x'

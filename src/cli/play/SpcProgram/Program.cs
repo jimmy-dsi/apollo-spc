@@ -159,7 +159,8 @@ if (!autoResizeable && !forceNoResize) {
 			}
 		}
 		
-		case OS.Linux: {
+		case OS.Linux:
+		case OS.OSX: {
 			if (height >= HEIGHT && width >= WIDTH) {
 				forceNoResize = true;
 				break;
