@@ -19,9 +19,9 @@ execd zig build-lib -dynamic ./src/lib_api.zig -O ReleaseFast -target native-mac
 
 execd cp bin/apollo.dylib src/cli/play/Apollo/
 
-case "$(uname -p)" in
-  arm) RUNTIME=osx-arm64 ;;
-  x86_64) RUNTIME=osx-x64 ;;
+case "$(uname -m)" in
+  arm*) RUNTIME=osx-arm64 ;;
+  x86*) RUNTIME=osx-x64 ;;
   *) fail "unsupported architecture: $(uname -p)" ;;
 esac
 
