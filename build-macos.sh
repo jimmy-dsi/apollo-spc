@@ -5,6 +5,11 @@ execd() {
   "$@" || exit $?
 }
 
+fail() {
+  echo "$@" >&2
+  exit 1
+}
+
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 mkdir -p bin
 
@@ -14,8 +19,14 @@ execd zig build-lib -dynamic ./src/lib_api.zig -O ReleaseFast -target native-mac
 
 execd cp bin/apollo.dylib src/cli/play/Apollo/
 
+case "$(uname -p)" in
+  arm) RUNTIME=osx-arm64 ;;
+  x86_64) RUNTIME=osx-x64 ;;
+  *) fail "unsupported architecture: $(uname -p)" ;;
+esac
+
 execd dotnet publish src/cli/play/SpcProgram/SpcProgram.csproj \
-  -r osx-arm64 \
+  -r "$RUNTIME" \
   -p:PublishAot=true \
   -p:WarningLevel=0 \
   --output ./bin
