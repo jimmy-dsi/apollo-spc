@@ -71,7 +71,7 @@ public static class Shell {
 		if (OS.Get() == OS.Windows) {
 			fullCommand = $"{producerFullCommand} 2>CON | {consumerFullCommand}";
 		}
-		else if (OS.Get() == OS.Linux) {
+		else if (OS.IsPosix()) {
 			fullCommand = $"{producerFullCommand} | {consumerFullCommand}";
 		}
 		else {
@@ -129,7 +129,8 @@ public static class Shell {
 				                 .Replace("\"", "%")
 				                 .Replace("%",  "\"\"")}\"";
 			}
-			case OS.Linux: {
+			case OS.Linux:
+			case OS.OSX: {
 				// Assuming bash shell
 				return $"\"{value.Replace(@"\", @"\\")
 				                 .Replace("\"", "\\\"")
@@ -160,7 +161,7 @@ public static class Shell {
 					throw new CommandNotFoundError();
 				}
 			}
-			else if (OS.Get() == OS.Linux) {
+			else if (OS.IsPosix()) {
 				if (process.ExitCode is 127 or 126) { // Not found / not executable
 					throw new CommandNotFoundError();
 				}
@@ -196,7 +197,7 @@ public static class Shell {
 					throw new CommandNotFoundError();
 				}
 			}
-			else if (OS.Get() == OS.Linux) {
+			else if (OS.IsPosix()) {
 				if (process.ExitCode is 127 or 126) { // Not found / not executable
 					throw new CommandNotFoundError();
 				}
@@ -227,7 +228,7 @@ public static class Shell {
 					throw new CommandNotFoundError();
 				}
 			}
-			else if (OS.Get() == OS.Linux) {
+			else if (OS.IsPosix()) {
 				if (process.ExitCode is 127 or 126) { // Not found / not executable
 					throw new CommandNotFoundError();
 				}
@@ -274,7 +275,8 @@ public static class Shell {
 				}
 				break;
 			}
-			case OS.Linux: {
+			case OS.Linux:
+			case OS.OSX: {
 				psi = new() {
 					FileName               = "/bin/bash",
 					RedirectStandardInput  = redirectStandardInput,
