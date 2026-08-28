@@ -557,6 +557,7 @@ public static class Display {
 		}
 		
 		AnsiColor? prevColor = null;
+		bool prevModified = false;
 		
 		// Update color and char grids
 		for (var i = 0; i < framesSinceLastDisplay; i++) {
@@ -692,17 +693,56 @@ public static class Display {
 					}
 				}
 				
-				if (cl != prevColor) {
-					if (prevColor is not null) {
-						sb.Append("\x1B[0m");
+				if (cl != prevColor || prevModified || !CliMain.RGB24Enabled && ch is '█' or ' ') {
+					var ans = cl?.AnsiString;
+					
+					if (cl is not null
+					    && cl.SecondaryAnsiString is string sans
+					    && !CliMain.RGB24Enabled
+					    && (ch == '█' && cl.ForegroundRGB is not null || ch == ' ' && cl.BackgroundRGB is not null))
+					{
+						if (cl != prevColor && prevColor is not null) {
+							sb.Append("\x1B[0m");
+						}
+						
+						if (ch == '█' && cl.ForegroundRGB is not null) {
+							if      (cl.SecondaryBlendRatio >= 15 / 16.0) ch = ' ';
+							else if (cl.SecondaryBlendRatio >=  7 /  8.0) ch = '░';
+							else if (cl.SecondaryBlendRatio >=  4 /  8.0) ch = '▒';
+							else if (cl.SecondaryBlendRatio >=  1 /  8.0) ch = '▓';
+							
+							if (cl != prevColor || !prevModified) {
+								sb.Append(cl.FGAnsiString() + sans);
+							}
+						}
+						else if (ch == ' ' && cl.BackgroundRGB is not null) {
+							if      (cl.SecondaryBlendRatio >= 7 /  8.0) ch = '█';
+							else if (cl.SecondaryBlendRatio >= 4 /  8.0) ch = '▓';
+							else if (cl.SecondaryBlendRatio >= 1 /  8.0) ch = '▒';
+							else if (cl.SecondaryBlendRatio >= 1 / 16.0) ch = '░';
+							
+							if (cl != prevColor || !prevModified) {
+								sb.Append(cl.BGAnsiString() + sans);
+							}
+						}
+						
+						prevModified = true;
 					}
-					if (cl is not null) {
-						sb.Append(cl.AnsiString);
+					else if (cl != prevColor || prevModified) {
+						if (prevColor is not null) {
+							sb.Append("\x1B[0m");
+						}
+						if (cl is not null) {
+							sb.Append(ans);
+						}
+						
+						prevModified = false;
 					}
+					
 					prevColor = cl;
 				}
 				
-				sb.Append(isMultiBlended ? '▀' : ch);
+				sb.Append(isMultiBlended && (CliMain.RGB24Enabled || ch is not '█' and not '▓' and not '▒' and not '░' and not ' ') ? '▀' : ch);
 			}
 			
 			if (y < Height - 1) {

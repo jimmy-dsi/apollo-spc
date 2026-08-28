@@ -162,6 +162,7 @@ public static partial class CliMain {
 	
 	public static bool FadeoutsEnabled { get; set; } = true;
 	public static bool FineCharDisplay { get; set; } = false;
+	public static bool RGB24Enabled    { get; set; } = false;
 	
 	public static State UI_State {
 		get {

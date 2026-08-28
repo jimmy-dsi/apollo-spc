@@ -353,7 +353,12 @@ public static class Analysis {
 			if (loopLine is int LL) {
 				if (x >= LL) {
 					for (var y = 0; y < canvasHeight; y++) {
-						canvas[y][x] ??= (' ', new(eqInsideRGB, isBG: true));
+						if (cursorLine is int cl_ && cl_ == x) {
+							canvas[y][x] ??= (' ', new(eqInsideRGB, isBG: true));
+						}
+						else {
+							canvas[y][x] ??= ('▄', new(eqInsideRGB, eqInsideRGB));
+						}
 					
 						var cc = canvas[y][x]!.Value;
 						if (cc.Item2.IsFG) {
@@ -439,11 +444,11 @@ public static class Analysis {
 	                           int yMaxRem)
 	{
 		for (var y = yMax + 1; y < yZero; y++) {
-			canvas[y][x] = (' ', fgCol);
+			canvas[y][x] = ('▄', new(fgCol.BackgroundRGB!, fgCol.BackgroundRGB!));
 		}
 		
 		for (var y = yZero; y <= yMin - 1; y++) {
-			canvas[y][x] = (' ', fgCol);
+			canvas[y][x] = ('▄', new(fgCol.BackgroundRGB!, fgCol.BackgroundRGB!));
 		}
 			
 		var c = '▄';
@@ -451,7 +456,7 @@ public static class Analysis {
 		if (yMax <= yMin) {
 			if (yMaxRem == 0) {
 				if (yMax != yZero) {
-					canvas[yMax][x] = (' ', fgCol);
+					canvas[yMax][x] = ('▄', new(fgCol.BackgroundRGB!, fgCol.BackgroundRGB!));
 				}
 			}
 			else {

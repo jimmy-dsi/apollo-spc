@@ -326,6 +326,56 @@ public partial class Color {
 		};
 	}
 	
+	public double Distance(Color other) => Distance(other, BlendSpace);
+	
+	public double Distance(Color other, Space colorSpace) {
+		double x1, y1, z1, x2, y2, z2;
+		
+		switch (colorSpace) {
+			case Space.RGB: {
+				(x1, y1, z1) =       SRGB.Unwrap().AsTuple;
+				(x2, y2, z2) = other.SRGB.Unwrap().AsTuple;
+				break;
+			}
+			case Space.LRGB: {
+				(x1, y1, z1) =       LRGB.Unwrap().AsTuple;
+				(x2, y2, z2) = other.LRGB.Unwrap().AsTuple;
+				break;
+			}
+			case Space.HSV: {
+				(x1, y1, z1) =       HSV.Unwrap().AsTuple;
+				(x2, y2, z2) = other.HSV.Unwrap().AsTuple;
+				break;
+			}
+			case Space.HSL: {
+				(x1, y1, z1) =       HSL.Unwrap().AsTuple;
+				(x2, y2, z2) = other.HSL.Unwrap().AsTuple;
+				break;
+			}
+			case Space.XYZ: {
+				(x1, y1, z1) =       XYZ.Unwrap().AsTuple;
+				(x2, y2, z2) = other.XYZ.Unwrap().AsTuple;
+				break;
+			}
+			case Space.Lab: {
+				(x1, y1, z1) =       Lab.Unwrap().AsTuple;
+				(x2, y2, z2) = other.Lab.Unwrap().AsTuple;
+				x1 *= 1.8;
+				x2 *= 1.8;
+				break;
+			}
+			case Space.LCh: {
+				(x1, y1, z1) =       LCh.Unwrap().AsTuple;
+				(x2, y2, z2) = other.LCh.Unwrap().AsTuple;
+				break;
+			}
+			default: throw new NotSupportedException();
+		}
+		
+		var (dx, dy, dz) = (x1 - x2, y1 - y2, z1 - z2);
+		return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+	}
+	
 	public Color Filter(IEnumerable<Color> prevColors, IEnumerable<double> filter) => Filter(prevColors, filter, FilterSpace);
 	
 	public Color Filter(IEnumerable<Color> prevColors, IEnumerable<double> filter, Space colorSpace) {

@@ -1,5 +1,7 @@
 namespace Jimbl.Graphics;
 
+using Jimbl.JMath;
+
 public class AnsiColor {
 	public enum Code {
 		Black    =  0,       Red,       Green,       Yellow,       Blue,       Magenta,       Cyan,  Grey,
@@ -10,11 +12,97 @@ public class AnsiColor {
 	object? foregroundColor;
 	object? backgroundColor;
 	
+	public static bool RGB24Enabled { get; set; } = false;
+	
+	static int chan6val(byte chan256val) {
+		if (chan256val <= 47) return 0;
+		return Math.Clamp(JMath.Round((chan256val - 40) / 40.0), 1, 5);
+	}
+	
+	static Color col256ToRGB24(byte c) {
+		if (c is < 16) throw new NotSupportedException();
+		
+		if (c < 232) {
+			var r6 = (c - 16) / 36;
+			var g6 = (c - 16) % 36 / 6;
+			var b6 = (c - 16) % 6;
+		
+			var r = (byte) (r6 == 0 ? 0 : 95 + 40 * (r6 - 1));
+			var g = (byte) (g6 == 0 ? 0 : 95 + 40 * (g6 - 1));
+			var b = (byte) (b6 == 0 ? 0 : 95 + 40 * (b6 - 1));
+		
+			return new(r, g, b);
+		}
+		else {
+			var v = 8 + (c - 232) * 10;
+			
+			var r = (byte) v;
+			var g = (byte) v;
+			var b = (byte) v;
+			
+			return new(r, g, b);
+		}
+	}
+	
+	static ((double, byte), (double, byte)) col256vals(Color c) {
+		var (r, g, b) = c;
+		
+		List<(double, byte)> distances = [];
+		
+		if (r == g && g == b && r != 0) {
+			var bv = (byte) Math.Clamp(r > 8 ? (r - 4) / 10 + 232 : 232, 232, 255);
+			
+			distances.Add((0, bv));
+			for (var d = -1; d <= 1; d++) {
+				var byteVal = (byte) (bv + d);
+				if (byteVal is < 232 or > 255) continue;
+				
+				var col = col256ToRGB24(byteVal);
+				if (byteVal == bv) {
+					distances.Add((0, byteVal));
+				}
+				else {
+					distances.Add((c.Distance(col, Color.Space.RGB), byteVal));
+				}
+			}
+		}
+		else {
+			var (r6, g6, b6) = (chan6val(r), chan6val(g), chan6val(b));
+		
+			for (var dr = -1; dr <= 1; dr++) {
+				for (var dg = -1; dg <= 1; dg++) {
+					for (var db = -1; db <= 1; db++) {
+						var (cr6, cg6, cb6) = (r6 + dr, g6 + dg, b6 + db);
+						if (cr6 >= 6 || cg6 >= 6 || cb6 >= 6) continue;
+						if (cr6 <  0 || cg6 <  0 || cb6 <  0) continue;
+					
+						var byteVal = (byte) (16 + 36 * cr6 + 6 * cg6 + cb6);
+						var col     = col256ToRGB24(byteVal);
+					
+						if (dr == 0 && dg == 0 && db == 0) {
+							distances.Add((0, byteVal));
+						}
+						else {
+							distances.Add((c.Distance(col, Color.Space.RGB), byteVal));
+						}
+					}
+				}
+			}
+		}
+		
+		// Grab the 2 nearest colors by distance
+		var colors     = distances.OrderBy(d => d.Item1).Take(2).ToArray();
+		var trueColors = colors.Select(c => col256ToRGB24(c.Item2)).ToArray();
+		
+		return ((c.Distance(trueColors[0], Color.Space.RGB), colors[0].Item2),
+		        (c.Distance(trueColors[1], Color.Space.RGB), colors[1].Item2));
+	}
+	
+	public string? SecondaryAnsiString { get; private set; } = null;
+	public double? SecondaryBlendRatio { get; private set; } = null;
+	
 	public string AnsiString {
 		get {
-			var fgCode = (byte) (ForegroundANSI ?? Code.Invalid);
-			var bgCode = (byte) (BackgroundANSI ?? Code.Invalid);
-			
 			var str = "";
 			
 			if (IsBold) {
@@ -24,24 +112,72 @@ public class AnsiColor {
 				str += $"\x1B[22m";
 			}
 			
-			if (fgCode < 255) {
-				str += $"\x1B[{fgCode + 30}m";
-			}
-			else if (foregroundColor is Color c) {
-				var (r, g, b) = c;
-				str += $"\x1B[38;2;{r};{g};{b}m";
-			}
-			
-			if (bgCode < 255) {
-				str += $"\x1B[{bgCode + 40}m";
-			}
-			else if (backgroundColor is Color c) {
-				var (r, g, b) = c;
-				str += $"\x1B[48;2;{r};{g};{b}m";
-			}
-			
-			return str;
+			return str + FGAnsiString(omitBold: true) + BGAnsiString(omitBold: true);
 		}
+	}
+	
+	public string FGAnsiString(bool omitBold = false) {
+		var fgCode = (byte) (ForegroundANSI ?? Code.Invalid);
+		
+		var str = "";
+		
+		if (!omitBold) {
+			if (IsBold) {
+				str += $"\x1B[1m";
+			}
+			else {
+				str += $"\x1B[22m";
+			}
+		}
+			
+		if (fgCode < 255) {
+			str += $"\x1B[{fgCode + 30}m";
+		}
+		else if (foregroundColor is Color c) {
+			var (r, g, b) = c;
+				
+			if (RGB24Enabled) str += $"\x1B[38;2;{r};{g};{b}m";
+			else {
+				var (col1, col2) = col256vals(c);
+				str += $"\x1B[38;5;{col1.Item2}m";
+				SecondaryAnsiString  = $"\x1B[48;5;{col2.Item2}m";
+				SecondaryBlendRatio  = col1.Item1 / (col1.Item1 + col2.Item1);
+			}
+		}
+		
+		return str;
+	}
+	
+	public string BGAnsiString(bool omitBold = false) {
+		var bgCode = (byte) (BackgroundANSI ?? Code.Invalid);
+		
+		var str = "";
+		
+		if (!omitBold) {
+			if (IsBold) {
+				str += $"\x1B[1m";
+			}
+			else {
+				str += $"\x1B[22m";
+			}
+		}
+			
+		if (bgCode < 255) {
+			str += $"\x1B[{bgCode + 40}m";
+		}
+		else if (backgroundColor is Color c) {
+			var (r, g, b) = c;
+				
+			if (RGB24Enabled) str += $"\x1B[48;2;{r};{g};{b}m";
+			else {
+				var (col1, col2) = col256vals(c);
+				str += $"\x1B[48;5;{col1.Item2}m";
+				SecondaryAnsiString  = $"\x1B[38;5;{col2.Item2}m";
+				SecondaryBlendRatio  = col1.Item1 / (col1.Item1 + col2.Item1);
+			}
+		}
+		
+		return str;
 	}
 	
 	public bool IsRGB => foregroundColor is null or Color 
