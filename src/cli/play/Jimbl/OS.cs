@@ -13,6 +13,8 @@ public static class OS {
 	public const Platform Linux   = Platform.Linux;
 	public const Platform OSX     = Platform.OSX;
 	
+	public static Version Version => Environment.OSVersion.Version;
+	
 	static Platform curPlatform;
 	
 	public static Platform Get() {

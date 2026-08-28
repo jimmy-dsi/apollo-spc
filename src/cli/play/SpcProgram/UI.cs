@@ -2193,7 +2193,7 @@ public static partial class CliMain {
 					fgAnsi    = new(bgCol, eqInsideRGB);
 				}
 				
-				#if LINUX
+				#if LINUX || OSX
 					var linuxDisplay = true;
 				#else
 					var linuxDisplay = FineCharDisplay;

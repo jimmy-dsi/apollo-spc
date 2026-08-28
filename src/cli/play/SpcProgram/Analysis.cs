@@ -179,7 +179,7 @@ public static class Analysis {
 		AnsiColor shadowColor = new(Color.FromLCh(30, 30, 280) * (isMuted ? 0.5 : 1.0), isBG: true);
 		
 		int cellPrecision;
-		#if LINUX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
+		#if LINUX || OSX // By default, Windows terminal emulators do not seem to support unicode char display - make bars more coarse for those
 			cellPrecision = 8;
 		#else
 			cellPrecision = CliMain.FineCharDisplay ? 8 : 2; // But allow our hidden setting to enable it for the few 3rd party terminals that support it

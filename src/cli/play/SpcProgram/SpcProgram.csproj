@@ -27,5 +27,14 @@
     <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
         <DefineConstants>LINUX</DefineConstants>
     </PropertyGroup>
+    
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
+        <DefineConstants>OSX</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">
+        <DefineConstants>OSX</DefineConstants>
+        <DefineConstants>ARM</DefineConstants>
+    </PropertyGroup>
 
 </Project>
