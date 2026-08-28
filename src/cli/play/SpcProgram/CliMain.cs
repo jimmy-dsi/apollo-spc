@@ -213,6 +213,12 @@ public static partial class CliMain {
 			Console.Clear();
 			Console.CursorVisible = false;
 			
+			#if OSX
+				RGB24Enabled = OS.Version >= 25; // macOS terminal didn't get RGB support until macOS 26 (kernel version 25)
+			#else
+				RGB24Enabled = true;
+			#endif
+			
 			runAheadThread = new(RunAheadLoop);
 			runAheadThread.Start();
 			

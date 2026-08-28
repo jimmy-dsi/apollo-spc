@@ -544,6 +544,8 @@ public static class Display {
 	}
 	
 	public static string Flush() {
+		AnsiColor.RGB24Enabled = CliMain.RGB24Enabled;
+		
 		prevFrame = frame;
 		frame = Driver.Frame;
 		
