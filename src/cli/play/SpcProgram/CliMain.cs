@@ -69,7 +69,7 @@ public static partial class CliMain {
 
 	public static int Start(string[] args) {
 		try {
-			ConsoleWin32.EnableCmdAnsiCodes();
+			ConsoleOS.EnableCmdAnsiCodes();
 		}
 		catch (Exception) {
 			// Allow program to continue even if Win32 call fails
@@ -123,6 +123,7 @@ public static partial class CliMain {
 			seekBarSnapshot(0, RunAheadEmu);
 			
 			// Register Key Bindings
+			KeyBindings.Register(KeyBindings.Key.Char('C'),  KeyBindings.Action.Quit, ctrl: true); // Failsafe if Ctrl+C isn't handled by default
 			KeyBindings.Register(KeyBindings.Key.Escape,     KeyBindings.Action.ExitCurrentMenu);
 			KeyBindings.Register(KeyBindings.Key.Char('L'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
 			//KeyBindings.Register(KeyBindings.Key.Char('G'),  KeyBindings.Action.ToggleHelpMenu, ctrl: true);
@@ -222,7 +223,7 @@ public static partial class CliMain {
 			runAheadThread = new(RunAheadLoop);
 			runAheadThread.Start();
 			
-			Thread keyListener = new(KeyListener.Run);
+			Thread keyListener = new(InputListener.Run);
 			keyListener.Start();
 			
 			Driver.Setup(handleUI, initLPStatus);
@@ -244,6 +245,12 @@ public static partial class CliMain {
 				if (settingsLoaded) SaveSettings();
 			}
 			finally {
+				// Disable mouse tracking sequences
+				Console.Write("\x1b[?1006l");
+				Console.Write("\x1b[?1003l");
+				
+				ConsoleOS.RestoreInputMode();
+				
 				KillAllThreads = true; // Send signal to run-ahead thread to terminate
 				runAheadThread?.Join();
 				Lib.Deinit();

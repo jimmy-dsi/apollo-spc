@@ -186,6 +186,8 @@ public static class KeyBindings {
 		SettingsMenuSelect,
 		
 		WindowsCharSetting,
+		
+		Quit
 	}
 		
 	static Key?      lastCtrlKey    = null;
@@ -227,7 +229,7 @@ public static class KeyBindings {
 	}
 	
 	public static Action? GetAction() {
-		var keyInfo = KeyListener.GetKeyInfo();
+		var keyInfo = InputListener.GetKeyInfo();
 		if (keyInfo is null) return null;
 		
 		var ki = keyInfo.Value;

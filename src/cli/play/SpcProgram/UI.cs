@@ -291,7 +291,7 @@ public static partial class CliMain {
 		
 		if (state == State.NonFatalError) {
 			// Handle error menu controls
-			var keyInfo = KeyListener.GetKeyInfo();
+			var keyInfo = InputListener.GetKeyInfo();
 			if (keyInfo is not null) {
 				var ki = keyInfo.Value;
 				
@@ -1441,6 +1441,10 @@ public static partial class CliMain {
 					setTempStatusMsg(StatusMSG.FineCharDisabled);
 				}
 				break;
+			}
+			
+			case KeyBindings.Action.Quit: {
+				throw new EndAppException();
 			}
 		}
 	}

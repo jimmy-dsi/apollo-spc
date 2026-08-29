@@ -544,6 +544,9 @@ public static class Display {
 	}
 	
 	public static string Flush() {
+		// Test: show mouse position
+		var mouseInfo = InputListener.GetMouseInfo();
+		
 		AnsiColor.RGB24Enabled = CliMain.RGB24Enabled;
 		
 		prevFrame = frame;
@@ -616,6 +619,12 @@ public static class Display {
 			for (var x = 0; x < Width; x++) {
 				var ch =  CharAt(x, y);
 				var cl = ColorAt(x, y);
+				
+				// Mouse test code
+				if (x + 1 == mouseInfo?.X && y + 1 == mouseInfo?.Y) {
+					ch = '█';
+					cl = AnsiColor.White;
+				}
 				
 				var isMulti = cl is not null
 				           && cl.BackgroundRGB is not null && cl.ForegroundRGB is not null
