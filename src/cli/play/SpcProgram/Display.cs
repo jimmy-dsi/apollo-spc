@@ -621,9 +621,20 @@ public static class Display {
 				var cl = ColorAt(x, y);
 				
 				// Mouse test code
-				if (x + 1 == mouseInfo?.X && y + 1 == mouseInfo?.Y) {
+				if (x + 1 == InputListener.MouseX && y + 1 == InputListener.MouseY) {
 					ch = '█';
-					cl = AnsiColor.White;
+					if (InputListener.MouseButtonDown(MouseEventType.LeftClick)) {
+						cl = AnsiColor.BrightBlue;
+					}
+					else if (InputListener.MouseButtonDown(MouseEventType.RightClick)) {
+						cl = AnsiColor.BrightRed;
+					}
+					else if (InputListener.MouseButtonDown(MouseEventType.MiddleClick)) {
+						cl = AnsiColor.BrightGreen;
+					}
+					else {
+						cl = AnsiColor.White;
+					}
 				}
 				
 				var isMulti = cl is not null

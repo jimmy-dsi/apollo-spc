@@ -8,6 +8,28 @@ public static class InputListener {
 	static ConsoleKeyInfo? keyInfo   = null;
 	static MouseInfo?      mouseInfo = null;
 	
+	static Dictionary<MouseEventType, ButtonStatus> mouseState = new() {
+		[MouseEventType.LeftClick]       = ButtonStatus.Off,
+		[MouseEventType.MiddleClick]     = ButtonStatus.Off,
+		[MouseEventType.RightClick]      = ButtonStatus.Off,
+		[MouseEventType.ScrollWheelUp]   = ButtonStatus.Off,
+		[MouseEventType.ScrollWheelDown] = ButtonStatus.Off,
+	};
+	
+	static Dictionary<MouseEventType, ButtonStatus> mouseEffectiveState = new() {
+		[MouseEventType.LeftClick]       = ButtonStatus.Off,
+		[MouseEventType.MiddleClick]     = ButtonStatus.Off,
+		[MouseEventType.RightClick]      = ButtonStatus.Off,
+		[MouseEventType.ScrollWheelUp]   = ButtonStatus.Off,
+		[MouseEventType.ScrollWheelDown] = ButtonStatus.Off,
+	};
+	
+	public static int MouseX          { get; private set; } = -1;
+	public static int MouseY          { get; private set; } = -1;
+	
+	public static int LeftClickMouseX { get; private set; } = -1;
+	public static int LeftClickMouseY { get; private set; } = -1;
+	
 	public static void Run() {
 		// Enable Mouse Tracking
 		Console.Write("\x1B[?1003h");
@@ -83,10 +105,70 @@ public static class InputListener {
 			if (mouseInfo is null) return null;
 			
 			var info = mouseInfo.Value;
-			keyInfo = null;
+			mouseInfo = null;
+			
+			MouseX = info.X;
+			MouseY = info.Y;
+			
+			foreach (var item in mouseState) {
+				var effValue = mouseEffectiveState[item.Key];
+				
+				if (item.Key is MouseEventType.LeftClick or MouseEventType.MiddleClick or MouseEventType.RightClick) {
+					if (item.Value == ButtonStatus.On && effValue is ButtonStatus.Off or ButtonStatus.Released) { // Off -> On
+						effValue = ButtonStatus.Pressed;
+						
+						if (item.Key == MouseEventType.LeftClick) {
+							LeftClickMouseX = info.X;
+							LeftClickMouseY = info.Y;
+						}
+					}
+					else if (item.Value == ButtonStatus.On && effValue is ButtonStatus.Pressed or ButtonStatus.Held) { // On -> On
+						effValue = ButtonStatus.Held;
+					}
+					else if (item.Value == ButtonStatus.Off && effValue is ButtonStatus.Off or ButtonStatus.Released) { // Off -> Off
+						effValue = ButtonStatus.Off;
+						
+						if (item.Key == MouseEventType.LeftClick) {
+							LeftClickMouseX = -1;
+							LeftClickMouseY = -1;
+						}
+					}
+					else if (item.Value == ButtonStatus.Off && effValue is ButtonStatus.Pressed or ButtonStatus.Held) { // On -> Off
+						effValue = ButtonStatus.Released;
+					}
+				}
+				else {
+					if (item.Value == ButtonStatus.On && effValue is ButtonStatus.Off or ButtonStatus.Released) { // Off -> On
+						effValue = ButtonStatus.Pressed;
+					}
+					else if (item.Value == ButtonStatus.On && effValue == ButtonStatus.Pressed) { // On -> On
+						effValue = ButtonStatus.Released;
+					}
+					else if (item.Value == ButtonStatus.Off && effValue is ButtonStatus.Off or ButtonStatus.Released) { // Off -> Off
+						effValue = ButtonStatus.Off;
+					}
+					else if (item.Value == ButtonStatus.Off && effValue is ButtonStatus.Pressed) { // On -> Off
+						effValue = ButtonStatus.Released;
+					}
+				}
+				
+				mouseEffectiveState[item.Key] = effValue;
+			}
 			
 			return info;
 		}
+	}
+	
+	public static bool MouseButtonPressed(MouseEventType button) {
+		return mouseEffectiveState[button] == ButtonStatus.Pressed;
+	}
+	
+	public static bool MouseButtonDown(MouseEventType button) {
+		return mouseEffectiveState[button] is ButtonStatus.Pressed or ButtonStatus.Held;
+	}
+	
+	public static bool MouseButtonReleased(MouseEventType button) {
+		return mouseEffectiveState[button] == ButtonStatus.Released;
 	}
 	
 	// Modifiers
@@ -345,7 +427,7 @@ public static class InputListener {
 				var x      = int.Parse(parts[1]);
 				var y      = int.Parse(parts[2]);
 			
-				return new() {
+				MouseInfo info = new() {
 					X = x,
 					Y = y,
 					Released = isRelease,
@@ -358,6 +440,18 @@ public static class InputListener {
 						_  => MouseEventType.None
 					}
 				};
+				
+				// Monitor changes in mouse button states
+				if (info.EventType != MouseEventType.None) {
+					if (info.Released) {
+						mouseState[info.EventType] = ButtonStatus.Off;
+					}
+					else {
+						mouseState[info.EventType] = ButtonStatus.On;
+					}
+				}
+				
+				return info;
 			}
 		}
 		
@@ -371,6 +465,11 @@ public struct MouseInfo {
 	
 	public MouseEventType EventType { get; init; }
 	public bool Released { get; init; }
+}
+
+public enum ButtonStatus {
+	Off, On,
+	Pressed, Held, Released
 }
 
 public enum MouseEventType {
