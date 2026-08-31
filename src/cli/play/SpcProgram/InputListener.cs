@@ -102,13 +102,29 @@ public static class InputListener {
 	
 	public static MouseInfo? GetMouseInfo() {
 		lock (keyLock) {
-			if (mouseInfo is null) return null;
+			if (mouseInfo is null) {
+				foreach (var item in mouseEffectiveState) {
+					if (item.Value == ButtonStatus.Pressed) {
+						mouseEffectiveState[item.Key] = ButtonStatus.Held;
+					}
+					else if (item.Value == ButtonStatus.Released) {
+						mouseEffectiveState[item.Key] = ButtonStatus.Off;
+						
+						if (item.Key == MouseEventType.LeftClick) {
+							LeftClickMouseX = -1;
+							LeftClickMouseY = -1;
+						}
+					}
+				}
+				
+				return null;
+			}
 			
 			var info = mouseInfo.Value;
 			mouseInfo = null;
 			
-			MouseX = info.X;
-			MouseY = info.Y;
+			MouseX = info.X - 1;
+			MouseY = info.Y - 1;
 			
 			foreach (var item in mouseState) {
 				var effValue = mouseEffectiveState[item.Key];

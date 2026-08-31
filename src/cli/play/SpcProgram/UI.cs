@@ -111,6 +111,20 @@ public static partial class CliMain {
 	static View targetLoadView = View.Metadata;
 	static int asmViewerIndex = views.IndexOf(View.ASMViewer);
 	
+	static Dictionary<View, UIElement[]> layouts = new() { };
+	
+	static Dictionary<View, UIElement[]> Layouts {
+		get {
+			if (layouts.Count == 0) {
+				layouts = new() {
+					[View.BRRViewer] = BRRViewerUIElements
+				};
+			}
+			
+			return layouts;
+		}
+	}
+	
 	static bool initLPStatus = true;
 	
 	static bool[] mainChannelsEnabled = new [] {
@@ -289,6 +303,8 @@ public static partial class CliMain {
 		prevFrame = frame;
 		frame     = Driver.Frame;
 		
+		var mouseInfo = InputListener.GetMouseInfo();
+		
 		if (state == State.NonFatalError) {
 			// Handle error menu controls
 			var keyInfo = InputListener.GetKeyInfo();
@@ -420,7 +436,15 @@ public static partial class CliMain {
 			}
 			else {
 				displayInit = false;
-				action = KeyBindings.GetAction();
+				// Check action from mouse first
+				foreach (var element in UIElement.ActiveElements) {
+					action = element.TriggeredAction();
+					if (action is not null) break;
+				}
+				
+				if (action is null) {
+					action = KeyBindings.GetAction();
+				}
 			}
 		
 			var framesSinceLastDisplay = Math.Max(1, frame - prevFrame);
@@ -1720,6 +1744,21 @@ public static partial class CliMain {
 	static void commitCurrentView() {
 		currentView = nextView;
 		Display.Clear();
+		
+		foreach (var element in UIElement.ActiveElements) {
+			element.Active = false;
+		}
+		
+		if (Layouts.ContainsKey(currentView)) {
+			UIElement.ActiveElements = Layouts[currentView];
+			
+			foreach (var element in UIElement.ActiveElements) {
+				element.Active = true;
+			}
+		}
+		else {
+			UIElement.ActiveElements = [];
+		}
 	}
 	
 	static void setStatusMsg(StatusMSG msg, bool error = false, bool forceOverride = false) {

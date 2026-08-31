@@ -543,10 +543,10 @@ public static class Display {
 		}
 	}
 	
+	static Color blackHighlight   = new(0.12, 0.12, 0.20);
+	static Color blackHighlight_2 = new(0.16, 0.16, 0.25);
+	
 	public static string Flush() {
-		// Test: show mouse position
-		var mouseInfo = InputListener.GetMouseInfo();
-		
 		AnsiColor.RGB24Enabled = CliMain.RGB24Enabled;
 		
 		prevFrame = frame;
@@ -619,23 +619,6 @@ public static class Display {
 			for (var x = 0; x < Width; x++) {
 				var ch =  CharAt(x, y);
 				var cl = ColorAt(x, y);
-				
-				// Mouse test code
-				if (x + 1 == InputListener.MouseX && y + 1 == InputListener.MouseY) {
-					ch = '█';
-					if (InputListener.MouseButtonDown(MouseEventType.LeftClick)) {
-						cl = AnsiColor.BrightBlue;
-					}
-					else if (InputListener.MouseButtonDown(MouseEventType.RightClick)) {
-						cl = AnsiColor.BrightRed;
-					}
-					else if (InputListener.MouseButtonDown(MouseEventType.MiddleClick)) {
-						cl = AnsiColor.BrightGreen;
-					}
-					else {
-						cl = AnsiColor.White;
-					}
-				}
 				
 				var isMulti = cl is not null
 				           && cl.BackgroundRGB is not null && cl.ForegroundRGB is not null
@@ -712,6 +695,42 @@ public static class Display {
 								prevColorGrids[3][y][x]
 							);
 						}
+					}
+				}
+				
+				// Change bg color slightly for currently hovered elements, if applicable
+				foreach (var element in UIElement.ActiveElements) {
+					var depressed = element.IsDepressed();
+					
+					if (element.HighlightOnHover && element.Overlaps(x, y) && (element.OverlapsCursor() || depressed)) {
+						var highlight = depressed ? blackHighlight_2 : blackHighlight;
+						
+						if (cl is null) cl = new(highlight, isBG: true);
+						else {
+							var fg = cl.ForegroundRGB;
+							var bg = cl.BackgroundRGB;
+						
+							var fgAnsi = cl.ForegroundANSI;
+							var bgAnsi = cl.BackgroundANSI ?? AnsiColor.Code.Black;
+						
+							if (fg is not null) fg *= depressed ? 1.3 : 1.18;
+							if (bg is not null) bg *= depressed ? 1.3 : 1.18;
+						
+							if (fgAnsi is AnsiColor.Code.Black) {
+								fgAnsi = null;
+								fg     = highlight;
+							}
+							if (bg is null && bgAnsi is AnsiColor.Code.Black) {
+								bg = highlight;
+							}
+						
+							if      (fg is not null && bg is not null) cl = new(fg, bg);
+							else if (fg is not null && bg is     null) cl = new(fg, bgAnsi);
+							else if (fg is     null && bg is not null && fgAnsi is     null) cl = new(bg, isBG: true);
+							else if (fg is     null && bg is not null && fgAnsi is not null) cl = new(fgAnsi!.Value, bg);
+						}
+						
+						break;
 					}
 				}
 				

@@ -4,9 +4,20 @@ using Jimbl.Graphics;
 using Jimbl.JMath;
 
 using Apollo;
-using Jimbl;
 
 public static partial class CliMain {
+	public static UIElement[] BRRViewerUIElements = [
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_1,  0, 0, 33, 14),
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_2, 33, 0, 33, 14),
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_3, 66, 0, 33, 14),
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_4, 99, 0, 33, 14),
+		
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_5,  0, 17, 33, 14),
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_6, 33, 17, 33, 14),
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_7, 66, 17, 33, 14),
+		new(UIElement.Type.ClickableButton_1, KeyBindings.Action.ToggleChannel_8, 99, 17, 33, 14),
+	];
+	
 	static void showBRRViewer(EmuDataBuffer buffer) {
 		if (EQInsideColor is null) {
 			EQInsideColor = HeatMapColor(BusSize.Bit8, false, 1, 0);
