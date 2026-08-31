@@ -117,7 +117,11 @@ public static partial class CliMain {
 		get {
 			if (layouts.Count == 0) {
 				layouts = new() {
-					[View.BRRViewer] = BRRViewerUIElements
+					[View.Help]         = SettingsMenuUIElements,
+					[View.BRRViewer]    = BRRViewerUIElements,
+					[View.EchoViewer]   = EchoViewerUIElements,
+					[View.MemoryViewer] = MemoryViewerUIElements,
+					[View.ASMViewer]    = ASMViewerUIElements,
 				};
 			}
 			
@@ -172,7 +176,8 @@ public static partial class CliMain {
 		["Quit"],
 	];
 	
-	static int selectedItem = 0;
+	static int  selectedItem = 0;
+	static bool menuButtonTrigger = false;
 	
 	public static bool FadeoutsEnabled { get; set; } = true;
 	public static bool FineCharDisplay { get; set; } = false;
@@ -439,7 +444,10 @@ public static partial class CliMain {
 				// Check action from mouse first
 				foreach (var element in UIElement.ActiveElements) {
 					action = element.TriggeredAction();
-					if (action is not null) break;
+					if (action is not null) {
+						if (element.TriggerSignal) menuButtonTrigger = true;
+						break;
+					}
 				}
 				
 				if (action is null) {
@@ -1016,6 +1024,26 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.EnableLPF: {
+				if (currentView == View.Help && settingsRow != 1) {
+					settingsRow = 1;
+					displaySettingDesc();
+				}
+
+				setLPFStatus(true);
+				break;
+			}
+			
+			case KeyBindings.Action.DisableLPF: {
+				if (currentView == View.Help && settingsRow != 1) {
+					settingsRow = 1;
+					displaySettingDesc();
+				}
+
+				setLPFStatus(false);
+				break;
+			}
+			
 			case KeyBindings.Action.ScrollRowUp: {
 				if (currentView == View.MemoryViewer) {
 					if (StartAddr >= 0x10) {
@@ -1076,6 +1104,74 @@ public static partial class CliMain {
 					settingsRow += 1;
 					settingsRow %= settingsMenu.Length;
 					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.ScrollWheelUp: {
+				if (currentView == View.MemoryViewer) {
+					if (StartAddr >= 0x30) {
+						StartAddr -= 0x30;
+						requestEmuData(requests);
+					}
+					else if (StartAddr > 0) {
+						//scrollSignal = true;
+						StartAddr    = 0;
+						requestEmuData(requests);
+					}
+				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset + 3 <= getScrollTopOffset()) {
+						ScrollOffset += 3;
+					}
+					else {
+						ScrollOffset = getScrollTopOffset();
+					}
+				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					
+					echoScrollOffset -= 12;
+					if (echoScrollOffset < 0) {
+						echoScrollOffset = 0;
+					}
+					
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.ScrollWheelDown: {
+				if (currentView == View.MemoryViewer) {
+					if (StartAddr <= 0xFFD0 - ScrollAreaRows * 0x10) {
+						StartAddr += 0x30;
+					}
+					else if (StartAddr < 0x1_0000 - ScrollAreaRows * 0x10) {
+						StartAddr = 0x1_0000 - ScrollAreaRows * 0x10;
+					}
+					requestEmuData(requests);
+				}
+				else if (currentView == View.ASMViewer) {
+					if (ScrollOffset - 3 >= 0) {
+						ScrollOffset -= 3;
+					}
+					else {
+						ScrollOffset = 0;
+					}
+				}
+				else if (currentView == View.EchoViewer) {
+					var len = prevEchoOffsetEnd + 1 - prevEchoOffsetStart;
+					
+					echoScrollOffset += 12;
+					if (echoScrollOffset + len > echoBufferLength) {
+						echoScrollOffset = echoBufferLength - len;
+					}
+					
+					prevEchoOffsetStart = echoScrollOffset;
+					prevEchoOffsetEnd   = echoScrollOffset + len - 1;
 				}
 				
 				break;
@@ -1216,9 +1312,98 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.DisableHeatMap: {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.SMPViewer or View.Script700Viewer
+				                or View.Help)
+				{
+					if (currentView == View.Help && settingsRow != 4) {
+						settingsRow = 4;
+						displaySettingDesc();
+					}
+					
+					if (heatMapEnabled) {
+						heatMapEnabled = false;
+						heatMapMemMode = HeatMapMode.TypeAware;
+					
+						Display.Clear();
+					
+						setTempStatusMsg(StatusMSG.HeatMapOff);
+					}
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.SetHeatMapTyped: {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.SMPViewer or View.Script700Viewer
+				                or View.Help)
+				{
+					if (currentView == View.Help && settingsRow != 4) {
+						settingsRow = 4;
+						displaySettingDesc();
+					}
+					
+					if (!heatMapEnabled || heatMapMemMode == HeatMapMode.Unsigned) {
+						heatMapEnabled = true;
+						heatMapMemMode = HeatMapMode.TypeAware;
+					
+						Display.Clear();
+					
+						setTempStatusMsg(StatusMSG.HeatMapOn);
+					}
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.SetHeatMapUnsigned: {
+				if (currentView is View.MemoryViewer or View.DSPViewer1 or View.DSPViewer2 or View.DSPViewer3 or View.SMPViewer or View.Script700Viewer
+				                or View.Help)
+				{
+					if (currentView == View.Help && settingsRow != 4) {
+						settingsRow = 4;
+						displaySettingDesc();
+					}
+					
+					if (!heatMapEnabled || heatMapMemMode == HeatMapMode.TypeAware) {
+						heatMapEnabled = true;
+						heatMapMemMode = HeatMapMode.Unsigned;
+					
+						Display.Clear();
+					
+						setTempStatusMsg(StatusMSG.HeatMapOn);
+					}
+				}
+				break;
+			}
+			
 			case KeyBindings.Action.ToggleCycleUnit: {
 				cyclesInSpcClocks = !cyclesInSpcClocks;
 				setTempStatusMsg(StatusMSG.CycleDisplayChanged);
+				break;
+			}
+			
+			case KeyBindings.Action.SetDSPCycles: {
+				if (currentView == View.Help && settingsRow != 3) {
+					settingsRow = 3;
+					displaySettingDesc();
+				}
+				
+				if (cyclesInSpcClocks) {
+					cyclesInSpcClocks = false;
+					setTempStatusMsg(StatusMSG.CycleDisplayChanged);
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.SetSPCCycles: {
+				if (currentView == View.Help && settingsRow != 3) {
+					settingsRow = 3;
+					displaySettingDesc();
+				}
+
+				if (!cyclesInSpcClocks) {
+					cyclesInSpcClocks = true;
+					setTempStatusMsg(StatusMSG.CycleDisplayChanged);
+				}
 				break;
 			}
 			
@@ -1373,6 +1558,58 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.HeapMapSize8bit: {
+				if (currentView == View.Help && settingsRow != 5) {
+					settingsRow = 5;
+					displaySettingDesc();
+				}
+
+				if (heatMapDataSize != BusSize.Bit8) {
+					heatMapDataSize = BusSize.Bit8;
+					setTempStatusMsg(StatusMSG.BusSizeChanged);
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.HeapMapSize16bit: {
+				if (currentView == View.Help && settingsRow != 5) {
+					settingsRow = 5;
+					displaySettingDesc();
+				}
+
+				if (heatMapDataSize != BusSize.Bit16) {
+					heatMapDataSize = BusSize.Bit16;
+					setTempStatusMsg(StatusMSG.BusSizeChanged);
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.HeapMapSize32bit: {
+				if (currentView == View.Help && settingsRow != 5) {
+					settingsRow = 5;
+					displaySettingDesc();
+				}
+
+				if (heatMapDataSize != BusSize.Bit32) {
+					heatMapDataSize = BusSize.Bit32;
+					setTempStatusMsg(StatusMSG.BusSizeChanged);
+				}
+				break;
+			}
+			
+			case KeyBindings.Action.HeapMapSize64bit: {
+				if (currentView == View.Help && settingsRow != 5) {
+					settingsRow = 5;
+					displaySettingDesc();
+				}
+
+				if (heatMapDataSize != BusSize.Bit64) {
+					heatMapDataSize = BusSize.Bit64;
+					setTempStatusMsg(StatusMSG.BusSizeChanged);
+				}
+				break;
+			}
+			
 			case KeyBindings.Action.ContextKey_B: {
 				if (currentView == View.EchoViewer) {
 					currentEchoView = EchoView.All;
@@ -1455,6 +1692,98 @@ public static partial class CliMain {
 				break;
 			}
 			
+			case KeyBindings.Action.SettingsMenuSelect_1: {
+				if (currentView == View.Help && settingsRow != 1) {
+					settingsRow = 1;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.SettingsMenuSelect_2: {
+				if (currentView == View.Help && settingsRow != 2) {
+					settingsRow = 2;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.SettingsMenuSelect_3: {
+				if (currentView == View.Help && settingsRow != 3) {
+					settingsRow = 3;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.SettingsMenuSelect_4: {
+				if (currentView == View.Help && settingsRow != 4) {
+					settingsRow = 4;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.SettingsMenuSelect_5: {
+				if (currentView == View.Help && settingsRow != 5) {
+					settingsRow = 5;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.SettingsMenuSelect_6: {
+				if (currentView == View.Help && settingsRow != 6) {
+					settingsRow = 6;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.SettingsMenuSelect_7: {
+				if (currentView == View.Help && settingsRow != 7) {
+					settingsRow = 7;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.SettingsMenuSelect_8: {
+				if (currentView == View.Help && settingsRow != 8) {
+					settingsRow = 8;
+					displaySettingDesc();
+				}
+				
+				break;
+			}
+			
+			case KeyBindings.Action.EnableFadeouts: {
+				if (currentView == View.Help && settingsRow != 2) {
+					settingsRow = 2;
+					displaySettingDesc();
+				}
+
+				setFadeoutStatus(true);
+				break;
+			}
+			
+			case KeyBindings.Action.DisableFadeouts: {
+				if (currentView == View.Help && settingsRow != 2) {
+					settingsRow = 2;
+					displaySettingDesc();
+				}
+
+				setFadeoutStatus(false);
+				break;
+			}
+			
 			case KeyBindings.Action.WindowsCharSetting: {
 				if (!FineCharDisplay) {
 					FineCharDisplay = true;
@@ -1504,6 +1833,15 @@ public static partial class CliMain {
 	}
 	
 	static void toggleChannel(int channelIndex, bool updatePos = true) {
+		if (menuButtonTrigger) {
+			if (currentView == View.Help && settingsRow != 6) {
+				settingsRow = 6;
+				displaySettingDesc();
+			}
+			
+			menuButtonTrigger = false;
+		}
+		
 		var newOnState = PrimaryEmu.ToggleVoice(channelIndex);
 		
 		mainChannelsEnabled[channelIndex] = newOnState;
@@ -1513,21 +1851,30 @@ public static partial class CliMain {
 		
 		if (updatePos) {
 			lastChanChanged = channelIndex;
-			lastMainChanged = channelIndex;
-			lastEchoChanged = channelIndex;
+			//lastMainChanged = channelIndex;
+			//lastEchoChanged = channelIndex;
 		}
 		
 		setTempStatusMsg(newOnState ? StatusMSG.ChannelX_Enabled : StatusMSG.ChannelX_Disabled);
 	}
 	
 	static void toggleMainChannel(int channelIndex, bool updatePos = true) {
+		if (menuButtonTrigger) {
+			if (currentView == View.Help && settingsRow != 7) {
+				settingsRow = 7;
+				displaySettingDesc();
+			}
+			
+			menuButtonTrigger = false;
+		}
+
 		var newOnState = PrimaryEmu.ToggleMainVoice(channelIndex);
 		
 		mainChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
 		
 		if (updatePos) {
-			lastChanChanged = channelIndex;
+			//lastChanChanged = channelIndex;
 			lastMainChanged = channelIndex;
 		}
 		
@@ -1535,13 +1882,22 @@ public static partial class CliMain {
 	}
 	
 	static void toggleEchoChannel(int channelIndex, bool updatePos = true) {
+		if (menuButtonTrigger) {
+			if (currentView == View.Help && settingsRow != 8) {
+				settingsRow = 8;
+				displaySettingDesc();
+			}
+			
+			menuButtonTrigger = false;
+		}
+
 		var newOnState = PrimaryEmu.ToggleEchoVoice(channelIndex);
 		
 		echoChannelsEnabled[channelIndex] = newOnState;
 		channelToToggle = channelIndex + 1;
 		
 		if (updatePos) {
-			lastChanChanged = channelIndex;
+			//lastChanChanged = channelIndex;
 			lastEchoChanged = channelIndex;
 		}
 		
@@ -1561,6 +1917,11 @@ public static partial class CliMain {
 		}
 		
 		setTempStatusMsg(newLpfEnabled ? StatusMSG.LPF_Enabled : StatusMSG.LPF_Disabled);
+	}
+	
+	static void setLPFStatus(bool status) {
+		if (status == PrimaryEmu.LowpassEnabled) return;
+		toggleLPF();
 	}
 	
 	static void seek(int offsetInSeconds) {
@@ -1599,6 +1960,11 @@ public static partial class CliMain {
 				setTempStatusMsg(StatusMSG.FadesDisabled);
 			}
 		}
+	}
+	
+	static void setFadeoutStatus(bool status) {
+		if (FadeoutsEnabled == status) return;
+		toggleFadeouts();
 	}
 	
 	static void loadSnapshot(int targetSnapshotIndex) {

@@ -32,6 +32,12 @@ public static partial class CliMain {
 	static int prevEchoOffsetStart = 0;
 	static int prevEchoOffsetEnd   = 0;
 	
+	public static UIElement[] EchoViewerUIElements = [
+		new(UIElement.Type.ScrollableAreaH,
+		    KeyBindings.Action.ScrollWheelUp, KeyBindings.Action.ScrollWheelDown,
+		    2, 0, 128, Display.Height - 7, highlightOnHover: false),
+	];
+	
 	static void showEchoViewer(EmuDataBuffer buffer) {
 		Display.UseBlending = false;
 		var ds = buffer.DSP_DebugState!;

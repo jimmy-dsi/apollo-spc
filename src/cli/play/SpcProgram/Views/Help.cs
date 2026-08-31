@@ -18,12 +18,12 @@ public static partial class CliMain {
 		(" Cycle display format",         ["DSP", "SPC"],                          ["Ctrl+D to toggle"]),
 		(" Heat map",                     ["Typed", "Unsigned 8-bit", "Off"],      ["Ctrl+E+T to change"]),
 		(" Script700 heat map data size", ["8-bit", "16-bit", "32-bit", "64-bit"], ["Ctrl+Up / Ctrl+Down to change"]),
-		(" Channels enabled",             ["On", "On", "On", "On",
-		                                   "On", "On", "On", "On"], ["1-4 to toggle", "5-8 to toggle"]),
-		(" Main channels enabled",        ["On", "On", "On", "On",
-		                                   "On", "On", "On", "On"], ["Shift+1-4 to toggle", "Shift+5-8 to toggle"]),
-		(" Echo channels enabled",        ["On", "On", "On", "On",
-			                                "On", "On", "On", "On"], ["Ctrl+F1-F4 / F1-F4 to toggle", "Ctrl+F5-F8 to toggle"]),
+		(" Channels enabled",             [" On  ", " On  ", " On  ", " On  ",
+		                                   " On  ", " On  ", " On  ", " On  "], ["1-4 to toggle", "5-8 to toggle"]),
+		(" Main channels enabled",        [" On  ", " On  ", " On  ", " On  ",
+		                                   " On  ", " On  ", " On  ", " On  "], ["Shift+1-4 to toggle", "Shift+5-8 to toggle"]),
+		(" Echo channels enabled",        [" On  ", " On  ", " On  ", " On  ",
+			                                " On  ", " On  ", " On  ", " On  "], ["Ctrl+F1-F4 / F1-F4 to toggle", "Ctrl+F5-F8 to toggle"]),
 	];
 	
 	static (string, string)[] helpMenu = [
@@ -48,6 +48,65 @@ public static partial class CliMain {
 		("Scroll to start / end",          "Home / End"),
 		
 		("Close app",                      "Ctrl+C"),
+	];
+	
+	public static UIElement[] SettingsMenuUIElements = [
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ExitCurrentMenu,     null,  2,  1, 18, 1),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.EnableLPF,           null, 42,  3,  4, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.DisableLPF,          null, 50,  3,  5, 1),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.EnableFadeouts,      null, 42,  4,  4, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.DisableFadeouts,     null, 50,  4,  5, 1),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.SetDSPCycles,        null, 42,  5,  5, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.SetSPCCycles,        null, 50,  5,  5, 1),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.SetHeatMapTyped,     null, 42,  6,  7, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.SetHeatMapUnsigned,  null, 50,  6, 16, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.DisableHeatMap,      null, 66,  6,  5, 1),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.HeapMapSize8bit,     null, 42,  7,  7, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.HeapMapSize16bit,    null, 50,  7,  8, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.HeapMapSize32bit,    null, 58,  7,  8, 1),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.HeapMapSize64bit,    null, 66,  7,  8, 1),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_1,     null, 42,  9,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_2,     null, 50,  9,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_3,     null, 58,  9,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_4,     null, 66,  9,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_5,     null, 42, 10,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_6,     null, 50, 10,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_7,     null, 58, 10,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleChannel_8,     null, 66, 10,  7, 1, useCustomTrigger: true),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_1, null, 42, 12,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_2, null, 50, 12,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_3, null, 58, 12,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_4, null, 66, 12,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_5, null, 42, 13,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_6, null, 50, 13,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_7, null, 58, 13,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleMainChannel_8, null, 66, 13,  7, 1, useCustomTrigger: true),
+		
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_1, null, 42, 15,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_2, null, 50, 15,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_3, null, 58, 15,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_4, null, 66, 15,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_5, null, 42, 16,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_6, null, 50, 16,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_7, null, 58, 16,  7, 1, useCustomTrigger: true),
+		new(UIElement.Type.ClickableButton_3, KeyBindings.Action.ToggleEchoChannel_8, null, 66, 16,  7, 1, useCustomTrigger: true),
+		
+		// Select lines
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_1, null, 1,  3, Display.Width - 2, 1),
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_2, null, 1,  4, Display.Width - 2, 1),
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_3, null, 1,  5, Display.Width - 2, 1),
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_4, null, 1,  6, Display.Width - 2, 1),
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_5, null, 1,  7, Display.Width - 2, 1),
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_6, null, 1,  9, Display.Width - 2, 2),
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_7, null, 1, 12, Display.Width - 2, 2),
+		new(UIElement.Type.ClickableButton_2, KeyBindings.Action.SettingsMenuSelect_8, null, 1, 15, Display.Width - 2, 2),
 	];
 	
 	static void showSettingsMenu() {
@@ -138,15 +197,15 @@ public static partial class CliMain {
 			for (var i = 0; i < options.Length; i++) {
 				var option = options[i];
 				if (r == 6) {
-					if      (!mainChannelsEnabled[i] && !echoChannelsEnabled[i]) option = "Off";
-					else if ( mainChannelsEnabled[i] && !echoChannelsEnabled[i]) option = "On*";
-					else if (!mainChannelsEnabled[i] &&  echoChannelsEnabled[i]) option = "Off*";
+					if      (!mainChannelsEnabled[i] && !echoChannelsEnabled[i]) option = " Off ";
+					else if ( mainChannelsEnabled[i] && !echoChannelsEnabled[i]) option = " On* ";
+					else if (!mainChannelsEnabled[i] &&  echoChannelsEnabled[i]) option = " Off*";
 				}
 				else if (r == 7) {
-					if (!mainChannelsEnabled[i]) option = "Off";
+					if (!mainChannelsEnabled[i]) option = " Off ";
 				}
 				else if (r == 8) {
-					if (!echoChannelsEnabled[i]) option = "Off";
+					if (!echoChannelsEnabled[i]) option = " Off ";
 				}
 				
 				Display.Write(

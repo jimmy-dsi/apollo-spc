@@ -6,6 +6,12 @@ using Apollo;
 using Jimbl;
 
 public static partial class CliMain {
+	public static UIElement[] MemoryViewerUIElements = [
+		new(UIElement.Type.ScrollableArea,
+		    KeyBindings.Action.ScrollWheelUp, KeyBindings.Action.ScrollWheelDown,
+		    0, 0, 110, Display.Height - 4, highlightOnHover: false),
+	];
+	
 	public static UInt16     StartAddr = 0x0000;
 	public static UInt16 PrevStartAddr = 0x0000;
 	

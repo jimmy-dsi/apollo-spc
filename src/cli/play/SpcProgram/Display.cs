@@ -544,7 +544,8 @@ public static class Display {
 	}
 	
 	static Color blackHighlight   = new(0.12, 0.12, 0.20);
-	static Color blackHighlight_2 = new(0.16, 0.16, 0.25);
+	static Color blackHighlight_2 = new(0.19, 0.19, 0.29);
+	static Color blackHighlight_3 = new(0.26, 0.26, 0.39);
 	
 	public static string Flush() {
 		AnsiColor.RGB24Enabled = CliMain.RGB24Enabled;
@@ -703,7 +704,10 @@ public static class Display {
 					var depressed = element.IsDepressed();
 					
 					if (element.HighlightOnHover && element.Overlaps(x, y) && (element.OverlapsCursor() || depressed)) {
-						var highlight = depressed ? blackHighlight_2 : blackHighlight;
+						var highlight = element.UIType is UIElement.Type.ClickableButton_3 ?
+							(depressed ? blackHighlight_3 : blackHighlight_2)
+						:
+							(depressed ? blackHighlight_2 : blackHighlight);
 						
 						if (cl is null) cl = new(highlight, isBG: true);
 						else {
@@ -713,8 +717,14 @@ public static class Display {
 							var fgAnsi = cl.ForegroundANSI;
 							var bgAnsi = cl.BackgroundANSI ?? AnsiColor.Code.Black;
 						
-							if (fg is not null) fg *= depressed ? 1.3 : 1.18;
-							if (bg is not null) bg *= depressed ? 1.3 : 1.18;
+							if (element.UIType is UIElement.Type.ClickableButton_3) {
+								if (fg is not null) fg *= depressed ? 1.8 : 1.55;
+								if (bg is not null) bg *= depressed ? 1.8 : 1.55;
+							}
+							else {
+								if (fg is not null) fg *= depressed ? 1.3 : 1.116;
+								if (bg is not null) bg *= depressed ? 1.3 : 1.116;
+							}
 						
 							if (fgAnsi is AnsiColor.Code.Black) {
 								fgAnsi = null;

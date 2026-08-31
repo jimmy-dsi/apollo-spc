@@ -105,7 +105,13 @@ public static class InputListener {
 			if (mouseInfo is null) {
 				foreach (var item in mouseEffectiveState) {
 					if (item.Value == ButtonStatus.Pressed) {
-						mouseEffectiveState[item.Key] = ButtonStatus.Held;
+						if (item.Key is MouseEventType.ScrollWheelUp or MouseEventType.ScrollWheelDown) {
+							mouseEffectiveState[item.Key] = ButtonStatus.Released;
+							mouseState[item.Key]          = ButtonStatus.Off;
+						}
+						else {
+							mouseEffectiveState[item.Key] = ButtonStatus.Held;
+						}
 					}
 					else if (item.Value == ButtonStatus.Released) {
 						mouseEffectiveState[item.Key] = ButtonStatus.Off;
@@ -134,8 +140,8 @@ public static class InputListener {
 						effValue = ButtonStatus.Pressed;
 						
 						if (item.Key == MouseEventType.LeftClick) {
-							LeftClickMouseX = info.X;
-							LeftClickMouseY = info.Y;
+							LeftClickMouseX = info.X - 1;
+							LeftClickMouseY = info.Y - 1;
 						}
 					}
 					else if (item.Value == ButtonStatus.On && effValue is ButtonStatus.Pressed or ButtonStatus.Held) { // On -> On
@@ -158,13 +164,16 @@ public static class InputListener {
 						effValue = ButtonStatus.Pressed;
 					}
 					else if (item.Value == ButtonStatus.On && effValue == ButtonStatus.Pressed) { // On -> On
-						effValue = ButtonStatus.Released;
+						effValue             = ButtonStatus.Released;
+						mouseState[item.Key] = ButtonStatus.Off;
 					}
 					else if (item.Value == ButtonStatus.Off && effValue is ButtonStatus.Off or ButtonStatus.Released) { // Off -> Off
-						effValue = ButtonStatus.Off;
+						effValue             = ButtonStatus.Off;
+						mouseState[item.Key] = ButtonStatus.Off;
 					}
 					else if (item.Value == ButtonStatus.Off && effValue is ButtonStatus.Pressed) { // On -> Off
-						effValue = ButtonStatus.Released;
+						effValue             = ButtonStatus.Released;
+						mouseState[item.Key] = ButtonStatus.Off;
 					}
 				}
 				

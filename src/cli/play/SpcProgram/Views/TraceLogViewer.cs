@@ -24,6 +24,12 @@ public static partial class CliMain {
 	static long lastEmuInstrStep  = 0;
 	static long lastEmuInstrCycle = -1;
 	
+	public static UIElement[] ASMViewerUIElements = [
+		new(UIElement.Type.ScrollableArea,
+		    KeyBindings.Action.ScrollWheelUp, KeyBindings.Action.ScrollWheelDown,
+		    0, 0, Display.Width, Display.Height - 4, highlightOnHover: false),
+	];
+	
 	static void showTraceLogger(EmuDataBuffer buffer, EmuDataBuffer[]? prevBuffers = null, int recurseLevel = 1) {
 		Display.UseBufferBlending = false;
 		
